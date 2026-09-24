@@ -135,6 +135,7 @@ Settings you may want to review for a public deployment:
 | Setting | Why |
 |---|---|
 | `DEFAULT_DOWNLOAD_MODE` | **Use `auto` for a public site.** It streams files that already play on phones (plain H.264 MP4) and prepares a compatible MP4 on the server for the rest (live merges, WebM, VP9/AV1/HEVC, HLS). `stream` never falls back, so those formats return an error. Clients can always choose with `?mode=` |
+| `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional Cloudflare bot check in front of fetch, stream and download. Set up in [Cloudflare Turnstile](#cloudflare-turnstile-optional) below. Off by default |
 | `INSTAGRAM_COOKIES_PATH` | Optional. Instagram often blocks datacenter IPs; a `cookies.txt` from a logged-in browser lets yt-dlp through. Without it the backup provider is used |
 | `YOUTUBE_FALLBACK_ENABLED` | Leave `true`: if YouTube blocks the server's IP, a fallback provider serves the request |
 | `REVALIDATE_AFTER_SECONDS` | How often stored media is re-checked for deletion (default 7 days) |
@@ -265,6 +266,14 @@ Adds a bot check in front of fetching and downloading. It is free and needs no v
 To test locally without a Cloudflare account use Cloudflare's dummy keys (they only work on localhost): site key
 `1x00000000000000000000AA` and secret `1x0000000000000000000000000000000AA` always pass; `2x00000000000000000000AB` and
 `2x0000000000000000000000000000000AA` always fail.
+
+Deployment notes for Turnstile:
+
+- Keep the frontend and `/api` on the **same domain** (the pass is an HttpOnly cookie and downloads are plain browser navigations that carry it). Nginx must pass `/api/v1/config` and `/api/v1/turnstile/verify` like every other `/api/` route, which the sample config in this guide already does.
+- Add your production domain to the widget's hostname list in Cloudflare (and `localhost` if you test locally with real keys).
+- The server needs outbound HTTPS to `challenges.cloudflare.com`. Behind a firewall that blocks outbound traffic, allow it.
+- Put the secret key only in the server's `.env` (never in git, the frontend or chat). If it leaks, rotate it in Cloudflare and restart with `pm2 restart <name> --update-env`.
+- Viewing stored pages (`/youtube/<id>`), the platform list and health checks stay open, so search engines can still read your pages.
 
 If a visitor sees "security check" errors: check the hostname is added to the widget in Cloudflare, that the secret is
 correct, and that the server can reach `challenges.cloudflare.com` (outbound HTTPS). The check fails closed by design.

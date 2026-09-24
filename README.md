@@ -168,6 +168,8 @@ GET    /api/v1/downloads/:id             stream the file once the job is ready
 DELETE /api/v1/downloads/:id             cancel + clean up temp files
 DELETE /api/v1/jobs/:id                  cancel a job
 GET    /api/v1/platforms                 list supported platforms + domains
+GET    /api/v1/config                    public settings (is Turnstile on, and its site key)
+POST   /api/v1/turnstile/verify          swap a solved Turnstile token for a pass cookie (only when Turnstile is on)
 GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpeg)
 ```
 
@@ -179,6 +181,14 @@ GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpe
 | It to work for every source in one request (**recommended**) | `GET /stream?mode=auto` |
 | A guaranteed H.264/AAC file | `GET /stream?mode=prepare` |
 | Server-side progress for a long file | `POST /download`, then poll `GET /jobs/:id` |
+
+### Optional bot check (Cloudflare Turnstile)
+
+Set `TURNSTILE_ENABLED=true` with a site key and secret key (see [.env.example](.env.example)) and fetching, streaming and
+downloading need a passed check. The official frontend handles it by itself and only shows the widget when Cloudflare needs a
+click. Details and setup: [docs/API.md](docs/API.md#cloudflare-turnstile-optional-bot-check) and
+[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md#cloudflare-turnstile-optional). If you build your own frontend, call
+`GET /config`, render the widget, then `POST /turnstile/verify` when the visitor first does something protected.
 
 ### Building a frontend
 
@@ -210,7 +220,7 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | `DEFAULT_DOWNLOAD_MODE` | `stream` | Default for `GET /stream` when a request has no `?mode=` |
 | `STREAM_MODE_ENABLED` | `true` | Turn `GET /stream` off entirely |
 | `REVALIDATE_AFTER_SECONDS` | `604800` (7 days) | How often each stored item is re-checked |
-| `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | `false` | Optional [Cloudflare Turnstile](docs/API.md#cloudflare-turnstile-optional-bot-check) bot check in front of fetch, stream and download |
+| `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_SESSION_SECONDS` | `false`, 1800 s | Optional [Cloudflare Turnstile](docs/API.md#cloudflare-turnstile-optional-bot-check) bot check in front of fetch, stream and download |
 | `YOUTUBE_FALLBACK_ENABLED` | `true` | Use a fallback provider when YouTube blocks the server |
 | `MAX_CONCURRENT_DOWNLOADS_GLOBAL` / `_PER_GUEST` | `10` / `1` | Concurrency limits |
 | `RATE_LIMIT_MAX_GUEST` / `RATE_LIMIT_MAX_DOWNLOAD` | `30` / `10` per minute | Rate limits |
