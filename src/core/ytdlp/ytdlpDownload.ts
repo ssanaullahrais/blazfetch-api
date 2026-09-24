@@ -6,6 +6,7 @@ import { logger } from '../../lib/logger';
 import { BlazfetchError } from '../../constants/errors';
 import { DownloadProgress } from '../adapters/types';
 import { classifyYtdlpFailure } from './ytdlpRunner';
+import { killProcessTree, processGroupOptions } from '../processTree';
 
 export interface YtdlpDownloadOptions {
   url: string;
@@ -76,27 +77,32 @@ async function runYtdlpDownload(options: YtdlpDownloadOptions, preferFfmpegHls: 
   ];
 
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(env.YTDLP_PATH, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(env.YTDLP_PATH, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], ...processGroupOptions });
 
     let stderr = '';
     let finalPath = '';
     let settled = false;
+    let stopReason: BlazfetchError | undefined;
 
-    const timer = setTimeout(() => {
-      if (settled) return;
-      child.kill('SIGKILL');
-      settled = true;
-      reject(new BlazfetchError('PROCESS_TIMEOUT', 'Download timed out.'));
-    }, timeoutMs);
-
-    const onAbort = () => {
-      if (settled) return;
-      child.kill('SIGKILL');
-      settled = true;
+    // Kill yt-dlp AND whatever it spawned (ffmpeg), and only report back once they are really gone so
+    // the caller's temp-file cleanup doesn't race a process that is still writing.
+    const stop = (reason: BlazfetchError): void => {
+      if (settled || stopReason) return;
+      stopReason = reason;
       clearTimeout(timer);
-      reject(new BlazfetchError('DOWNLOAD_FAILED', 'Download was cancelled.'));
+      killProcessTree(child);
+      setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(reason);
+      }, 3000).unref();
     };
-    signal.addEventListener('abort', onAbort, { once: true });
+
+    const timer = setTimeout(() => stop(new BlazfetchError('PROCESS_TIMEOUT', 'Download timed out.')), timeoutMs);
+
+    const onAbort = () => stop(new BlazfetchError('DOWNLOAD_FAILED', 'Request was cancelled.'));
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
 
     let stdoutBuffer = '';
     child.stdout.on('data', (chunk: Buffer) => {
@@ -137,7 +143,9 @@ async function runYtdlpDownload(options: YtdlpDownloadOptions, preferFfmpegHls: 
       settled = true;
       clearTimeout(timer);
       signal.removeEventListener('abort', onAbort);
-      if (code === 0 && finalPath) {
+      if (stopReason) {
+        reject(stopReason);
+      } else if (code === 0 && finalPath) {
         resolve(finalPath);
       } else {
         state.ffmpegFailed = /ffmpeg exited with code/.test(stderr);

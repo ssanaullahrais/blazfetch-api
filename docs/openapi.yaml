@@ -65,6 +65,45 @@ paths:
                 properties:
                   success: { type: boolean }
                   job: { $ref: '#/components/schemas/Job' }
+  /stream:
+    get:
+      summary: Direct stream. Pipes the media straight to the response with no temp file or job
+      description: >
+        Plain GET so a browser can start it by navigating to the URL. Failures before the first byte
+        return the normal JSON error envelope; after the first byte the connection is aborted.
+        Video-only formats are merged into fragmented MP4 without transcoding. Disabled when
+        STREAM_MODE_ENABLED=false (the route then returns 404).
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string }
+        - name: formatId
+          in: query
+          schema: { type: string, default: best }
+          description: A formatId from /fetch or /fetch/audio, or "best".
+        - name: kind
+          in: query
+          schema: { type: string, enum: [video, audio], default: video }
+        - name: filename
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Media bytes (chunked; Content-Length only when the exact size is known)
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+              description: attachment; filename="..."
+          content:
+            video/mp4: {}
+            audio/mp4: {}
+            audio/mpeg: {}
+            application/octet-stream: {}
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '5XX':
+          $ref: '#/components/responses/Error'
   /downloads/{id}:
     get:
       summary: Stream the resolved media for a ready/completed job

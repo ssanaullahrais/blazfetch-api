@@ -29,7 +29,7 @@ const BEST_SENTINEL = 'best';
 /** `formatId: "best"` (or omitted) resolves to the highest-quality option automatically —
  *  highest resolution for video, highest bitrate for audio/MP3 — so callers don't need to
  *  enumerate formats first just to get the default top-quality download. */
-async function resolveFormat(url: string, requestId: string, format: RequestedFormat): Promise<RequestedFormat> {
+export async function resolveFormat(url: string, requestId: string, format: RequestedFormat): Promise<RequestedFormat> {
   if (format.formatId && format.formatId.toLowerCase() !== BEST_SENTINEL) {
     return format;
   }
@@ -122,7 +122,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string): Promise
     await finalizeSuccess(job, result, startedAt);
     return { ...result, job: await refreshJob(job.id) };
   } catch (err) {
-    await finalizeFailure(job, err, startedAt);
+    await finalizeFailure(job, err, startedAt, signal.aborted);
     throw err;
   } finally {
     releaseUserSlot();
@@ -234,9 +234,9 @@ async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt
   });
 }
 
-async function finalizeFailure(job: JobRecord, err: unknown, startedAt: number): Promise<void> {
+async function finalizeFailure(job: JobRecord, err: unknown, startedAt: number, cancelled: boolean): Promise<void> {
   const code = err instanceof BlazfetchError ? err.code : 'DOWNLOAD_FAILED';
-  const status = code === 'DOWNLOAD_FAILED' && err instanceof BlazfetchError && err.message === 'Request was cancelled.' ? 'cancelled' : 'failed';
+  const status = cancelled || (code === 'DOWNLOAD_FAILED' && err instanceof BlazfetchError && err.message === 'Request was cancelled.') ? 'cancelled' : 'failed';
   await updateJobStatus(job.id, status, { error_code: code, error_message: (err as Error).message });
   await recordDownloadStat({
     jobId: job.id,

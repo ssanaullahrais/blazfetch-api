@@ -3,7 +3,7 @@ import { logger } from './lib/logger';
 import { createApp } from './app';
 import { getDb } from './db';
 import { checkFfmpeg, checkFfprobe, checkYtdlp } from './lib/dependencyCheck';
-import { cleanupAbandonedTempDirs } from './core/jobs/tempFiles';
+import { cleanupAbandonedTempDirs, startTempSweeper, sweepTempDir } from './core/jobs/tempFiles';
 
 async function verifyStartupDependencies(): Promise<void> {
   const [database, ytdlp, ffmpeg, ffprobe] = await Promise.all([
@@ -31,6 +31,8 @@ async function verifyStartupDependencies(): Promise<void> {
 async function main(): Promise<void> {
   await verifyStartupDependencies();
   await cleanupAbandonedTempDirs();
+  await sweepTempDir();
+  const stopSweeper = startTempSweeper();
 
   const app = createApp();
   const server = app.listen(env.PORT, () => {
@@ -43,6 +45,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     logger.info({ signal }, 'shutting down');
 
+    stopSweeper();
     server.close(() => {
       logger.info('http server closed');
     });

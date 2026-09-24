@@ -40,8 +40,15 @@ export async function getDownloadStream(req: Request, res: Response): Promise<vo
   const job = await getJob(req.params.id);
 
   if (job.status === 'completed' && job.tempPath) {
-    await streamLocalFile(job.tempPath, job.filename ?? 'download', job.mimeType ?? 'application/octet-stream', res);
-    await cleanupJobTempDir(job.id);
+    if (!fs.existsSync(job.tempPath)) {
+      // The periodic sweep (or a restart) already removed the file: the job is over.
+      await updateJobStatus(job.id, 'expired');
+      throw new BlazfetchError('JOB_NOT_FOUND', 'This download has expired. Start a new one with POST /api/v1/download.');
+    }
+    const finished = await streamLocalFile(job.tempPath, job.filename ?? 'download', job.mimeType ?? 'application/octet-stream', res);
+    // Only delete once the whole file reached the client; if the client dropped mid-transfer the
+    // file stays so a retry still works, and the periodic sweep removes it later.
+    if (finished) await cleanupJobTempDir(job.id);
     return;
   }
 
@@ -60,16 +67,23 @@ export async function deleteDownload(req: Request, res: Response): Promise<void>
   res.json({ success: true, job: await getJob(job.id) });
 }
 
-async function streamLocalFile(filePath: string, filename: string, mimeType: string, res: Response): Promise<void> {
+/** Resolves true when the whole file was sent, false when the client disconnected first. */
+async function streamLocalFile(filePath: string, filename: string, mimeType: string, res: Response): Promise<boolean> {
   const stat = await fs.promises.stat(filePath);
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Content-Length', String(stat.size));
   res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/"/g, '')}"`);
   const stream = fs.createReadStream(filePath);
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<boolean>((resolve, reject) => {
     stream.pipe(res);
-    stream.on('end', resolve);
-    stream.on('error', reject);
+    stream.on('error', (err) => {
+      stream.destroy();
+      reject(err);
+    });
+    res.on('close', () => {
+      stream.destroy();
+      resolve(res.writableFinished);
+    });
   });
 }
 
@@ -90,15 +104,27 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
   res.setHeader('Content-Disposition', `attachment; filename="${(job.filename ?? 'download').replace(/"/g, '')}"`);
 
   let downloaded = 0;
+  let clientGone = false;
   const reader = upstream.body.getReader();
+  // Stop pulling from the source as soon as the client goes away instead of reading it to the end.
+  res.on('close', () => {
+    if (res.writableFinished) return;
+    clientGone = true;
+    void reader.cancel().catch(() => undefined);
+  });
   try {
     // Streams bytes through without ever buffering the full file on disk or in memory.
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       downloaded += value.byteLength;
+      if (clientGone) break;
       res.write(value);
       void updateJobProgress(job.id, downloaded, totalBytes, totalBytes ? (downloaded / totalBytes) * 100 : undefined);
+    }
+    if (clientGone) {
+      await updateJobStatus(job.id, 'cancelled', { downloaded_bytes: downloaded });
+      return;
     }
     res.end();
     await updateJobStatus(job.id, 'completed', { progress: 100, downloaded_bytes: downloaded });

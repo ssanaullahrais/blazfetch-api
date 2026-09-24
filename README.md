@@ -90,6 +90,7 @@ step-by-step "fetch → pick format → download → poll → stream" walkthroug
 POST   /api/v1/fetch            resolve metadata + formats (rangeStart/rangeEnd for Pinterest boards)
 POST   /api/v1/fetch/audio      resolve audio/MP3 options
 POST   /api/v1/download         start a download job (formatId defaults to "best")
+GET    /api/v1/stream           direct stream: bytes start immediately, no job, no temp file
 GET    /api/v1/downloads/:id    stream the resolved media once ready
 DELETE /api/v1/downloads/:id    cancel + clean up temp files
 GET    /api/v1/jobs/:id         poll job status/progress

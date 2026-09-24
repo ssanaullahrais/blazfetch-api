@@ -323,7 +323,17 @@ for polling.
 
 ## `DELETE /api/v1/downloads/:id`
 
-Cancels the job (terminating any in-flight yt-dlp/ffmpeg process) and removes its temp directory.
+Cancels the job (terminating any in-flight yt-dlp/ffmpeg process, including anything they
+spawned) and removes its temp directory. The job ends as `cancelled`.
+
+### Temp file cleanup (prepare mode)
+
+Files created by `POST /download` are removed as soon as the job is downloaded, fails, is cancelled,
+or expires. A file that was never downloaded is deleted by a periodic sweep: anything in `TEMP_DIR`
+older than `TEMP_SWEEP_MAX_AGE_MS` (default 1 hour) is removed every `TEMP_SWEEP_INTERVAL_MS`
+(default 10 minutes). If a client drops mid-download the file is kept so a retry works, and the
+sweep removes it later. Requesting a download whose file has been swept returns `404 JOB_NOT_FOUND`
+and marks the job `expired`.
 
 ---
 
@@ -419,6 +429,66 @@ Returns all 18 configured platforms (see "Platform status" above for which are v
 
 ---
 
+## `GET /api/v1/stream` (direct stream)
+
+The fast alternative to `POST /download`. The media is piped from the source straight to the HTTP
+response, so bytes start arriving as soon as the source produces them. There is **no job, no
+polling, no "Preparing…" wait and no file on the server's disk**. It is a plain `GET`, so a browser
+can start the download simply by navigating to the URL (the guest cookie is sent automatically).
+
+```
+GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename=<optional>
+```
+
+| Query param | Required | Description |
+|---|---|---|
+| `url` | yes | Any URL from a supported platform (URL-encode it) |
+| `formatId` | no (default `best`) | A `formatId` from `/fetch` or `/fetch/audio`, or `best` for the highest quality |
+| `kind` | no (default `video`) | `video` or `audio` |
+| `filename` | no | Suggested file name; the correct extension is added if missing |
+
+**Success `200`:** `Content-Disposition: attachment`, the right `Content-Type`, and chunked transfer
+(no `Content-Length`) unless the exact size is known (a single file passed through untouched).
+
+**Errors before the first byte** come back as the normal JSON envelope with the usual codes and
+HTTP status (`success:false`, `error:{code,message}`, `requestId`). **After** the first byte the only
+way to signal a problem is to abort the connection, so treat a connection that ends early as a
+failed download.
+
+### How the bytes are produced
+
+| Requested format | Pipeline |
+|---|---|
+| Plain single file (most muxed formats, standalone audio) | the file's bytes are passed through untouched (exact size, original container) |
+| Video-only format needing audio (e.g. YouTube 1080p+) | video + best AAC audio are merged by ffmpeg with `-c copy` into **fragmented MP4** (`-movflags frag_keyframe+empty_moov+default_base_moof`), because a normal MP4 cannot be written to a pipe |
+| HLS video | ffmpeg remux (`-c copy`, ADTS AAC converted) to fragmented MP4 |
+| MP3 (no standalone audio track) | `ffmpeg -vn -c:a libmp3lame -f mp3` |
+
+- **No H.264 transcode in stream mode.** Codecs are copied as-is (for example VP9 or AV1 + AAC in
+  MP4), which is what makes it fast. Modern browsers and players handle this, but if you need
+  guaranteed H.264/AAC output use `POST /download` (prepare mode), which transcodes when needed.
+- **When to fall back to prepare mode:** if the source cannot be streamed, the response is a normal
+  JSON error (for example `DOWNLOAD_FAILED` with a message pointing at `POST /api/v1/download`).
+  This happens for sources whose HLS playlists ffmpeg cannot read (Loom is one). A frontend should
+  retry those with `POST /download`.
+- For the quickest start call `POST /fetch` first: the stream reuses the URLs it resolved, so the
+  first byte typically arrives in 1 to 3 seconds. Without a prior fetch it has to resolve the media
+  first, which can add several seconds on sites like YouTube.
+
+### Limits and safety
+
+- Uses the same concurrency limits as jobs (`MAX_CONCURRENT_DOWNLOADS_GLOBAL`, per user/guest) and the
+  download rate limiter (`RATE_LIMIT_MAX_DOWNLOAD`); over the limit returns `SERVER_BUSY`.
+- Aborts at `MAX_DOWNLOAD_SIZE_BYTES` and at `DOWNLOAD_TOTAL_TIMEOUT_MS`.
+- If the client disconnects, every yt-dlp/ffmpeg process behind the stream is killed immediately and
+  the download slot is released.
+- URLs go through the same validation and SSRF checks as every other endpoint.
+- Every stream (finished, failed or disconnected) is recorded with `recordDownloadStat`.
+- Disable the endpoint with `STREAM_MODE_ENABLED=false`; the route then returns `404 NOT_FOUND`.
+  `POST /download` and the rest are unaffected.
+
+---
+
 ## `GET /health`
 
 ```json
@@ -467,6 +537,11 @@ Typical flow for "user pastes a URL, picks a quality, downloads":
    show `errorCode`/`errorMessage`).
 5. Navigate to (or `fetch()`) `GET /downloads/:id` to get the actual file — the browser can
    treat this as a normal download link since it sets `Content-Disposition: attachment`.
+
+**Faster alternative (direct stream):** skip steps 3 to 5 and navigate to
+`GET /stream?url=...&formatId=best&kind=video`. The download starts immediately with no job and no
+polling. Use `POST /download` only when you need H.264/AAC output guaranteed, progress from the
+server, or as the fallback when `/stream` reports the source can't be streamed.
 
 For a live progress bar while downloading, `job.progress` (0-100) and `job.downloadedBytes`/
 `totalBytes` from the `/jobs/:id` poll response are the numbers to drive it with.

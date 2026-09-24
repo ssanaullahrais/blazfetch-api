@@ -45,6 +45,12 @@ const envSchema = z.object({
   MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
   MAX_DOWNLOAD_SIZE_BYTES: z.coerce.number().default(2147483648),
   TEMP_DIR: z.string().default('./tmp'),
+  // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
+  // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).
+  STREAM_MODE_ENABLED: boolFromString(true),
+  // How old (ms) a file/folder in TEMP_DIR must be before the periodic sweep deletes it.
+  TEMP_SWEEP_MAX_AGE_MS: z.coerce.number().default(3600000),
+  TEMP_SWEEP_INTERVAL_MS: z.coerce.number().default(600000),
 
   CACHE_TTL_SECONDS: z.coerce.number().default(3600),
 
