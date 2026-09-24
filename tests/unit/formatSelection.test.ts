@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { pickBestAudioFormat, pickBestVideoFormat } from '../../src/core/adapters/formatSelection';
 import { BlazfetchAudioFormat, BlazfetchFormat } from '../../src/types/blazfetch';
 
+describe('pickBestVideoFormat: prefers phone-safe H.264 from 720p up', () => {
+  const f = (formatId: string, height: number, compatible: boolean, ext = 'mp4') => ({ formatId, ext, kind: 'video' as const, height, compatible });
+
+  it('picks 1080p H.264 over 4K VP9 so no slow re-encode is needed', () => {
+    expect(pickBestVideoFormat([f('vp9-4k', 2160, false), f('avc-1080', 1080, true), f('avc-360', 360, true)])?.formatId).toBe('avc-1080');
+  });
+
+  it('falls back to the sharpest format when H.264 only exists in low resolution', () => {
+    expect(pickBestVideoFormat([f('vp9-1080', 1080, false), f('avc-480', 480, true)])?.formatId).toBe('vp9-1080');
+  });
+});
+
 describe('pickBestVideoFormat', () => {
   it('picks the highest resolution, breaking ties on bitrate', () => {
     const formats: BlazfetchFormat[] = [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fallbackItemType } from '../../src/core/adapters/InstagramAdapter';
+import { fallbackItemKey, fallbackItemType } from '../../src/core/adapters/InstagramAdapter';
 
 const token = (payload: object): string => `https://d.rapidcdn.app/v2?token=h.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.s`;
 
@@ -13,5 +13,14 @@ describe('fallbackItemType', () => {
     expect(fallbackItemType('https://cdn.example/a.mp4?x=1')).toBe('video');
     expect(fallbackItemType('https://cdn.example/a.jpg')).toBe('image');
     expect(fallbackItemType('https://d.rapidcdn.app/v2?token=garbage')).toBe('image');
+  });
+});
+
+describe('fallbackItemKey', () => {
+  it('gives the same key to repeated entries for one photo', () => {
+    const a = token({ url: 'https://scontent.cdninstagram.com/v/a_n.jpg?x=1' });
+    const b = token({ url: 'https://scontent.cdninstagram.com/v/a_n.jpg?x=2', filename: 'other' });
+    expect(fallbackItemKey(a)).toBe(fallbackItemKey(b));
+    expect(fallbackItemKey(token({ url: 'https://scontent.cdninstagram.com/v/z_n.jpg' }))).not.toBe(fallbackItemKey(a));
   });
 });

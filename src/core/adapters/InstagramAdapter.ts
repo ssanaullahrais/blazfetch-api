@@ -24,6 +24,18 @@ const IMAGE_EXT = /\.(jpg|jpeg|png|webp|heic)(?:\?|$)/i;
  * Fallback providers (rapidcdn) hand out extensionless links such as `/v2?token=<jwt>` for both photos and videos.
  * The token's payload carries the real file name and source URL, so the type is read from there.
  */
+/** The real file behind a provider link (its token names it), so repeated entries for one photo can be dropped. */
+export function fallbackItemKey(url: string): string {
+  try {
+    const token = new URL(url).searchParams.get('token');
+    const payload = token ? (JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf-8')) as { url?: string }) : undefined;
+    if (payload?.url) return payload.url.split('?')[0];
+  } catch {
+    // not a tokenised link
+  }
+  return url;
+}
+
 export function fallbackItemType(url: string): 'image' | 'video' {
   try {
     const token = new URL(url).searchParams.get('token');
@@ -133,7 +145,14 @@ export class InstagramAdapter implements PlatformAdapter {
     fallbackUsed: string,
   ): BlazfetchResponse {
     // Fallback providers return junk (empty URLs) for unavailable posts; never report those as media.
-    const items = rawItems.filter((item) => /^https?:\/\//i.test(item.url ?? ''));
+    const seen = new Set<string>();
+    const items = rawItems.filter((item) => {
+      if (!/^https?:\/\//i.test(item.url ?? '')) return false;
+      const key = fallbackItemKey(item.url);
+      if (seen.has(key)) return false; // providers sometimes list the same photo several times
+      seen.add(key);
+      return true;
+    });
     if (items.length === 0) {
       throw new BlazfetchError('MEDIA_NOT_FOUND', 'No media could be extracted for this Instagram URL.');
     }
