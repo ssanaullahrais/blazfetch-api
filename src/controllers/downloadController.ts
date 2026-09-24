@@ -10,6 +10,8 @@ import { assertOwnership } from '../core/jobs/ownership';
 import { safeFetch } from '../utils/safeFetch';
 import { attachmentHeader } from '../utils/contentDisposition';
 import { BlazfetchError } from '../constants/errors';
+import { recordDownloadStat } from '../services/statsService';
+import type { JobRecord } from '../core/jobs/jobTypes';
 
 export const downloadBodySchema = z.object({
   url: z.string().min(1),
@@ -49,7 +51,8 @@ export async function getDownloadStream(req: Request, res: Response): Promise<vo
       await updateJobStatus(job.id, 'expired');
       throw new BlazfetchError('JOB_NOT_FOUND', 'This download has expired. Start a new one with POST /api/v1/download.');
     }
-    const finished = await streamLocalFile(job.tempPath, job.filename ?? 'download', job.mimeType ?? 'application/octet-stream', res);
+    const countBytes = trackDelivery(job, res);
+    const finished = await streamLocalFile(job.tempPath, job.filename ?? 'download', job.mimeType ?? 'application/octet-stream', res, countBytes);
     // Only delete once the whole file reached the client; if the client dropped mid-transfer the
     // file stays so a retry still works, and the periodic sweep removes it later.
     if (finished) await cleanupJobTempDir(job.id);
@@ -57,7 +60,7 @@ export async function getDownloadStream(req: Request, res: Response): Promise<vo
   }
 
   if ((job.status === 'ready' || job.status === 'streaming') && job.sourceUrl) {
-    await proxyRemoteFile(job, res);
+    await proxyRemoteFile(job, res, trackDelivery(job, res));
     return;
   }
 
@@ -73,12 +76,35 @@ export async function deleteDownload(req: Request, res: Response): Promise<void>
 }
 
 /** Resolves true when the whole file was sent, false when the client disconnected first. */
-async function streamLocalFile(filePath: string, filename: string, mimeType: string, res: Response): Promise<boolean> {
+function trackDelivery(job: JobRecord, res: Response): (size: number) => void {
+  let bytes = 0;
+  let recorded = false;
+  const startedAt = Date.now();
+  const record = (finished: boolean): void => {
+    if (recorded) return;
+    recorded = true;
+    const expected = Number(res.getHeader('Content-Length')) || undefined;
+    const success = finished && res.statusCode < 400 && bytes > 0 && (expected === undefined || bytes === expected);
+    void recordDownloadStat({
+      jobId: job.id, platform: job.platform, mediaId: job.mediaId ?? undefined,
+      format: job.requestedFormat.formatId, kind: job.requestedFormat.kind,
+      userId: job.userId, guestId: job.guestId, success, mode: 'prepare',
+      bytesTransferred: bytes, processingDurationMs: Date.now() - startedAt,
+      errorCode: success ? undefined : 'DOWNLOAD_FAILED',
+    }).catch((err) => logger.warn({ jobId: job.id, err: (err as Error).message }, 'failed to record delivery stat'));
+  };
+  res.once('finish', () => record(true));
+  res.once('close', () => record(res.writableFinished));
+  return (size) => { bytes += size; };
+}
+
+async function streamLocalFile(filePath: string, filename: string, mimeType: string, res: Response, countBytes: (size: number) => void): Promise<boolean> {
   const stat = await fs.promises.stat(filePath);
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Content-Length', String(stat.size));
   res.setHeader('Content-Disposition', attachmentHeader(filename));
   const stream = fs.createReadStream(filePath);
+  stream.on('data', (chunk) => countBytes(chunk.length));
   return new Promise<boolean>((resolve, reject) => {
     stream.pipe(res);
     stream.on('error', (err) => {
@@ -92,7 +118,7 @@ async function streamLocalFile(filePath: string, filename: string, mimeType: str
   });
 }
 
-async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Response): Promise<void> {
+async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Response, countBytes: (size: number) => void): Promise<void> {
   const sourceUrl = job.sourceUrl as string;
   await assertUrlIsSafeToFetch(sourceUrl);
   await updateJobStatus(job.id, 'streaming');
@@ -124,6 +150,7 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
       if (done) break;
       downloaded += value.byteLength;
       if (clientGone) break;
+      countBytes(value.byteLength);
       res.write(value);
       void updateJobProgress(job.id, downloaded, totalBytes, totalBytes ? (downloaded / totalBytes) * 100 : undefined);
     }

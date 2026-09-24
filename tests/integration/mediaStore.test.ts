@@ -115,6 +115,41 @@ beforeEach(async () => {
 });
 
 describe('media store: fetch', () => {
+  it('counts every concurrent public lookup once even when extraction is shared', async () => {
+    const before = await getDb().stats.totals();
+    sourceBehaviour = async () => { await settle(); return video('abc123'); };
+    const responses = await Promise.all([1, 2, 3].map(() => fetch(`http://127.0.0.1:${port}/api/v1/fetch`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: VIDEO_URL }),
+    })));
+    expect(responses.map((res) => res.status)).toEqual([200, 200, 200]);
+    expect(sourceCalls).toBe(1);
+    expect((await getDb().stats.totals()).fetches - before.fetches).toBe(3);
+  });
+
+  it('counts stale stored responses once, excludes their refresh and excludes audio lookups', async () => {
+    await fetchMedia({ ...params, url: VIDEO_URL, internal: true });
+    await setRow('abc123', { expires_at: inPast() });
+    const before = await getDb().stats.totals();
+    expect((await fetch(`http://127.0.0.1:${port}/api/v1/media/youtube/abc123`)).status).toBe(200);
+    await settle();
+    expect((await getDb().stats.totals()).fetches - before.fetches).toBe(1);
+    await fetch(`http://127.0.0.1:${port}/api/v1/fetch/audio`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: VIDEO_URL }),
+    });
+    await settle();
+    expect((await getDb().stats.totals()).fetches - before.fetches).toBe(1);
+  });
+
+  it('does not count a failed public lookup', async () => {
+    const before = await getDb().stats.totals();
+    sourceBehaviour = async () => notFound();
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/fetch`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: VIDEO_URL }),
+    });
+    expect(response.ok).toBe(false);
+    expect((await getDb().stats.totals()).fetches).toBe(before.fetches);
+  });
+
   it('extracts once, stores everything, then answers from the database', async () => {
     const first = await fetchMedia({ ...params, url: VIDEO_URL });
     expect(sourceCalls).toBe(1);

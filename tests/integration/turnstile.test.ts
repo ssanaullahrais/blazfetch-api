@@ -17,6 +17,9 @@ vi.mock('../../src/services/fetchService', () => ({
 
 import { createApp } from '../../src/app';
 import { SITEVERIFY_URL } from '../../src/services/turnstileService';
+import { env } from '../../src/config/env';
+
+vi.mock('../../src/services/statsService', () => ({ recordVisitorFetch: vi.fn(async () => undefined) }));
 
 let server: http.Server;
 let base: string;
@@ -37,7 +40,7 @@ afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-beforeEach(() => siteverify.mockReset());
+beforeEach(() => { siteverify.mockReset(); env.TURNSTILE_ALLOWED_HOSTNAMES = ''; env.TURNSTILE_EXPECTED_ACTION = ''; });
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 const cookieOf = (res: Response, name: string): string | undefined => res.headers.getSetCookie().find((c) => c.startsWith(`${name}=`))?.split(';')[0];
@@ -64,6 +67,8 @@ describe('Cloudflare Turnstile', () => {
     expect(await fetchRes.json()).toMatchObject({ error: { code: 'TURNSTILE_REQUIRED' } });
     expect((await realFetch(`${base}/stream?url=https://youtu.be/abc&kind=video`)).status).toBe(403);
     expect((await realFetch(`${base}/download`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'https://youtu.be/abc' }) })).status).toBe(403);
+    expect((await realFetch(`${base}/media/youtube/abc`)).status).toBe(403);
+    expect((await realFetch(`${base}/fetch/audio`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'https://youtu.be/abc' }) })).status).toBe(403);
   });
 
   it('lets the visitor through after a passed check, using the pass cookie', async () => {
@@ -94,6 +99,26 @@ describe('Cloudflare Turnstile', () => {
   it('fails closed when Cloudflare cannot be reached', async () => {
     siteverify.mockRejectedValueOnce(new Error('network down'));
     const res = await realFetch(`${base}/turnstile/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'x' }) });
+    expect(res.status).toBe(403);
+  });
+
+  it.each([null, { success: 'true' }, { success: true, hostname: 'wrong.example', action: 'download' }, { success: true, hostname: 'allowed.example', action: 'wrong' }])('rejects invalid Siteverify result %j', async (result) => {
+    env.TURNSTILE_ALLOWED_HOSTNAMES = 'allowed.example';
+    env.TURNSTILE_EXPECTED_ACTION = 'download';
+    siteverify.mockResolvedValueOnce(json(result));
+    const res = await realFetch(`${base}/turnstile/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test' }) });
+    expect(res.status).toBe(403);
+    expect(cookieOf(res, 'blazfetch_turnstile')).toBeUndefined();
+  });
+
+  it('rejects an unsuccessful HTTP response even if its JSON says success', async () => {
+    siteverify.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 503 }));
+    const res = await realFetch(`${base}/turnstile/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test' }) });
+    expect(res.status).toBe(403);
+  });
+
+  it('treats a malformed pass cookie as a missing pass', async () => {
+    const res = await realFetch(`${base}/media/youtube/abc`, { headers: { cookie: 'blazfetch_turnstile=%ZZ' } });
     expect(res.status).toBe(403);
   });
 });

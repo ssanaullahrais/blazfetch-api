@@ -76,6 +76,8 @@ export interface RunDownloadResult extends DownloadResult {
 export interface RunDownloadOptions {
   /** GET /stream?mode=auto fell back to preparing the file after direct streaming failed. */
   fellBack?: boolean;
+  /** GET /stream records the entire response outcome itself, including preparation failures. */
+  recordFailure?: boolean;
 }
 
 export async function runDownloadJob(job: JobRecord, requestId: string, options: RunDownloadOptions = {}): Promise<RunDownloadResult> {
@@ -88,7 +90,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
   const releaseGlobalSlot = await globalDownloadSemaphore.acquire();
 
   const startedAt = Date.now();
-  const ctx: StatContext = { fellBack: options.fellBack };
+  const ctx: StatContext = { fellBack: options.fellBack, recordFailure: options.recordFailure };
   await updateJobStatus(job.id, 'preparing');
 
   try {
@@ -226,6 +228,7 @@ async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, 
 interface StatContext {
   mediaKey?: string;
   fellBack?: boolean;
+  recordFailure?: boolean;
 }
 
 async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt: number, ctx: StatContext): Promise<void> {
@@ -236,28 +239,16 @@ async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt
     progress: result.directUrl ? 0 : 100,
     temp_path: result.filePath || null,
     source_url: result.directUrl ?? null,
+    media_id: ctx.mediaKey ?? null,
   });
-  await recordDownloadStat({
-    jobId: job.id,
-    platform: job.platform,
-    format: job.requestedFormat.formatId,
-    kind: job.requestedFormat.kind,
-    userId: job.userId,
-    guestId: job.guestId,
-    success: true,
-    mediaId: ctx.mediaKey,
-    mode: 'prepare',
-    fellBack: ctx.fellBack,
-    bytesTransferred: result.bytes,
-    processingDurationMs: Date.now() - startedAt,
-  });
+  // Preparation is not delivery. The response controller records success after all bytes are sent.
 }
 
 async function finalizeFailure(job: JobRecord, err: unknown, startedAt: number, cancelled: boolean, ctx: StatContext): Promise<void> {
   const code = err instanceof BlazfetchError ? err.code : 'DOWNLOAD_FAILED';
   const status = cancelled || (code === 'DOWNLOAD_FAILED' && err instanceof BlazfetchError && err.message === 'Request was cancelled.') ? 'cancelled' : 'failed';
   await updateJobStatus(job.id, status, { error_code: code, error_message: (err as Error).message });
-  await recordDownloadStat({
+  if (ctx.recordFailure !== false) await recordDownloadStat({
     jobId: job.id,
     platform: job.platform,
     format: job.requestedFormat.formatId,

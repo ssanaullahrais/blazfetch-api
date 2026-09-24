@@ -259,13 +259,13 @@ Adds a bot check in front of fetching and downloading. It is free and needs no v
    ```
    TURNSTILE_ENABLED=true
    TURNSTILE_SITE_KEY=<site key>
-   TURNSTILE_SECRET_KEY=<secret key>
+  TURNSTILE_SECRET_KEY=<secret key>
    ```
 
 4. `pm2 restart <name> --update-env`. The frontend reads the site key from the backend (`GET /api/v1/config`), so it needs
    no setting of its own. To turn the check off, set `TURNSTILE_ENABLED=false` and restart.
 
-To test locally without a Cloudflare account use Cloudflare's dummy keys (they only work on localhost): site key
+To test locally without a Cloudflare account use Cloudflare's dummy keys (never use them in production): site key
 `1x00000000000000000000AA` and secret `1x0000000000000000000000000000000AA` always pass; `2x00000000000000000000AB` and
 `2x0000000000000000000000000000000AA` always fail.
 
@@ -275,7 +275,7 @@ Deployment notes for Turnstile:
 - Add your production domain to the widget's hostname list in Cloudflare (and `localhost` if you test locally with real keys).
 - The server needs outbound HTTPS to `challenges.cloudflare.com`. Behind a firewall that blocks outbound traffic, allow it.
 - Put the secret key only in the server's `.env` (never in git, the frontend or chat). If it leaks, rotate it in Cloudflare and restart with `pm2 restart <name> --update-env`.
-- Viewing stored pages (`/youtube/<id>`), the platform list and health checks stay open, so search engines can still read your pages.
+  - Stored-media API requests also require a pass because they can trigger extraction. Configuration, aggregate stats, platform lists and health checks remain public.
 
 If a visitor sees "security check" errors: check the hostname is added to the widget in Cloudflare, that the secret is
 correct, and that the server can reach `challenges.cloudflare.com` (outbound HTTPS). The check fails closed by design.

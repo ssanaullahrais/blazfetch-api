@@ -54,7 +54,10 @@ const envSchema = z.object({
   TURNSTILE_SITE_KEY: z.string().optional().default(''),
   TURNSTILE_SECRET_KEY: z.string().optional().default(''),
   // How long a passed check keeps working before the visitor is asked again (seconds).
-  TURNSTILE_SESSION_SECONDS: z.coerce.number().default(1800),
+  TURNSTILE_SESSION_SECONDS: z.coerce.number().int().min(60).max(86400).default(1800),
+  // Optional extra Siteverify checks. Hostnames contain no scheme or port; action must match the widget.
+  TURNSTILE_ALLOWED_HOSTNAMES: z.string().default(''),
+  TURNSTILE_EXPECTED_ACTION: z.string().regex(/^[a-zA-Z0-9_-]{0,32}$/).default(''),
   // Optional: secret used to sign the pass cookie. Defaults to one derived from TURNSTILE_SECRET_KEY.
   TURNSTILE_COOKIE_SECRET: z.string().optional().default(''),
   // Delivery mode for GET /api/v1/stream when the request has no ?mode=: "stream" pipes straight through,

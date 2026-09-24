@@ -396,6 +396,8 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     expect(res.headers['content-length']).toBe('14');
     expect(res.headers['content-disposition']).toMatch(/^attachment; filename="Test Video.mp4"/);
     expect(await body(res)).toBe('prepared-bytes');
+    await waitFor(() => stats.length === 1);
+    expect(stats[0]).toMatchObject({ success: true, mode: 'prepare', bytesTransferred: 14 });
     expect(children).toHaveLength(0); // no direct-stream process was ever started
     await waitFor(() => fs.readdirSync(tempDir).length === 0);
   });
@@ -467,8 +469,11 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     const req = http.get({ port, path: `/api/v1/stream?url=${VIDEO}&formatId=18&mode=prepare`, headers: { cookie: 'blazfetch_guest_id=disconnect-prepare' }, agent: false });
     req.on('error', () => undefined);
     await waitFor(() => preparedJobs.length === 1);
+    expect(stats).toHaveLength(0); // preparing a file is not a completed download
     req.destroy(); // the browser cancelled while the server was still preparing
     await waitFor(() => cancelledJobs.length === 1);
+    expect(stats).toHaveLength(1);
+    expect(stats[0]).toMatchObject({ success: false });
     expect(cancelledJobs[0]).toBe(preparedJobs[0]);
     release(); // the fake runner now writes its file; the controller must delete it, nobody is listening
     await waitFor(() => fs.readdirSync(tempDir).length === 0);

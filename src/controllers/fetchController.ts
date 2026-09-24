@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { fetchMedia } from '../services/fetchService';
 import { fetchAudio } from '../services/audioService';
+import { recordVisitorFetch } from '../services/statsService';
 
 export const fetchBodySchema = z.object({
   url: z.string().min(1),
@@ -15,6 +16,7 @@ export const fetchBodySchema = z.object({
 export async function postFetch(req: Request, res: Response): Promise<void> {
   const { url, forceRefresh, rangeStart, rangeEnd } = req.body as z.infer<typeof fetchBodySchema>;
   const result = await fetchMedia({
+    internal: true,
     url,
     forceRefresh,
     range: rangeStart || rangeEnd ? { start: rangeStart, end: rangeEnd } : undefined,
@@ -22,6 +24,7 @@ export async function postFetch(req: Request, res: Response): Promise<void> {
     userId: req.userId,
     guestId: req.guestId,
   });
+  await recordVisitorFetch(result, { userId: req.userId, guestId: req.guestId });
   res.json(result);
 }
 

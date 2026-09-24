@@ -12,6 +12,7 @@ import { buildFilename, openProxy, openStream } from '../services/streamService'
 import { runDownloadJob, startDownloadJob } from '../services/downloadService';
 import { fetchMedia } from '../services/fetchService';
 import { recordDownloadStat } from '../services/statsService';
+import { mediaKeyForResponse } from '../core/media/mediaPath';
 
 export const DOWNLOAD_MODES = ['stream', 'prepare', 'auto'] as const;
 
@@ -77,7 +78,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   let mediaKeyForStat: string | undefined;
   let firstByteMs: number | undefined;
   let fellBack = false;
-  /** Set when the exact size is announced (Content-Length): a client may close right after the last byte. */
+  /** Expected response size, when known. */
   let expectedLength: number | undefined;
   let deliveredMode: 'stream' | 'prepare' = 'stream';
   let timer: NodeJS.Timeout | undefined;
@@ -138,16 +139,20 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     }, env.DOWNLOAD_TOTAL_TIMEOUT_MS);
   };
 
-  // Fires for both a finished response and a client that went away mid-download.
+  res.once('finish', () => {
+    const complete = res.statusCode < 400 && bytes > 0 && (expectedLength === undefined || bytes === expectedLength);
+    recordStat(complete, complete ? undefined : 'DOWNLOAD_FAILED');
+  });
+
+  // Source EOF alone does not prove the HTTP response finished sending to the client.
   res.on('close', () => {
-    // A client that knows the exact size (Content-Length) may hang up the moment it has the last byte,
-    // before we have finished ending the response. That is a completed download, not a disconnect.
-    const gotEverything = expectedLength !== undefined && bytes >= expectedLength;
-    if (!res.writableFinished && !gotEverything) {
+    const sentKnownLength = res.statusCode < 400 && expectedLength !== undefined && bytes === expectedLength;
+    if (!res.writableFinished && !sentKnownLength) {
       clientClosed = true;
       logger.info({ requestId: req.requestId, bytes, mode }, 'client disconnected, stopping processes');
       recordStat(false, 'CLIENT_DISCONNECTED');
-    } else if (gotEverything) {
+    } else if (sentKnownLength) {
+      // Some browsers close immediately after reading Content-Length, before upstream EOF.
       recordStat(true);
     }
     cleanup();
@@ -208,7 +213,6 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       cleanup();
       res.destroy();
     });
-    opened.stream.on('end', () => recordStat(true));
     opened.stream.pipe(res);
   };
 
@@ -224,7 +228,6 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     prepareJob = job;
     platformForStat = job.platform;
     deliveredMode = 'prepare';
-    statRecorded = true; // the job pipeline records its own download stat
     if (clientClosed) {
       await cancelJob(job.id).catch(() => undefined);
       return;
@@ -232,7 +235,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      result = await runDownloadJob(job, req.requestId, { fellBack });
+      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false });
     } finally {
       prepareFinished = true;
     }
@@ -242,10 +245,12 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     }
 
     const media = await fetchMedia({ url, requestId: req.requestId, internal: true }).catch(() => undefined);
+    mediaKeyForStat = result.job.mediaId ?? (media ? mediaKeyForResponse(media) : undefined);
     const ext = (result.filename.split('.').pop() ?? 'mp4').toLowerCase();
     const name = media ? buildFilename(filename, media, ext) : result.filename;
 
     armTimeout();
+    firstByteMs = Date.now() - startedAt;
     res.status(200);
     announceStart();
     res.setHeader('Content-Type', result.mimeType);
@@ -261,8 +266,11 @@ export async function getStream(req: Request, res: Response): Promise<void> {
         throw new BlazfetchError('FILE_TOO_LARGE', 'The file exceeds the maximum allowed download size.');
       }
       res.setHeader('Content-Length', String(stat.size));
+      expectedLength = stat.size;
       const file = fs.createReadStream(result.filePath);
+      file.on('data', (chunk) => { bytes += chunk.length; });
       file.on('error', (err) => {
+        recordStat(false, 'DOWNLOAD_FAILED');
         logger.warn({ requestId: req.requestId, err: err.message }, 'reading the prepared file failed');
         res.destroy();
       });
@@ -275,8 +283,13 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     if (result.directUrl) {
       const source = await openProxy(result.directUrl, abort.signal, req.requestId);
       killSource = source.kill;
-      if (source.contentLength) res.setHeader('Content-Length', String(source.contentLength));
+      if (source.contentLength) {
+        expectedLength = source.contentLength;
+        res.setHeader('Content-Length', String(source.contentLength));
+      }
+      source.stream.on('data', (chunk: Buffer) => { bytes += chunk.length; });
       source.stream.on('error', (err) => {
+        recordStat(false, 'DOWNLOAD_FAILED');
         logger.warn({ requestId: req.requestId, err: err.message }, 'proxying the prepared source failed');
         res.destroy();
       });
@@ -298,7 +311,6 @@ export async function getStream(req: Request, res: Response): Promise<void> {
           { requestId: req.requestId, code: (err as BlazfetchError).code, err: (err as Error).message },
           'direct stream failed before the first byte, falling back to prepare mode',
         );
-        statRecorded = true; // the prepare run records the outcome instead
         fellBack = true;
         stopStreamAttempt();
         abort = new AbortController(); // the stream attempt's signal is spent

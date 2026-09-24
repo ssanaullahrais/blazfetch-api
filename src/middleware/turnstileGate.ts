@@ -5,7 +5,9 @@ import { passIsValid, TURNSTILE_COOKIE, turnstileEnabled } from '../services/tur
 function cookieValue(req: Request, name: string): string | undefined {
   for (const part of (req.headers.cookie ?? '').split(';')) {
     const [key, ...rest] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(rest.join('='));
+    if (key === name) {
+      try { return decodeURIComponent(rest.join('=')); } catch { return undefined; }
+    }
   }
   return undefined;
 }
