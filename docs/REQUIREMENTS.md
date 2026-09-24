@@ -124,7 +124,8 @@ CORS_ALLOWED_ORIGINS=https://your-frontend.example
 ```
 
 `CORS_ALLOWED_ORIGINS` must list your real frontend origin(s) (comma separated). Never use `*` in
-production. The other limits (concurrency, timeouts, sizes) have sensible defaults: see
+production. If the frontend and `/api` share one domain (recommended), CORS is not used at all, so do not add
+`localhost` origins in production. The other limits (concurrency, timeouts, sizes) have sensible defaults: see
 [.env.example](../.env.example) and the [sizing](#server-sizing) table below.
 
 `.env` is already in `.gitignore`; never commit it.
@@ -133,7 +134,8 @@ Settings you may want to review for a public deployment:
 
 | Setting | Why |
 |---|---|
-| `DEFAULT_DOWNLOAD_MODE` | `stream` (default) is fastest; `auto` falls back to a server-prepared file when a source can't be streamed. Clients can always choose with `?mode=` |
+| `DEFAULT_DOWNLOAD_MODE` | **Use `auto` for a public site.** It streams files that already play on phones (plain H.264 MP4) and prepares a compatible MP4 on the server for the rest (live merges, WebM, VP9/AV1/HEVC, HLS). `stream` never falls back, so those formats return an error. Clients can always choose with `?mode=` |
+| `INSTAGRAM_COOKIES_PATH` | Optional. Instagram often blocks datacenter IPs; a `cookies.txt` from a logged-in browser lets yt-dlp through. Without it the backup provider is used |
 | `YOUTUBE_FALLBACK_ENABLED` | Leave `true`: if YouTube blocks the server's IP, a fallback provider serves the request |
 | `REVALIDATE_AFTER_SECONDS` | How often stored media is re-checked for deletion (default 7 days) |
 | `RATE_LIMIT_MAX_GUEST`, `RATE_LIMIT_MAX_DOWNLOAD`, `MAX_CONCURRENT_DOWNLOADS_*` | Protect the server's bandwidth and CPU |
@@ -154,6 +156,9 @@ Start PM2 from inside the project folder so the app finds its `.env`. Confirm it
 ```bash
 curl localhost:4000/health/ready
 ```
+
+`/health/ready` is public and returns only pass/fail flags (`database`, `ytdlp`, `ffmpeg`). Versions and the database
+type are not exposed; `npm run diagnostics` on the server shows them.
 
 ### 7. Put Nginx and HTTPS in front
 
@@ -249,7 +254,9 @@ before redeploying.
 | High traffic | 8+ | 16 GB+ | 80 GB+ SSD | Raise `MAX_CONCURRENT_DOWNLOADS_GLOBAL`; consider several app instances behind Nginx |
 
 ffmpeg transcoding (the H.264/AAC compatibility pass) is the most CPU-heavy operation, so size CPU
-around your expected number of simultaneous transcodes, not just request volume.
+around your expected number of simultaneous transcodes, not just request volume. With `DEFAULT_DOWNLOAD_MODE=auto`,
+high-quality YouTube downloads and other non-H.264 sources are prepared on the server, so plan CPU and `TEMP_DIR`
+space for them (a few GB free per concurrent download).
 
 ### Ports
 
@@ -295,4 +302,6 @@ sudo journalctl -u nginx -n 100
 | Browser shows a CORS error | Add your frontend's origin to `CORS_ALLOWED_ORIGINS` and restart with `pm2 restart blazfetch-backend`. |
 | 502 from Nginx | The app is not running: check `pm2 status` and the logs. |
 | YouTube fails with "Sign in to confirm you're not a bot" | YouTube temporarily blocked the server's IP. The fallback provider takes over automatically (check `fallbackUsed` in responses); the block usually clears in minutes to hours. Fewer repeated requests and the media store help. |
+| Downloaded video is black or cannot be shared on a phone (WhatsApp, gallery) | Update to the latest version and set `DEFAULT_DOWNLOAD_MODE=auto`: older versions streamed VP9/AV1, WebM and fragmented MP4 as-is, which phones cannot play. |
+| An Instagram link shows only a thumbnail or fails, but works locally | yt-dlp is blocked from the server's IP. Check with `yt-dlp -J "<link>"` on the server; add `INSTAGRAM_COOKIES_PATH` if it asks for a login. After fixing, use the app's Refresh button once on that link to replace the stored result. |
 | Downloads cut off partway | Nginx `proxy_read_timeout` too low, or `proxy_buffering` left on. |
