@@ -15,8 +15,9 @@ export interface FetchStatParams {
   /** A stored answer whose direct media URLs were past their trust window. */
   cacheStale?: boolean;
   kind?: 'video' | 'playlist';
-  /** 'user' for a request, 'revalidation' for the weekly existence check. */
-  source?: 'user' | 'revalidation';
+  /** 'user' for a request, 'revalidation' for the weekly existence check, 'internal' for a lookup made on the way to
+   *  a download (the visitor's own fetch was already counted). Only 'user' counts toward the public totals. */
+  source?: 'user' | 'revalidation' | 'internal';
 }
 
 export async function recordFetchStat(params: FetchStatParams): Promise<void> {

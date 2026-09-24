@@ -27,7 +27,9 @@ export async function postFetch(req: Request, res: Response): Promise<void> {
 
 export async function postFetchAudio(req: Request, res: Response): Promise<void> {
   const { url, forceRefresh } = req.body as z.infer<typeof fetchBodySchema>;
+  // The visitor's fetch was already counted by POST /fetch: the audio lookup is not a second one.
   const result = await fetchAudio({
+    internal: true,
     url,
     forceRefresh,
     requestId: req.requestId,
