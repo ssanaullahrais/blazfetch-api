@@ -1,0 +1,69 @@
+import { z } from 'zod';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const boolFromString = (defaultValue: boolean) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? defaultValue : v === 'true'));
+
+const envSchema = z.object({
+  APP_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().default(4000),
+  APP_URL: z.string().default('http://localhost:4000'),
+  LOG_LEVEL: z.string().default('info'),
+
+  DATABASE_URL: z.string(),
+  DATABASE_SSL: boolFromString(false),
+
+  YTDLP_PATH: z.string().default('yt-dlp'),
+  FFMPEG_PATH: z.string().default('ffmpeg'),
+  FFPROBE_PATH: z.string().default('ffprobe'),
+
+  FETCH_TIMEOUT_MS: z.coerce.number().default(25000),
+  REDIRECT_RESOLVE_TIMEOUT_MS: z.coerce.number().default(8000),
+  FALLBACK_TIMEOUT_MS: z.coerce.number().default(15000),
+  DOWNLOAD_START_TIMEOUT_MS: z.coerce.number().default(15000),
+  DOWNLOAD_TOTAL_TIMEOUT_MS: z.coerce.number().default(600000),
+  FFMPEG_TIMEOUT_MS: z.coerce.number().default(180000),
+  PROXY_STREAM_TIMEOUT_MS: z.coerce.number().default(600000),
+
+  MAX_CONCURRENT_DOWNLOADS_GLOBAL: z.coerce.number().default(10),
+  MAX_CONCURRENT_DOWNLOADS_PER_USER: z.coerce.number().default(2),
+  MAX_CONCURRENT_DOWNLOADS_PER_GUEST: z.coerce.number().default(1),
+  MAX_CONCURRENT_FETCHES_GLOBAL: z.coerce.number().default(20),
+
+  MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
+  MAX_DOWNLOAD_SIZE_BYTES: z.coerce.number().default(2147483648),
+  TEMP_DIR: z.string().default('./tmp'),
+
+  CACHE_TTL_SECONDS: z.coerce.number().default(3600),
+
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
+  RATE_LIMIT_MAX_GUEST: z.coerce.number().default(30),
+  RATE_LIMIT_MAX_USER: z.coerce.number().default(120),
+  RATE_LIMIT_MAX_DOWNLOAD: z.coerce.number().default(10),
+
+  INSTAGRAM_FALLBACK_MAX_RETRIES: z.coerce.number().default(3),
+  INSTAGRAM_FALLBACK_RETRY_DELAY_MS: z.coerce.number().default(1000),
+  CAKKATROK_MAX_ATTEMPTS: z.coerce.number().default(1),
+  CAKKATROK_API_BASE: z.string().optional().default(''),
+
+  CORS_ALLOWED_ORIGINS: z.string().default('*'),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+function loadEnv(): Env {
+  const parsed = envSchema.safeParse(process.env);
+  if (!parsed.success) {
+    // eslint-disable-next-line no-console
+    console.error('Invalid environment configuration:', parsed.error.flatten().fieldErrors);
+    process.exit(1);
+  }
+  return parsed.data;
+}
+
+export const env = loadEnv();

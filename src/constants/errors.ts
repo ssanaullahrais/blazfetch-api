@@ -1,0 +1,57 @@
+export const ErrorCode = {
+  UNSUPPORTED_PLATFORM: 'UNSUPPORTED_PLATFORM',
+  INVALID_URL: 'INVALID_URL',
+  MEDIA_NOT_FOUND: 'MEDIA_NOT_FOUND',
+  PRIVATE_MEDIA: 'PRIVATE_MEDIA',
+  LOGIN_REQUIRED: 'LOGIN_REQUIRED',
+  AGE_RESTRICTED: 'AGE_RESTRICTED',
+  GEO_RESTRICTED: 'GEO_RESTRICTED',
+  EXTRACTOR_FAILED: 'EXTRACTOR_FAILED',
+  PLATFORM_RATE_LIMITED: 'PLATFORM_RATE_LIMITED',
+  DOWNLOAD_FAILED: 'DOWNLOAD_FAILED',
+  FORMAT_UNAVAILABLE: 'FORMAT_UNAVAILABLE',
+  PROCESS_TIMEOUT: 'PROCESS_TIMEOUT',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  SERVER_BUSY: 'SERVER_BUSY',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  JOB_NOT_FOUND: 'JOB_NOT_FOUND',
+  NOT_FOUND: 'NOT_FOUND',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+const STATUS_BY_CODE: Record<ErrorCodeType, number> = {
+  UNSUPPORTED_PLATFORM: 422,
+  INVALID_URL: 400,
+  MEDIA_NOT_FOUND: 404,
+  PRIVATE_MEDIA: 403,
+  LOGIN_REQUIRED: 401,
+  AGE_RESTRICTED: 403,
+  GEO_RESTRICTED: 403,
+  EXTRACTOR_FAILED: 502,
+  PLATFORM_RATE_LIMITED: 429,
+  DOWNLOAD_FAILED: 502,
+  FORMAT_UNAVAILABLE: 404,
+  PROCESS_TIMEOUT: 504,
+  FILE_TOO_LARGE: 413,
+  SERVER_BUSY: 503,
+  VALIDATION_ERROR: 400,
+  JOB_NOT_FOUND: 404,
+  NOT_FOUND: 404,
+  INTERNAL_ERROR: 500,
+};
+
+export class BlazfetchError extends Error {
+  code: ErrorCodeType;
+  status: number;
+  details?: unknown;
+
+  constructor(code: ErrorCodeType, message: string, details?: unknown) {
+    super(message);
+    this.name = 'BlazfetchError';
+    this.code = code;
+    this.status = STATUS_BY_CODE[code];
+    this.details = details;
+  }
+}

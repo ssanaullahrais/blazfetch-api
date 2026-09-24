@@ -1,0 +1,219 @@
+openapi: 3.0.3
+info:
+  title: Blazfetch Backend API
+  version: 0.1.0
+  description: >
+    Resolves media metadata/formats and orchestrates downloads from supported social platforms.
+    See docs/API.md for full narrative documentation and examples.
+servers:
+  - url: /api/v1
+paths:
+  /fetch:
+    post:
+      summary: Resolve metadata and video/image formats for a URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchRequest'
+      responses:
+        '200':
+          description: Normalized media metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlazfetchResponse'
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '5XX':
+          $ref: '#/components/responses/Error'
+  /fetch/audio:
+    post:
+      summary: Resolve audio/MP3 options for a URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchRequest'
+      responses:
+        '200':
+          description: Audio format options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioFetchResponse'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /download:
+    post:
+      summary: Start a download job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  job: { $ref: '#/components/schemas/Job' }
+  /downloads/{id}:
+    get:
+      summary: Stream the resolved media for a ready/completed job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Media file stream
+          content:
+            application/octet-stream: {}
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      summary: Cancel a job and clean up its temp files
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job cancelled
+  /jobs/{id}:
+    get:
+      summary: Poll job status/progress
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  job: { $ref: '#/components/schemas/Job' }
+    delete:
+      summary: Cancel a job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job cancelled
+  /platforms:
+    get:
+      summary: List supported platforms and domains
+      responses:
+        '200':
+          description: Platform list
+components:
+  parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Error:
+      description: Normalized error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    FetchRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        forceRefresh: { type: boolean }
+    DownloadRequest:
+      type: object
+      required: [url, formatId, kind]
+      properties:
+        url: { type: string }
+        formatId: { type: string }
+        kind: { type: string, enum: [video, audio] }
+        quality: { type: string }
+    BlazfetchFormat:
+      type: object
+      properties:
+        formatId: { type: string }
+        ext: { type: string }
+        kind: { type: string, enum: [video, audio, video_only, audio_only] }
+        quality: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        fps: { type: number }
+        bitrate: { type: number }
+        codec: { type: string }
+        filesizeBytes: { type: integer }
+        filesizeApprox: { type: boolean }
+        url: { type: string }
+        requiresMerge: { type: boolean }
+        compatible: { type: boolean }
+    BlazfetchResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        platform: { type: string }
+        mediaType: { type: string, enum: [video, audio, image, carousel, playlist] }
+        mediaId: { type: string }
+        canonicalUrl: { type: string }
+        title: { type: string }
+        description: { type: string }
+        thumbnail: { type: string }
+        durationSeconds: { type: number, nullable: true }
+        formats:
+          type: array
+          items: { $ref: '#/components/schemas/BlazfetchFormat' }
+        audioFormats:
+          type: array
+          items:
+            type: object
+        metadata:
+          type: object
+        extractor: { type: string }
+    AudioFetchResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        platform: { type: string }
+        mediaId: { type: string }
+        canonicalUrl: { type: string }
+        audioFormats:
+          type: array
+          items:
+            type: object
+        requiresConversion: { type: boolean }
+    Job:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, preparing, ready, streaming, completed, failed, cancelled, expired] }
+        platform: { type: string }
+        canonicalUrl: { type: string }
+        progress: { type: integer }
+        downloadedBytes: { type: integer }
+        totalBytes: { type: integer, nullable: true }
+        filename: { type: string, nullable: true }
+        mimeType: { type: string, nullable: true }
+        errorCode: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+        requestId: { type: string }
