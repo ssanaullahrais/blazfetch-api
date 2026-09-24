@@ -16,7 +16,7 @@ guidance below all assume Linux.
 | Component  | Minimum version | Notes |
 |---|---|---|
 | Node.js    | 20.x LTS | `engines.node` in package.json enforces this |
-| PostgreSQL | 14 | earlier versions likely work but are untested |
+| Database (one of) | SQLite (bundled, nothing to install), PostgreSQL 14+, MySQL 8+ / MariaDB, MongoDB 6+ | choose during `npm run setup`; SQLite is the default |
 | yt-dlp     | latest (update regularly — see below) | installed separately from npm deps |
 | ffmpeg / ffprobe | 5.x+ | needed for merging, MP3 extraction, and output validation |
 | Nginx      | 1.18+ | reverse proxy in front of Node |
@@ -61,6 +61,20 @@ Or set `DATABASE_DRIVER` and `DATABASE_URL` in `.env` yourself and run `npm run 
 `mysql://user:pass@localhost:3306/blazfetch`, MongoDB `mongodb://localhost:27017/blazfetch`. SQLite
 needs only `DATABASE_DRIVER=sqlite` (optionally `DATABASE_SQLITE_PATH`), no URL.
 
+## Installing the app
+
+```bash
+git clone https://github.com/ssanaullahrais/blazfetch-social-downloader.git blazfetch-backend
+cd blazfetch-backend
+npm ci
+npm run setup         # pick your database, writes .env and creates the tables
+npm run diagnostics   # confirms the database, yt-dlp and ffmpeg are all reachable
+```
+
+`npm run setup` is interactive. On a server you can skip the prompts with flags, for example
+`npm run setup -- --driver=sqlite` or `npm run setup -- --driver=postgres --url=postgres://...`.
+Edit `.env` afterwards for production values (see below).
+
 ## Environment variables
 
 See [.env.example](../.env.example) for the full list with defaults. At minimum, production
@@ -68,6 +82,8 @@ deployments should set: `APP_ENV=production`, `DATABASE_DRIVER`, `DATABASE_URL` 
 (never `*` in production), and review the concurrency/timeout/size limits for your VPS specs.
 
 Never commit `.env` — it's already in `.gitignore`.
+
+With SQLite the database is a single file (`DATABASE_SQLITE_PATH`, default `./data/blazfetch.sqlite3`). Keep it on persistent disk, outside any directory that is wiped on deploy.
 
 ## Recommended VPS specifications
 
@@ -133,12 +149,17 @@ sudo certbot --nginx -d api.your-domain.example
 
 ```bash
 npm run build
+npm run migrate   # safe to re-run on every deploy; only creates tables that are missing
 pm2 start dist/index.js --name blazfetch-backend
 pm2 save
 pm2 startup   # follow the printed instructions to enable boot startup
 ```
 
-Logs: `pm2 logs blazfetch-backend`. Restart after deploy: `pm2 restart blazfetch-backend`.
+Logs: `pm2 logs blazfetch-backend`. Update and redeploy:
+
+```bash
+git pull && npm ci && npm run build && npm run migrate && pm2 restart blazfetch-backend
+```
 
 ## Firewall
 
