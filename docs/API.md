@@ -53,6 +53,7 @@ unless noted. Every example in [Responses by platform](#responses-by-platform) i
 | [`GET /stream`](#get-apiv1stream-direct-stream-prepare-or-auto) | Download in one request. `mode=stream` (default), `prepare`, or `auto` (stream, fall back to prepare) |
 | [`POST /download`](#post-apiv1download), [`GET /jobs/:id`](#get-apiv1jobsid), [`GET /downloads/:id`](#get-apiv1downloadsid) | Job-based download with server-side progress |
 | `DELETE /downloads/:id`, `DELETE /jobs/:id` | Cancel a job and clean up |
+| `GET /stats` | Public all-time totals `{ fetches, downloads }` (successful fetches and downloads), cached for a minute. No per-visitor data |
 | [`GET /platforms`](#get-apiv1platforms) | Supported platforms and their domains |
 | [`GET /health`, `GET /health/ready`](#get-health) | Liveness and readiness probes |
 

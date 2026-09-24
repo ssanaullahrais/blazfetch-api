@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getKnex } from './knexClient';
 import { DownloadStatParams, FetchStatParams } from '../../services/statsService';
-import { StatsStore } from '../types';
+import { StatsStore, StatsTotals } from '../types';
 
 export class SqlStatsRepository implements StatsStore {
   async recordFetchStat(params: FetchStatParams): Promise<void> {
@@ -46,5 +46,12 @@ export class SqlStatsRepository implements StatsStore {
       fell_back: params.fellBack ?? null,
       created_at: knex.fn.now(),
     });
+  }
+
+  async totals(): Promise<StatsTotals> {
+    const knex = getKnex();
+    const [fetches] = await knex('fetch_stats').where({ success: true }).andWhere((q) => q.where({ source: 'user' }).orWhereNull('source')).count({ n: '*' });
+    const [downloads] = await knex('download_stats').where({ success: true }).count({ n: '*' });
+    return { fetches: Number((fetches as { n: number | string }).n), downloads: Number((downloads as { n: number | string }).n) };
   }
 }
