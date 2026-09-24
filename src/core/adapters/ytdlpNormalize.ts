@@ -37,16 +37,29 @@ export interface YtdlpRawInfo {
   _type?: string;
 }
 
+/**
+ * yt-dlp's dedicated extractors (YouTube DASH, etc.) always set vcodec/acodec to either a real
+ * codec string or the literal string 'none' to mean "confirmed absent". But its generic/HTML5
+ * embed extractor (used for platforms with no dedicated extractor, e.g. Snapchat) often leaves
+ * these fields null/undefined to mean "unknown" — which is NOT the same as "absent". Treating
+ * null the same as 'none' silently drops real, downloadable formats. Only the explicit string
+ * 'none' counts as confirmed-absent; anything else (a codec name, null, or undefined) counts as
+ * present-or-unknown-but-probably-present.
+ */
+function trackPresent(codec: string | undefined): boolean {
+  return codec !== 'none';
+}
+
 function isVideoOnly(f: YtdlpRawFormat): boolean {
-  return !!f.vcodec && f.vcodec !== 'none' && (!f.acodec || f.acodec === 'none');
+  return trackPresent(f.vcodec) && !trackPresent(f.acodec);
 }
 
 function isAudioOnly(f: YtdlpRawFormat): boolean {
-  return (!f.vcodec || f.vcodec === 'none') && !!f.acodec && f.acodec !== 'none';
+  return !trackPresent(f.vcodec) && trackPresent(f.acodec);
 }
 
 function isCombined(f: YtdlpRawFormat): boolean {
-  return !!f.vcodec && f.vcodec !== 'none' && !!f.acodec && f.acodec !== 'none';
+  return trackPresent(f.vcodec) && trackPresent(f.acodec);
 }
 
 /** H.264/AVC video and AAC/mp4a audio are the safest bet for universal playback; VP9, AV1, HEVC

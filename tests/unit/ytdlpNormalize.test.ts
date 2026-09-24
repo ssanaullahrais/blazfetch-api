@@ -25,4 +25,19 @@ describe('normalizeFormats', () => {
     expect(combined?.requiresMerge).toBe(false);
     expect(combined?.compatible).toBe(true);
   });
+
+  it('treats null/missing vcodec+acodec (generic HTML5 embed extractor) as a combined format, not dropped', () => {
+    // Reproduces yt-dlp's generic/HTML5 embed extractor output (e.g. Snapchat, which has no
+    // dedicated yt-dlp extractor): vcodec is null and acodec is absent entirely, meaning
+    // "unknown" — not the explicit 'none' string that means "confirmed absent". Previously this
+    // fell through every branch and the format was silently dropped, even though yt-dlp itself
+    // could download it fine.
+    const { formats, audioFormats } = normalizeFormats([
+      { format_id: '0', ext: 'mp4', vcodec: undefined, url: 'https://cdn.example/video.mp4' } as any,
+    ]);
+    expect(audioFormats).toHaveLength(0);
+    expect(formats).toHaveLength(1);
+    expect(formats[0].kind).toBe('video');
+    expect(formats[0].requiresMerge).toBe(false);
+  });
 });
