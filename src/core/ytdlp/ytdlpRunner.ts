@@ -99,13 +99,13 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   if (lower.includes('login required') || lower.includes('sign in')) {
     return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.');
   }
-  if (lower.includes('age')) {
+  if (/age|age-restricted|age restricted/.test(lower)) {
     return new BlazfetchError('AGE_RESTRICTED', 'This media is age-restricted.');
   }
-  if (lower.includes('not available in your country') || lower.includes('geo')) {
+  if (lower.includes('not available in your country') || /geo/.test(lower)) {
     return new BlazfetchError('GEO_RESTRICTED', 'This media is not available in this region.');
   }
-  if (lower.includes('unable to download webpage') || lower.includes('429') || lower.includes('rate')) {
+  if (lower.includes('unable to download webpage') || lower.includes('429') || /rate.?limit|too many requests/.test(lower)) {
     return new BlazfetchError('PLATFORM_RATE_LIMITED', 'The source platform is rate-limiting requests.');
   }
   if (lower.includes('unsupported url') || lower.includes('no video formats found')) {
