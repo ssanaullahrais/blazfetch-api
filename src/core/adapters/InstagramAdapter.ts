@@ -70,6 +70,8 @@ export class InstagramAdapter implements PlatformAdapter {
       );
     } catch (btchErr) {
       logger.warn({ requestId: ctx.requestId, err: (btchErr as Error).message }, 'btch-downloader failed, trying cakkatrok');
+      // Cakkatrok is optional; when it isn't configured, surface the real reason btch failed instead.
+      if (!env.CAKKATROK_API_BASE) throw btchErr;
       const items = await fetchInstagramViaCakkatrok(targetUrl);
       return this.normalizeFallbackItems(items, targetUrl, 'cakkatrok-instagram-downloader');
     }
