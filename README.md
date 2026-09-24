@@ -1,7 +1,7 @@
 # Blazfetch Backend
 
 Backend API that resolves media (video/audio/images) from social platform links and streams
-downloads to the client. No permanent storage of media — it resolves, downloads, validates, and
+downloads to the client. No permanent storage of media. It resolves, downloads, validates, and
 streams through, cleaning up temp files after.
 
 ## Platform status
