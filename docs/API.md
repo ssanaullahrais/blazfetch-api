@@ -11,7 +11,7 @@
 [Back to README](../README.md) ·
 [OpenAPI file](openapi.yaml) ·
 [Example responses](examples/) ·
-[Frontend repository](https://github.com/ssanaullahrais/blazfetch-frontend)
+[Frontend repository](https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend)
 
 </div>
 
@@ -1701,8 +1701,8 @@ or orchestrator readiness probe:
 ## Quick reference for frontend integration
 
 > [!TIP]
-> The official frontend, [blazfetch-frontend](https://github.com/ssanaullahrais/blazfetch-frontend), already
-> implements everything below. Its [integration guide](https://github.com/ssanaullahrais/blazfetch-frontend/blob/main/docs/INTEGRATION.md) maps each screen to these endpoints.
+> The official frontend, [blazfetch-social-downloader-frontend](https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend), already
+> implements everything below. Its [integration guide](https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend/blob/main/docs/INTEGRATION.md) maps each screen to these endpoints.
 
 **Simplest flow (recommended):** the user pastes a URL.
 
@@ -1736,5 +1736,5 @@ from the database, fetches never-seen media when the link can be rebuilt from th
 ---
 
 <div align="center">
-<a href="../README.md">Back to README</a> · <a href="https://github.com/ssanaullahrais/blazfetch-frontend">blazfetch-frontend</a>
+<a href="../README.md">Back to README</a> · <a href="https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend">blazfetch-social-downloader-frontend</a>
 </div>
