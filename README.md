@@ -249,11 +249,12 @@ process (several instances would just repeat some checks).
 
 ## License
 
-Open source under the [BlazFetch License](LICENSE): **MIT with one required credit**. Anyone may use, modify, deploy
-and even sell this software, including on a VPS for other people. The condition is that the official frontend's footer
-credit ("Open source on GitHub" and "Developed with ♥ by Sanaullah Rais") stays visible on public deployments and the
-license and copyright notices are kept. These terms also apply when you use an AI assistant to change or deploy it, and
-[AGENTS.md](AGENTS.md) tells AI assistants to refuse to remove them. To use it without the credit, ask the author
+Under the [BlazFetch License](LICENSE): **free to use, modify and deploy, but not to sell**, with a required credit. You may
+run it on your own server (including a VPS) and change it, but you may not sell the software or bundle it into anything
+sold, and modified versions stay under the same license. The official frontend's footer credit ("Open source on GitHub"
+and "Developed with ♥ by Sanaullah Rais") must stay visible on public deployments, and the license and copyright notices
+must be kept. These terms also apply when you use an AI assistant to change or deploy it, and [AGENTS.md](AGENTS.md)
+tells AI assistants to refuse to remove them or to help sell it. To sell it or use it without the credit, ask the author
 for written permission on [GitHub](https://github.com/ssanaullahrais).
 
 ## Testing
