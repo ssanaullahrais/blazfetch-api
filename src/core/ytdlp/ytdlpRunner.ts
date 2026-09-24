@@ -108,6 +108,9 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   if (lower.includes('not available in your country') || /geo/.test(lower)) {
     return new BlazfetchError('GEO_RESTRICTED', 'This media is not available in this region.');
   }
+  if (/http error 404|404: not found|video (?:has been|was) removed|does not exist/.test(lower)) {
+    return new BlazfetchError('MEDIA_NOT_FOUND', 'Media could not be found at the given URL.');
+  }
   if (lower.includes('unable to download webpage') || lower.includes('429') || /rate.?limit|too many requests/.test(lower)) {
     return new BlazfetchError('PLATFORM_RATE_LIMITED', 'The source platform is rate-limiting requests.');
   }

@@ -19,4 +19,8 @@ describe('classifyYtdlpFailure', () => {
   it('reports DRM-protected media clearly', () => {
     expect(classifyYtdlpFailure('ERROR: This format is DRM protected').code).toBe('FORMAT_UNAVAILABLE');
   });
+
+  it('maps a 404 to MEDIA_NOT_FOUND, not a rate limit', () => {
+    expect(classifyYtdlpFailure('ERROR: [facebook] x: Unable to download webpage: HTTP Error 404: Not Found').code).toBe('MEDIA_NOT_FOUND');
+  });
 });
