@@ -1,5 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import mime from '../../lib/mime';
+import { logger } from '../../lib/logger';
 import { assertUrlIsSafeToFetch, NormalizedUrlResult } from '../../utils/url';
 import { classifyYtdlpFailure, runYtdlp } from '../ytdlp/ytdlpRunner';
+import { downloadWithYtdlp } from '../ytdlp/ytdlpDownload';
 import { normalizeYtdlpInfo, YtdlpRawInfo } from './ytdlpNormalize';
 import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
@@ -45,6 +50,30 @@ export class VimeoAdapter implements PlatformAdapter {
   }
 
   async download(ctx: AdapterFetchContext, target: DownloadTarget): Promise<DownloadResult> {
-    return this.delegate.download(ctx, target);
+    try {
+      return await this.delegate.download(ctx, target);
+    } catch (err) {
+      const playerUrl = toPlayerUrl(ctx.normalizedUrl.canonicalUrl);
+      if (!playerUrl) throw err;
+
+      logger.warn({ requestId: ctx.requestId, err: (err as Error).message }, 'yt-dlp download failed for Vimeo watch URL, retrying via player URL');
+      await assertUrlIsSafeToFetch(playerUrl);
+
+      const filePath = await downloadWithYtdlp({
+        url: playerUrl,
+        formatId: target.formatId,
+        outputDir: target.outputDir,
+        signal: target.signal,
+        onProgress: target.onProgress,
+      });
+
+      const stat = await fs.promises.stat(filePath);
+      return {
+        filePath,
+        filename: path.basename(filePath),
+        mimeType: mime.lookup(filePath) || 'application/octet-stream',
+        bytes: stat.size,
+      };
+    }
   }
 }
