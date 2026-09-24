@@ -51,7 +51,7 @@ export class MongoStatsRepository implements StatsStore {
   async totals(): Promise<StatsTotals> {
     const db = await getMongoDb();
     const [fetches, downloads] = await Promise.all([
-      db.collection('fetch_stats').countDocuments({ success: true, source: { $ne: 'revalidation' } }),
+      db.collection('fetch_stats').countDocuments({ success: true, source: { $in: ['user', null] } }),
       db.collection('download_stats').countDocuments({ success: true }),
     ]);
     return { fetches, downloads };

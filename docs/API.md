@@ -53,7 +53,8 @@ unless noted. Every example in [Responses by platform](#responses-by-platform) i
 | [`GET /stream`](#get-apiv1stream-direct-stream-prepare-or-auto) | Download in one request. `mode=stream` (default), `prepare`, or `auto` (stream, fall back to prepare) |
 | [`POST /download`](#post-apiv1download), [`GET /jobs/:id`](#get-apiv1jobsid), [`GET /downloads/:id`](#get-apiv1downloadsid) | Job-based download with server-side progress |
 | `DELETE /downloads/:id`, `DELETE /jobs/:id` | Cancel a job and clean up |
-| `GET /stats` | Public all-time totals `{ fetches, downloads }`, cached for 5 seconds. Every successful `POST /fetch` and every opened `GET /media/...` page counts as a fetch, including repeats of the same link; every successful download counts once. Lookups made on the way to a download, `/fetch/audio` and the weekly re-checks do not count. No per-visitor data |
+| `GET /stats` | Public all-time totals `{ fetches, downloads }`. Every successful `POST /fetch` and `GET /media/...` response counts once, including repeat and concurrent requests. Internal lookups, audio format lookups, background refreshes and failed requests are excluded. Downloads count when the API finishes delivering bytes, including prepared files; merely preparing a job does not count. No per-visitor data or browser caching |
+| `GET /stats/events` | Server-sent events with the same totals, pushed immediately after a successful statistics write. Reconnects automatically; a two-second check observes writes from other API workers. Keep proxy buffering disabled |
 | [`GET /platforms`](#get-apiv1platforms) | Supported platforms and their domains |
 | [`GET /health`, `GET /health/ready`](#get-health) | Liveness and readiness probes |
 
@@ -1668,8 +1669,9 @@ media, the platform and the (guest) user.
 ## Cloudflare Turnstile (optional bot check)
 
 Turnstile is Cloudflare's free, privacy-friendly CAPTCHA replacement. It is **off by default**. When
-`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /stream` and `POST /download` need a passed check;
-everything else (`/media`, `/platforms`, `/config`, health) stays open so stored pages can still be read and indexed.
+`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /media/...`, `GET /stream` and `POST /download` need a passed check.
+The media route can extract missing or stale metadata, so it uses the same gate as fetch. Public configuration,
+aggregate statistics, the platform list and health endpoints remain open. Existing job delivery checks job ownership.
 
 How it works:
 
@@ -1690,6 +1692,15 @@ How it works:
 | `POST /turnstile/verify` | Swap a solved widget token for the pass cookie. `403 TURNSTILE_FAILED` when Cloudflare rejects the token or cannot be reached (it fails closed) |
 
 A client should call `/turnstile/verify` lazily, when the visitor first does something protected, rather than on page load. Send `credentials: 'include'` so the cookies travel. Set up: [docs/REQUIREMENTS.md](REQUIREMENTS.md#cloudflare-turnstile-optional).
+
+`TURNSTILE_ALLOWED_HOSTNAMES` optionally checks Siteverify's hostname against a comma-separated list (no scheme or port).
+`TURNSTILE_EXPECTED_ACTION` optionally checks its action; `/config` supplies that action to the frontend widget.
+The pass cookie is an application session, not a reusable Cloudflare token or a Cloudflare `cf_clearance` cookie.
+Cloudflare tokens are submitted once; expired or refused passes require a new widget token.
+
+Statistics describe completed API transfers, including an audio transfer used for preview. Saving that cached audio
+again or downloading an image directly from an external CDN makes no new API transfer and adds no server count.
+Historic statistics are preserved; old rows that did not distinguish internal work cannot be reliably reclassified.
 
 ---
 

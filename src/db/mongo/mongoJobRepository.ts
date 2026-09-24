@@ -55,6 +55,7 @@ function docToJob(doc: JobDoc): JobRecord {
 /** Same snake_case extra-field keys the SQL/legacy callers always used, mapped to this
  *  collection's camelCase document fields. */
 const FIELD_MAP: Record<string, string> = {
+  media_id: 'mediaId',
   filename: 'filename',
   mime_type: 'mimeType',
   downloaded_bytes: 'downloadedBytes',

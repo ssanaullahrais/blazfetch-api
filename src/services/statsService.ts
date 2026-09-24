@@ -1,4 +1,7 @@
 import { getDb } from '../db';
+import { resetStatsTotalsCache } from './statsTotalsService';
+import { kindOfKey, mediaKeyForResponse } from '../core/media/mediaPath';
+import type { BlazfetchResponse } from '../types/blazfetch';
 
 export interface FetchStatParams {
   platform: string;
@@ -22,6 +25,21 @@ export interface FetchStatParams {
 
 export async function recordFetchStat(params: FetchStatParams): Promise<void> {
   await getDb().stats.recordFetchStat(params);
+  if (params.success && (!params.source || params.source === 'user')) resetStatsTotalsCache();
+}
+
+/** Count a public API response once, even when extraction is shared, refreshed in the background, or served stale. */
+export async function recordVisitorFetch(result: BlazfetchResponse, visitor: { userId?: string | null; guestId?: string | null }): Promise<void> {
+  const mediaId = mediaKeyForResponse(result);
+  await recordFetchStat({
+    ...visitor,
+    platform: result.platform,
+    mediaId,
+    kind: kindOfKey(mediaId),
+    success: true,
+    source: 'user',
+    extractor: result.extractor,
+  });
 }
 
 export interface DownloadStatParams {
@@ -46,6 +64,7 @@ export interface DownloadStatParams {
 
 export async function recordDownloadStat(params: DownloadStatParams): Promise<void> {
   await getDb().stats.recordDownloadStat(params);
+  if (params.success) resetStatsTotalsCache();
   // Successful downloads also count against the stored media itself (mediaId is its storage key).
   if (params.success && params.mediaId && params.mode && params.kind !== 'image') {
     await getDb().metadataCache.recordDownload(params.platform, params.mediaId, { mode: params.mode, bytes: params.bytesTransferred ?? 0 });

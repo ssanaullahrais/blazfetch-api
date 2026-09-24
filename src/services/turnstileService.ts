@@ -51,16 +51,20 @@ export async function verifyTurnstileToken(token: string, remoteIp?: string): Pr
   const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET_KEY, response: token });
   if (remoteIp) body.set('remoteip', remoteIp);
 
-  let result: { success?: boolean; 'error-codes'?: string[] };
+  let result: { success?: boolean; hostname?: string; action?: string; 'error-codes'?: string[] };
   try {
     const res = await fetch(SITEVERIFY_URL, { method: 'POST', body, signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`Siteverify returned HTTP ${res.status}`);
     result = (await res.json()) as typeof result;
   } catch (err) {
     logger.warn({ err: (err as Error).message }, 'turnstile verification request failed');
     throw new BlazfetchError('TURNSTILE_FAILED', 'The security check could not be verified right now. Please try again.');
   }
-  if (!result.success) {
-    logger.info({ errors: result['error-codes'] }, 'turnstile token rejected');
-    throw new BlazfetchError('TURNSTILE_FAILED', 'The security check failed. Please try again.', { errorCodes: result['error-codes'] ?? [] });
+  const allowedHosts = env.TURNSTILE_ALLOWED_HOSTNAMES.split(',').map((host) => host.trim().toLowerCase()).filter(Boolean);
+  if (result?.success !== true ||
+      (allowedHosts.length > 0 && !allowedHosts.includes(result.hostname?.toLowerCase() ?? '')) ||
+      (env.TURNSTILE_EXPECTED_ACTION && result.action !== env.TURNSTILE_EXPECTED_ACTION)) {
+    logger.info({ errors: result?.['error-codes'] }, 'turnstile token rejected');
+    throw new BlazfetchError('TURNSTILE_FAILED', 'The security check failed. Please try again.', { errorCodes: result?.['error-codes'] ?? [] });
   }
 }
