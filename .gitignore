@@ -11,3 +11,8 @@ coverage/
 *.tsbuildinfo
 /examples/
 data/
+
+# Temporary fragment files yt-dlp can leave in the working directory
+--Frag*
+*.part
+*.ytdl
