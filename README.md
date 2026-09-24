@@ -60,12 +60,15 @@ npm run dev           # starts on http://localhost:4000
 `npm run setup` asks which database to use. **SQLite is the default and needs nothing installed**:
 just press Enter and you're running. Pick another if you already have a server:
 
-| Database | You need | Connection URL example |
-|---|---|---|
-| SQLite (default) | nothing | none (the file is created automatically) |
-| PostgreSQL 14+ | an empty database created first | `postgres://user:password@localhost:5432/blazfetch` |
-| MySQL 8+ / MariaDB | an empty database created first | `mysql://user:password@localhost:3306/blazfetch` |
-| MongoDB 6+ | a running server | `mongodb://localhost:27017/blazfetch` |
+| Database | Status | You need | Connection URL example |
+|---|---|---|---|
+| SQLite (default) | ✅ Confirmed | nothing | none (the file is created automatically) |
+| PostgreSQL 14+ | ⚠️ Wired, untested | an empty database created first | `postgres://user:password@localhost:5432/blazfetch` |
+| MySQL 8+ / MariaDB | ⚠️ Wired, untested | an empty database created first | `mysql://user:password@localhost:3306/blazfetch` |
+| MongoDB 6+ | ⚠️ Storage layer tested | a running server | `mongodb://localhost:27017/blazfetch` |
+
+Confirmed = tested end to end from a fresh clone (setup, server start, fetch, download). Storage
+layer tested = jobs, cache and stats verified against a real server, full API run pending.
 
 Setup creates the tables, not the database itself. For PostgreSQL run `createdb blazfetch` first,
 for MySQL `CREATE DATABASE blazfetch;`. All four store the same data (metadata cache, jobs, stats,

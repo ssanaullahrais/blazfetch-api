@@ -47,12 +47,14 @@ node --version && yt-dlp --version && ffmpeg -version | head -1 && ffprobe -vers
 Use exactly one. They store the same data (metadata cache, jobs, stats, never media files) and the
 app behaves identically on each.
 
-| Database | Best for | Do this first | Connection URL |
-|---|---|---|---|
-| **SQLite** (default) | one server, zero setup | nothing | none needed |
-| **PostgreSQL** | recommended for production | install + create DB (below) | `postgres://blazfetch:change-me@localhost:5432/blazfetch` |
-| **MySQL / MariaDB** | if you already run it | install + create DB (below) | `mysql://blazfetch:change-me@localhost:3306/blazfetch` |
-| **MongoDB** | if you already run it | install (below) | `mongodb://localhost:27017/blazfetch` |
+| Database | Status | Best for | Do this first | Connection URL |
+|---|---|---|---|---|
+| **SQLite** (default) | ✅ Confirmed | one server, zero setup | nothing | none needed |
+| **PostgreSQL** | ⚠️ Wired, untested | production, if you already run it | install + create DB (below) | `postgres://blazfetch:change-me@localhost:5432/blazfetch` |
+| **MySQL / MariaDB** | ⚠️ Wired, untested | if you already run it | install + create DB (below) | `mysql://blazfetch:change-me@localhost:3306/blazfetch` |
+| **MongoDB** | ⚠️ Storage layer tested | if you already run it | install (below) | `mongodb://localhost:27017/blazfetch` |
+
+Confirmed = tested end to end from a fresh clone. For a production VPS, SQLite is the verified choice today.
 
 Skip the rest of this step if you choose SQLite. Otherwise follow only your database's section:
 
