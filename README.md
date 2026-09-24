@@ -19,7 +19,7 @@ See [docs/API.md](docs/API.md#stored-media-and-stable-paths).
 
 | Platform | Status | Notes |
 |---|---|---|
-| YouTube | ✅ Confirmed | Video, playlists, best-quality auto-select |
+| YouTube | ✅ Confirmed | Video, playlists, best-quality auto-select. If YouTube temporarily blocks the server's IP ("confirm you're not a bot"), a fallback provider serves the request automatically |
 | TikTok | ✅ Confirmed | yt-dlp primary, `@tobyg74/tiktok-api-dl` fallback |
 | Instagram | ✅ Confirmed | Posts, reels, carousels |
 | X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com` |

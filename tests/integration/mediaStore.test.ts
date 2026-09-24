@@ -205,6 +205,18 @@ describe('media store: freshness of the direct media URLs', () => {
     expect(answer.stored?.cached).toBe(false);
   });
 
+  it('trusts the direct links from a fallback provider only briefly, since they die within a minute', async () => {
+    sourceBehaviour = async () => ({ ...video('abc123'), extractor: 'btch-downloader', fallbackUsed: 'btch-downloader' });
+    await fetchMedia({ ...params, url: VIDEO_URL });
+    const stored = await row('abc123');
+    expect(new Date(stored.expires_at).getTime() - Date.now()).toBeLessThan(31_000);
+
+    // a stream asks for fresh URLs, so it never reuses that stored link once it is past its short window
+    await setRow('abc123', { expires_at: inPast(1000) });
+    await fetchMedia({ ...params, url: VIDEO_URL, requireFreshUrls: true });
+    expect(sourceCalls).toBe(2);
+  });
+
   it('extracts a burst of simultaneous requests for one item only once', async () => {
     let release: () => void = () => undefined;
     sourceBehaviour = () => new Promise((resolve) => (release = () => resolve(video('abc123'))));

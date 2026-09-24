@@ -278,4 +278,5 @@ sudo journalctl -u nginx -n 100
 | A platform suddenly stops working | Update yt-dlp (see above); extractors break as sites change. |
 | Browser shows a CORS error | Add your frontend's origin to `CORS_ALLOWED_ORIGINS` and restart with `pm2 restart blazfetch-backend`. |
 | 502 from Nginx | The app is not running: check `pm2 status` and the logs. |
+| YouTube fails with "Sign in to confirm you're not a bot" | YouTube temporarily blocked the server's IP. The fallback provider takes over automatically (check `fallbackUsed` in responses); the block usually clears in minutes to hours. Fewer repeated requests and the media store help. |
 | Downloads cut off partway | Nginx `proxy_read_timeout` too low, or `proxy_buffering` left on. |

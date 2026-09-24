@@ -112,6 +112,7 @@ vi.mock('../../src/utils/url', async () => {
 });
 
 import { createApp } from '../../src/app';
+import { fetchMedia } from '../../src/services/fetchService';
 import { BlazfetchError } from '../../src/constants/errors';
 import { activeStreamProcessCount } from '../../src/core/ytdlp/ytdlpStream';
 
@@ -270,6 +271,39 @@ describe('GET /api/v1/stream', () => {
     await waitFor(() => stats.length === 1);
     expect(stats[0]).toMatchObject({ success: true, bytesTransferred: 11 });
     await waitFor(() => activeStreamProcessCount() === 0);
+  });
+
+  it('retries once with a freshly extracted link when a fallback provider link is refused (expired)', async () => {
+    const upstream = http.createServer((req, res) => {
+      if (req.url === '/dead') {
+        res.writeHead(403).end('An error occurred (code: 1-4).');
+      } else {
+        res.writeHead(200, { 'content-type': 'video/mp4' }).end('fresh-bytes');
+      }
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, resolve));
+    const base = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
+    const media = (linkPath: string) => ({
+      success: true,
+      platform: 'youtube',
+      mediaType: 'video',
+      mediaId: 'abc123',
+      canonicalUrl: 'https://www.youtube.com/watch?v=abc123',
+      title: 'Test Video',
+      formats: [{ formatId: 'btch-mp4', ext: 'mp4', kind: 'video', url: `${base}${linkPath}` }],
+      audioFormats: [],
+      extractor: 'btch-downloader',
+    });
+    vi.mocked(fetchMedia).mockResolvedValueOnce(media('/dead') as never).mockResolvedValueOnce(media('/live') as never);
+
+    try {
+      const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=btch-mp4&kind=video`);
+      expect(res.statusCode).toBe(200);
+      expect(await body(res)).toBe('fresh-bytes');
+      expect(vi.mocked(fetchMedia).mock.calls.at(-1)?.[0]).toMatchObject({ forceRefresh: true, requireFreshUrls: true });
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
   });
 
   it('aborts the connection (no JSON) when the source fails after the first byte', async () => {

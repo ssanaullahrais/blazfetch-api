@@ -56,6 +56,12 @@ function freshnessMs(platform: string, mediaKey: string): number {
   return (isPlaylist ? env.PLAYLIST_REFRESH_SECONDS : env.CACHE_TTL_SECONDS) * 1000;
 }
 
+/** Fallback providers hand out links that die within a minute, so an answer from one is trusted only briefly. */
+function urlTrustMs(result: BlazfetchResponse, mediaKey: string): number {
+  const base = freshnessMs(result.platform, mediaKey);
+  return result.fallbackUsed ? Math.min(base, env.FALLBACK_LINK_TTL_SECONDS * 1000) : base;
+}
+
 function storedInfo(record: StoredMedia, extra: { cached: boolean; validationFailed?: boolean; playlistPath?: string }): StoredInfo {
   return {
     path: record.path ?? buildMediaPath(record.platform, record.mediaKey),
@@ -216,7 +222,7 @@ async function extractLive(
         path,
         metadata: clean,
         isPublic: isPublicSource(result.platform),
-        urlsExpireAt: new Date(Date.now() + freshnessMs(result.platform, mediaKey)),
+        urlsExpireAt: new Date(Date.now() + urlTrustMs(result, mediaKey)),
         nextCheckAt: new Date(Date.now() + env.REVALIDATE_AFTER_SECONDS * 1000),
       });
 

@@ -99,6 +99,11 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   if (lower.includes('drm protected') || lower.includes('drm-protected')) {
     return new BlazfetchError('FORMAT_UNAVAILABLE', 'This media is DRM-protected and cannot be downloaded.');
   }
+  if (lower.includes('not a bot')) {
+    // YouTube's temporary "sign in to confirm you're not a bot" block on an IP: nothing to do with this
+    // particular video, and worth backing off from rather than retrying.
+    return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.', { botCheck: true });
+  }
   if (lower.includes('login required') || lower.includes('sign in')) {
     return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.');
   }

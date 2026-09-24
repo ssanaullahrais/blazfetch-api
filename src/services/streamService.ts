@@ -250,13 +250,20 @@ function sourceUrlCandidates(canonicalUrl: string, platform: string): string[] {
  * FIRST byte has arrived. Anything that fails before that point rejects with a BlazfetchError, so
  * the controller can still reply with the normal JSON error envelope.
  */
-export async function openStream(params: OpenStreamParams): Promise<OpenedStream> {
+export async function openStream(params: OpenStreamParams, retriedWithFreshLinks = false): Promise<OpenedStream> {
   const normalized = validateAndNormalizeUrl(params.url);
   await assertUrlIsSafeToFetch(normalized.canonicalUrl);
 
   const resolved = await resolveFormat(params.url, params.requestId, { formatId: params.formatId, kind: params.kind });
   // requireFreshUrls: the fast path below feeds the stored direct URLs to ffmpeg, so they must not be stale.
-  const media = await fetchMedia({ url: params.url, requestId: params.requestId, userId: params.userId, guestId: params.guestId, requireFreshUrls: true });
+  const media = await fetchMedia({
+    url: params.url,
+    requestId: params.requestId,
+    userId: params.userId,
+    guestId: params.guestId,
+    requireFreshUrls: true,
+    forceRefresh: retriedWithFreshLinks,
+  });
   const plan = planStream(media, resolved);
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);
@@ -308,6 +315,12 @@ export async function openStream(params: OpenStreamParams): Promise<OpenedStream
         );
       }
     }
+  }
+
+  // A direct link (from a fallback provider) that was refused has most likely expired: get a fresh one once.
+  if (!retriedWithFreshLinks && !params.signal.aborted && lastError instanceof BlazfetchError && lastError.code === 'DOWNLOAD_FAILED' && plan.type === 'proxy') {
+    logger.warn({ requestId: params.requestId }, 'direct link was refused, retrying with a freshly extracted one');
+    return openStream(params, true);
   }
 
   if (lastError instanceof BlazfetchError && lastError.code === 'DOWNLOAD_FAILED' && plan.type === 'ffmpeg') {

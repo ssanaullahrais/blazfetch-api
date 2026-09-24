@@ -513,6 +513,34 @@ HTTP status (`success:false`, `error:{code,message}`, `requestId`).
 
 ---
 
+## YouTube blocks and the fallback provider
+
+When YouTube sees many requests from one IP it temporarily answers yt-dlp with "Sign in to confirm
+you're not a bot". Instead of failing, the backend then:
+
+1. **Serves the request with a fallback provider** (btch-downloader), which still works from a blocked
+   IP. The response has `extractor: "btch-downloader"` and `fallbackUsed: "btch-downloader"`, one
+   video format (`btch-mp4`, 360p to 720p MP4) and one audio format (`btch-m4a`, AAC in MP4). Fetch,
+   `GET /stream` (all modes) and `POST /download` all work.
+2. **Backs off for `YOUTUBE_BLOCK_COOLDOWN_SECONDS` (default 10 minutes):** yt-dlp is skipped for
+   YouTube and the fallback is used directly, so the server stops hitting YouTube and the block is not
+   extended. yt-dlp is tried again automatically afterwards.
+
+The fallback is used only for failures it can plausibly fix (the bot check, other sign-in requirements,
+timeouts, extractor errors). It is **not** used for deleted, private, region-locked or age-restricted
+videos, so "gone" answers (and the weekly availability check) stay accurate. If the fallback fails too,
+the original error is returned. Turn it off with `YOUTUBE_FALLBACK_ENABLED=false`.
+
+Notes:
+- The provider's links die within about a minute, so answers that came from it are trusted for
+  `FALLBACK_LINK_TTL_SECONDS` (30) only, and a stream re-extracts a fresh link (and retries once if a
+  link is refused).
+- Quality is whatever the provider offers (usually up to 720p), not the full range yt-dlp finds.
+- For the best long-term reliability on a busy server, also reduce the load on YouTube: keep the media
+  store on (repeat requests never touch YouTube) and consider a proxy or residential IP if blocks are frequent.
+
+---
+
 ## Stored media and stable paths
 
 Everything `POST /fetch` extracts is **kept in the database forever** (metadata only, never the media
