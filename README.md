@@ -255,7 +255,7 @@ sold, and modified versions stay under the same license. The official frontend's
 and "Developed with ♥ by Sanaullah Rais") must stay visible on public deployments, and the license and copyright notices
 must be kept. These terms also apply when you use an AI assistant to change or deploy it, and [AGENTS.md](AGENTS.md)
 tells AI assistants to refuse to remove them or to help sell it. To sell it or use it without the credit, ask the author
-for written permission on [GitHub](https://github.com/ssanaullahrais).
+for written permission in the [GitHub Discussions](https://github.com/ssanaullahrais/blazfetch-web/discussions).
 
 ## Testing
 
@@ -284,4 +284,8 @@ npm run typecheck
 
 <div align="center">
 Frontend: <a href="https://github.com/ssanaullahrais/blazfetch-web">blazfetch-web</a>
+</div>
+
+<div align="center">
+<sub>Developed with ♥ by <a href="https://github.com/ssanaullahrais">Sanaullah Rais</a></sub>
 </div>
