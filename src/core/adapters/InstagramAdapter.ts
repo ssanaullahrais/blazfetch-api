@@ -1,5 +1,7 @@
+import fs from 'node:fs';
 import { NormalizedUrlResult } from '../../utils/url';
 import { assertUrlIsSafeToFetch } from '../../utils/url';
+import { env } from '../../config/env';
 import { BlazfetchError } from '../../constants/errors';
 import { logger } from '../../lib/logger';
 import { classifyYtdlpFailure, runYtdlp } from '../ytdlp/ytdlpRunner';
@@ -8,16 +10,42 @@ import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
 import { fetchInstagramViaBtchDownloader } from '../fallback/instagram/btchDownloader';
 import { fetchInstagramViaCakkatrok } from '../fallback/instagram/cakkatrokAdapter';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
-import { BlazfetchItem, BlazfetchResponse } from '../../types/blazfetch';
+import { BlazfetchItem, BlazfetchPlaylistItem, BlazfetchResponse } from '../../types/blazfetch';
 
 interface YtdlpPlaylistInfo extends YtdlpRawInfo {
   _type?: string;
   entries?: YtdlpRawInfo[];
 }
 
+interface YtdlpFlatUserEntry {
+  id: string;
+  title?: string;
+  thumbnails?: { url: string }[];
+  duration?: number;
+  url?: string;
+}
+
+interface YtdlpFlatUserInfo {
+  id: string;
+  title?: string;
+  entries?: YtdlpFlatUserEntry[];
+}
+
+const INSTAGRAM_NON_PROFILE_SEGMENTS = new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct', 'about', 'developer', 'legal']);
+
 function guessExtFromUrl(url: string): string {
   const match = url.match(/\.(jpg|jpeg|png|webp|mp4|mov)(?:\?|$)/i);
   return match ? match[1].toLowerCase() : 'jpg';
+}
+
+/** Resolves the operator-supplied cookies file, only if configured and actually present on disk. */
+function cookiesArgs(): string[] {
+  if (!env.INSTAGRAM_COOKIES_PATH) return [];
+  if (!fs.existsSync(env.INSTAGRAM_COOKIES_PATH)) {
+    logger.warn({ path: env.INSTAGRAM_COOKIES_PATH }, 'INSTAGRAM_COOKIES_PATH is set but the file does not exist');
+    return [];
+  }
+  return ['--cookies', env.INSTAGRAM_COOKIES_PATH];
 }
 
 export class InstagramAdapter implements PlatformAdapter {
@@ -28,13 +56,24 @@ export class InstagramAdapter implements PlatformAdapter {
     return normalizedUrl.platform === 'instagram';
   }
 
+  private isProfileUrl(canonicalUrl: string): string | null {
+    const segments = new URL(canonicalUrl).pathname.split('/').filter(Boolean);
+    if (segments.length !== 1 || INSTAGRAM_NON_PROFILE_SEGMENTS.has(segments[0].toLowerCase())) return null;
+    return segments[0];
+  }
+
   async fetchMetadata(ctx: AdapterFetchContext): Promise<BlazfetchResponse> {
     const targetUrl = ctx.normalizedUrl.canonicalUrl;
+
+    const username = this.isProfileUrl(targetUrl);
+    if (username) {
+      return this.fetchProfile(username, targetUrl, ctx.requestId);
+    }
 
     // Layer 1 & 2: yt-dlp, allowing playlist expansion so carousel posts return every entry.
     try {
       await assertUrlIsSafeToFetch(targetUrl);
-      const { stdout, stderr, exitCode } = await runYtdlp({ args: ['-J', '--no-warnings', '--yes-playlist', targetUrl] });
+      const { stdout, stderr, exitCode } = await runYtdlp({ args: [...cookiesArgs(), '-J', '--no-warnings', '--yes-playlist', targetUrl] });
       if (exitCode !== 0) throw classifyYtdlpFailure(stderr);
 
       const info: YtdlpPlaylistInfo = JSON.parse(stdout);
@@ -61,6 +100,63 @@ export class InstagramAdapter implements PlatformAdapter {
       const items = await fetchInstagramViaCakkatrok(targetUrl);
       return this.normalizeFallbackItems(items, targetUrl, 'cakkatrok-instagram-downloader');
     }
+  }
+
+  /**
+   * Lists a profile's posts. Instagram requires an authenticated session for this even for
+   * public accounts (confirmed: the anonymous web_profile_info API returns 401 require_login),
+   * so this only works when the operator has configured INSTAGRAM_COOKIES_PATH with their own
+   * exported session for an account authorized to view this profile — never anonymously, and
+   * never using credentials this backend obtained on its own.
+   */
+  private async fetchProfile(username: string, targetUrl: string, requestId: string): Promise<BlazfetchResponse> {
+    const cookies = cookiesArgs();
+    if (cookies.length === 0) {
+      throw new BlazfetchError(
+        'LOGIN_REQUIRED',
+        'Listing an Instagram profile requires an authenticated session (Instagram blocks this anonymously). ' +
+          'Set INSTAGRAM_COOKIES_PATH to a cookies.txt exported from an account authorized to view this profile.',
+      );
+    }
+
+    await assertUrlIsSafeToFetch(targetUrl);
+    logger.info({ requestId, username }, 'fetching Instagram profile via yt-dlp with configured session cookies');
+
+    const { stdout, stderr, exitCode } = await runYtdlp({
+      args: [...cookies, '-J', '--flat-playlist', '--no-warnings', '--playlist-end', String(env.MAX_PLAYLIST_ITEMS), targetUrl],
+    });
+    if (exitCode !== 0) throw classifyYtdlpFailure(stderr);
+
+    let info: YtdlpFlatUserInfo;
+    try {
+      info = JSON.parse(stdout);
+    } catch {
+      throw new BlazfetchError('EXTRACTOR_FAILED', 'Failed to parse Instagram profile listing.');
+    }
+
+    const items: BlazfetchPlaylistItem[] = (info.entries ?? []).map((entry) => ({
+      videoId: entry.id,
+      title: entry.title ?? entry.id,
+      thumbnail: entry.thumbnails?.at(-1)?.url,
+      durationSeconds: entry.duration,
+      url: entry.url ?? `https://www.instagram.com/p/${entry.id}/`,
+    }));
+
+    return {
+      success: true,
+      platform: 'instagram',
+      mediaType: 'playlist',
+      mediaId: info.id ?? username,
+      canonicalUrl: targetUrl,
+      title: info.title ?? username,
+      isPlaylist: true,
+      itemCount: items.length,
+      playlist: { title: info.title ?? username, itemCount: items.length, items },
+      formats: [],
+      audioFormats: [],
+      metadata: {},
+      extractor: 'yt-dlp-authenticated',
+    };
   }
 
   private normalizeCarousel(info: YtdlpPlaylistInfo, canonicalUrl: string): BlazfetchResponse {
