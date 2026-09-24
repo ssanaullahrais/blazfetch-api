@@ -28,8 +28,10 @@ guidance below all assume Linux.
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# PostgreSQL (optional: SQLite needs nothing)
-sudo apt-get install -y postgresql postgresql-contrib
+# Database: install ONLY the one you will use (SQLite needs nothing, it is bundled)
+sudo apt-get install -y postgresql postgresql-contrib   # PostgreSQL
+sudo apt-get install -y mariadb-server                  # or MySQL/MariaDB (mysql-server also works)
+# MongoDB is not in Ubuntu's default repos: follow https://www.mongodb.com/docs/manual/administration/install-on-linux/
 
 # ffmpeg / ffprobe
 sudo apt-get install -y ffmpeg
@@ -47,9 +49,25 @@ sudo npm install -g pm2
 
 ## Database setup
 
-The fastest path is `npm run setup`, which asks which database to use and creates the tables. For a
-production VPS PostgreSQL is recommended; SQLite also works for a single-server deployment, and
-MySQL/MariaDB and MongoDB are supported too.
+Blazfetch works with **SQLite, PostgreSQL, MySQL/MariaDB or MongoDB**. Use exactly one; they store
+the same data (metadata cache, jobs, stats, never media files) and behave identically. The easiest
+path is `npm run setup`, which asks which one you want and creates the tables. `npm run setup`
+needs the database itself to exist first (except SQLite). Pick one section below.
+
+| Database | Good for | Connection URL |
+|---|---|---|
+| SQLite (default) | single server, zero setup | none |
+| PostgreSQL 14+ | recommended for production | `postgres://user:pass@localhost:5432/blazfetch` |
+| MySQL 8+ / MariaDB | if you already run MySQL | `mysql://user:pass@localhost:3306/blazfetch` |
+| MongoDB 6+ | if you already run MongoDB | `mongodb://localhost:27017/blazfetch` |
+
+**SQLite** (nothing to create):
+
+```bash
+npm run setup -- --driver=sqlite
+```
+
+**PostgreSQL:**
 
 ```bash
 sudo -u postgres psql -c "CREATE ROLE blazfetch WITH LOGIN PASSWORD 'change-me';"
@@ -57,9 +75,23 @@ sudo -u postgres psql -c "CREATE DATABASE blazfetch OWNER blazfetch;"
 npm run setup -- --driver=postgres --url=postgres://blazfetch:change-me@localhost:5432/blazfetch
 ```
 
-Or set `DATABASE_DRIVER` and `DATABASE_URL` in `.env` yourself and run `npm run migrate`. MySQL uses
-`mysql://user:pass@localhost:3306/blazfetch`, MongoDB `mongodb://localhost:27017/blazfetch`. SQLite
-needs only `DATABASE_DRIVER=sqlite` (optionally `DATABASE_SQLITE_PATH`), no URL.
+**MySQL / MariaDB:**
+
+```bash
+sudo mysql -e "CREATE DATABASE blazfetch CHARACTER SET utf8mb4;"
+sudo mysql -e "CREATE USER 'blazfetch'@'localhost' IDENTIFIED BY 'change-me';"
+sudo mysql -e "GRANT ALL ON blazfetch.* TO 'blazfetch'@'localhost'; FLUSH PRIVILEGES;"
+npm run setup -- --driver=mysql --url=mysql://blazfetch:change-me@localhost:3306/blazfetch
+```
+
+**MongoDB** (the database and collections are created automatically on first use):
+
+```bash
+npm run setup -- --driver=mongodb --url=mongodb://localhost:27017/blazfetch
+```
+
+You can also set `DATABASE_DRIVER` and `DATABASE_URL` in `.env` yourself and run `npm run migrate`.
+Special characters in a password must be URL-encoded inside the connection URL.
 
 ## Installing the app
 
@@ -72,7 +104,7 @@ npm run diagnostics   # confirms the database, yt-dlp and ffmpeg are all reachab
 ```
 
 `npm run setup` is interactive. On a server you can skip the prompts with flags, for example
-`npm run setup -- --driver=sqlite` or `npm run setup -- --driver=postgres --url=postgres://...`.
+`npm run setup -- --driver=sqlite` or `npm run setup -- --driver=mysql --url=mysql://...` (see Database setup above).
 Edit `.env` afterwards for production values (see below).
 
 ## Environment variables
@@ -100,7 +132,7 @@ backend — size CPU around your expected concurrent transcode count, not just r
 
 - `4000` (or your configured `PORT`) — Node app, bound to `127.0.0.1` behind Nginx, not exposed publicly
 - `443` / `80` — Nginx (public)
-- `5432` — PostgreSQL, if used (bind to localhost only unless using a managed/remote DB)
+- Your database port, if you use a server database: `5432` PostgreSQL, `3306` MySQL/MariaDB, `27017` MongoDB (bind to localhost only unless using a managed/remote DB)
 
 ## File permissions & temporary storage
 
@@ -169,7 +201,7 @@ sudo ufw allow 'Nginx Full'
 sudo ufw enable
 ```
 
-Do not expose port 4000 (the app) or your database port (e.g. 5432 for Postgres) publicly — both should only be reachable via
+Do not expose port 4000 (the app) or your database port (5432 / 3306 / 27017) publicly — both should only be reachable via
 localhost/Nginx.
 
 ## Updating yt-dlp
