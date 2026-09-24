@@ -118,11 +118,24 @@ function normalizeReddit(url: URL): { canonicalUrl: string } {
   return { canonicalUrl: `https://www.reddit.com${path}` };
 }
 
+/**
+ * pin.it short links can't be resolved synchronously (needs a network round trip), so they're
+ * passed through as-is here and resolved to a canonical /pin/<id> URL later, in PinterestAdapter.
+ * Direct pinterest.com URLs are validated immediately: only individual pin pages are supported —
+ * yt-dlp has open issues with some board/search/collection URLs even when single pins work, so
+ * those are rejected clearly here rather than silently mistreated as a single video.
+ */
 function normalizePinterest(url: URL): { canonicalUrl: string } {
   if (url.hostname === 'pin.it') {
     return { canonicalUrl: url.toString() };
   }
   const path = url.pathname.replace(/\/+$/, '') || '/';
+  if (!/^\/pin\/\d+/.test(path)) {
+    throw new BlazfetchError(
+      'INVALID_URL',
+      'Only individual Pinterest pin URLs (pinterest.com/pin/<id>) are supported, not boards, search, or collections.',
+    );
+  }
   return { canonicalUrl: `https://www.pinterest.com${path}` };
 }
 

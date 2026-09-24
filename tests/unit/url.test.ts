@@ -60,4 +60,24 @@ describe('validateAndNormalizeUrl', () => {
   it('rejects SoundCloud browse pages like /you or /discover', () => {
     expect(() => validateAndNormalizeUrl('https://soundcloud.com/discover')).toThrow(BlazfetchError);
   });
+
+  it('normalizes an individual Pinterest pin URL', () => {
+    const result = validateAndNormalizeUrl('https://www.pinterest.com/pin/108367934772533401/');
+    expect(result.canonicalUrl).toBe('https://www.pinterest.com/pin/108367934772533401');
+  });
+
+  it('normalizes Pinterest country-domain pins to pinterest.com', () => {
+    const result = validateAndNormalizeUrl('https://in.pinterest.com/pin/498210777529274794/');
+    expect(result.canonicalUrl).toBe('https://www.pinterest.com/pin/498210777529274794');
+  });
+
+  it('passes pin.it links through unresolved (resolved later by the adapter)', () => {
+    const result = validateAndNormalizeUrl('https://pin.it/abc123');
+    expect(result.platform).toBe('pinterest');
+  });
+
+  it('rejects Pinterest board/search URLs, not just pin URLs', () => {
+    expect(() => validateAndNormalizeUrl('https://www.pinterest.com/search/pins/?q=cats')).toThrow(BlazfetchError);
+    expect(() => validateAndNormalizeUrl('https://www.pinterest.com/someuser/some-board/')).toThrow(BlazfetchError);
+  });
 });
