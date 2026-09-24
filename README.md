@@ -46,14 +46,21 @@ yt-dlp --version
 ffmpeg -version && ffprobe -version
 ```
 
+Create the database (one-time, `npm run migrate` builds tables inside it but doesn't create it):
+
+```bash
+createdb blazfetch
+# or: psql -c "CREATE DATABASE blazfetch;"
+```
+
 Project setup:
 
 ```bash
 npm install
 cp .env.example .env
-# edit .env: set DATABASE_URL at minimum
-npm run migrate
-npm run diagnostics   # checks all of the above are reachable
+# edit .env: set DATABASE_URL to point at the database you just created
+npm run migrate       # creates all tables inside it
+npm run diagnostics   # checks everything above is reachable
 npm run dev           # starts on http://localhost:4000
 ```
 
