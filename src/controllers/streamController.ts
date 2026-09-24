@@ -241,7 +241,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const media = await fetchMedia({ url, requestId: req.requestId }).catch(() => undefined);
+    const media = await fetchMedia({ url, requestId: req.requestId, internal: true }).catch(() => undefined);
     const ext = (result.filename.split('.').pop() ?? 'mp4').toLowerCase();
     const name = media ? buildFilename(filename, media, ext) : result.filename;
 

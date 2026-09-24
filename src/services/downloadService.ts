@@ -36,13 +36,13 @@ export async function resolveFormat(url: string, requestId: string, format: Requ
   }
 
   if (format.kind === 'video') {
-    const media = await fetchMedia({ url, requestId });
+    const media = await fetchMedia({ url, requestId, internal: true });
     const best = pickBestVideoFormat(media.formats);
     if (!best) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'No video formats are available for this media.');
     return { ...format, formatId: best.formatId, quality: best.quality };
   }
 
-  const audio = await fetchAudio({ url, requestId });
+  const audio = await fetchAudio({ url, requestId, internal: true });
   const best = pickBestAudioFormat(audio.audioFormats);
   if (!best) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'No audio formats are available for this media.');
   return { ...format, formatId: best.formatId, quality: best.quality };
@@ -96,14 +96,14 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
     let effectiveFormatId = job.requestedFormat.formatId;
 
     if (job.requestedFormat.kind === 'audio') {
-      const metadata = await fetchMedia({ url: job.canonicalUrl, requestId });
+      const metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
       const hasStandaloneAudio = metadata.audioFormats.some((f) => f.formatId === job.requestedFormat.formatId);
       if (!hasStandaloneAudio) {
         return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt, ctx);
       }
     } else {
-      const metadata = await fetchMedia({ url: job.canonicalUrl, requestId });
+      const metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
       const format = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
       if (format?.requiresMerge) {

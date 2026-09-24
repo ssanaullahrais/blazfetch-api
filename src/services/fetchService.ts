@@ -31,6 +31,9 @@ export interface FetchMediaParams {
   /** The caller is about to use the direct media URLs in the response (e.g. GET /stream), so a
    *  stored answer whose URLs are past their trust window is re-extracted first. */
   requireFreshUrls?: boolean;
+  /** A lookup made on the way to a download or another lookup: the visitor's own fetch was already counted, so
+   *  this one does not count toward the public totals. */
+  internal?: boolean;
 }
 
 /** "Gone" answers. Timeouts, rate limits and extractor hiccups say nothing about whether media still exists. */
@@ -44,6 +47,11 @@ const inFlight = new Map<string, Promise<BlazfetchResponse>>();
 /** Results extracted with the operator's own login must never be served to the public. */
 export function isPublicSource(platform: string): boolean {
   return !(platform === 'instagram' && env.INSTAGRAM_COOKIES_PATH);
+}
+
+/** What to record as the source of a lookup: internal ones (made on the way to a download) are not visitor fetches. */
+function statSource(source: 'user' | 'revalidation', params: { internal?: boolean }): 'user' | 'revalidation' | 'internal' {
+  return params.internal ? 'internal' : source;
 }
 
 function safeStat(params: Parameters<typeof recordFetchStat>[0]): void {
@@ -124,7 +132,7 @@ export async function fetchMedia(params: FetchMediaParams): Promise<BlazfetchRes
       // Known to be gone. Don't re-extract on every request; look again only every so often.
       const lastCheck = stored.lastCheckAt ? new Date(stored.lastCheckAt).getTime() : 0;
       if (now - lastCheck < env.UNAVAILABLE_RECHECK_SECONDS * 1000) {
-        safeStat({ platform: stored.platform, mediaId: stored.mediaKey, userId: params.userId, guestId: params.guestId, success: false, cacheHit: true, errorCode: 'MEDIA_UNAVAILABLE', kind: stored.kind });
+        safeStat({ platform: stored.platform, mediaId: stored.mediaKey, userId: params.userId, guestId: params.guestId, success: false, cacheHit: true, errorCode: 'MEDIA_UNAVAILABLE', kind: stored.kind, source: statSource('user', params) });
         throw tombstoneError(stored);
       }
     } else {
@@ -148,6 +156,7 @@ export async function fetchMedia(params: FetchMediaParams): Promise<BlazfetchRes
           extractor: stored.metadata.extractor,
           cacheHit: true,
           cacheStale: !urlsFresh,
+          source: statSource('user', params),
           kind: stored.kind,
         });
         return decorate(stored, { cached: true, playlistPath: playlistPathFor(normalized) });
@@ -206,7 +215,7 @@ async function extractLive(
           fallbackUsed: result.fallbackUsed,
           durationMs: Date.now() - startedAt,
           cacheHit: false,
-          source,
+          source: statSource(source, params),
         });
         return result;
       }
@@ -237,7 +246,7 @@ async function extractLive(
         durationMs: Date.now() - startedAt,
         cacheHit: false,
         kind: kindOfKey(mediaKey),
-        source,
+        source: statSource(source, params),
       });
 
       const record = await getDb().metadataCache.findByKey(result.platform, mediaKey);
@@ -253,7 +262,7 @@ async function extractLive(
         durationMs: Date.now() - startedAt,
         errorCode: code,
         cacheHit: false,
-        source,
+        source: statSource(source, params),
       });
       return await handleFailure(err, code, stored, params, source);
     } finally {

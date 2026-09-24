@@ -288,6 +288,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
   const media = await fetchMedia({
     url: params.url,
     requestId: params.requestId,
+    internal: true,
     userId: params.userId,
     guestId: params.guestId,
     requireFreshUrls: true,
