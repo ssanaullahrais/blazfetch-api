@@ -1770,4 +1770,4 @@ from the database, fetches never-seen media when the link can be rebuilt from th
 
 ## License
 
-Open source (MIT with required attribution): free to use, modify and deploy, including commercially, as long as the official frontend keeps its footer credit and the license notices are kept. See [LICENSE](../LICENSE) and [AGENTS.md](../AGENTS.md).
+Free to use, modify and deploy (including on your own VPS), but not to sell, and the official frontend must keep its footer credit. See [LICENSE](../LICENSE) and [AGENTS.md](../AGENTS.md).

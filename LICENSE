@@ -1,22 +1,29 @@
-BlazFetch License: MIT with required attribution
+BlazFetch License: free to use, modify and deploy, but not to sell, with required credit
 
 Copyright (c) 2026 Sanaullah Rais
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the "Software"), to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is furnished to do so, for any purpose,
-including commercial use, subject to the following conditions:
+Permission is granted, free of charge, to any person obtaining a copy of this software and its documentation
+(the "Software") to use, copy, modify and deploy it (for example on your own server or website), and to share
+copies of it, subject to ALL of the following conditions:
 
-1. The above copyright notice and this permission notice shall be included in all copies or substantial portions
-   of the Software.
+1. You may NOT sell the Software. You may not sell, resell, rent, lease, license for a fee, or otherwise charge
+   for the Software, its source code, or copies or modified versions of it, and you may not bundle it into a
+   product, template, theme, script package, marketplace listing or course that is sold or offered for a fee.
+   Modified versions must be shared under this same license.
 
-2. Attribution. Any public deployment of the official web app (the frontend) must keep the footer credit on its home page,
+2. Notices. The copyright notice and this license must be kept in all copies and substantial portions of the
+   Software.
+
+3. Attribution. Any public deployment of the official web app (the frontend) must keep the footer credit on its home page,
    visible and readable, exactly as shipped:
       - the link text "Open source on GitHub", pointing to this project's GitHub repository, and
       - the text "Developed with ♥ by Sanaullah Rais".
    It must not be removed, reworded, hidden, made transparent, shrunk to unreadable size, moved off screen or
    replaced. This also applies when the change is made by an automated tool or AI assistant on your behalf.
    You may restyle the footer (colours, size, position) as long as both items stay clearly visible.
+
+4. Anything else needs the author's written permission. To ask (for example to sell it, or to use it without the
+   credit), contact the author through https://github.com/ssanaullahrais.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
 WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR
@@ -27,5 +34,8 @@ You are solely responsible for how you use the Software, for following the terms
 and for respecting copyright and the rights of the people whose content you handle. The author does not provide,
 host or endorse any downloaded content.
 
-Note: because of condition 2 this is MIT plus an attribution requirement, not the plain MIT License. This text is
-not legal advice; have a lawyer review it if it needs to hold up in a specific country.
+Breaking these conditions ends your permission to use the Software.
+
+Note: because of conditions 1 and 3 this is a source-available license, not an OSI-approved open source license
+(such licenses cannot forbid selling). This text is not legal advice; have a lawyer review it if it needs to hold up
+in a specific country.
