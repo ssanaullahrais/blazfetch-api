@@ -126,6 +126,27 @@ function normalizePinterest(url: URL): { canonicalUrl: string } {
   return { canonicalUrl: `https://www.pinterest.com${path}` };
 }
 
+const SOUNDCLOUD_NON_TRACK_SEGMENTS = new Set(['you', 'stream', 'discover', 'search', 'upload', 'charts', 'stations']);
+
+/**
+ * A single track/set URL has at least two path segments (/user/track or /user/sets/name).
+ * A bare profile URL (/user) has one segment and, if passed to yt-dlp, gets treated as a
+ * "channel" extraction that enumerates the user's entire upload history — which is slow (or
+ * times out) and isn't what "fetch this SoundCloud link" means. Reject it before it ever
+ * reaches yt-dlp, same as an unsupported platform would be rejected.
+ */
+function normalizeSoundCloud(url: URL): { canonicalUrl: string } {
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (segments.length === 0 || SOUNDCLOUD_NON_TRACK_SEGMENTS.has(segments[0].toLowerCase())) {
+    throw new BlazfetchError('INVALID_URL', 'This looks like a SoundCloud profile or browse page, not a single track. Provide a link to one track or set.');
+  }
+  if (segments.length < 2) {
+    throw new BlazfetchError('INVALID_URL', 'This looks like a SoundCloud profile page, not a single track. Provide a link to one track or set.');
+  }
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  return { canonicalUrl: `https://soundcloud.com${path}` };
+}
+
 function normalizeDailymotion(url: URL): { canonicalUrl: string } {
   const embedMatch = url.pathname.match(/^\/embed\/video\/([^/?]+)/);
   if (embedMatch) {
@@ -179,6 +200,9 @@ export function validateAndNormalizeUrl(raw: string): NormalizedUrlResult {
       break;
     case 'pinterest':
       result = normalizePinterest(url);
+      break;
+    case 'soundcloud':
+      result = normalizeSoundCloud(url);
       break;
     case 'dailymotion':
       result = normalizeDailymotion(url);

@@ -46,4 +46,18 @@ describe('validateAndNormalizeUrl', () => {
     const result = validateAndNormalizeUrl('https://instagr.am/p/abc123/');
     expect(result.canonicalUrl).toBe('https://www.instagram.com/p/abc123');
   });
+
+  it('normalizes a single SoundCloud track URL', () => {
+    const result = validateAndNormalizeUrl('https://soundcloud.com/nasa/houston-we-have-a-podcast-4');
+    expect(result.platform).toBe('soundcloud');
+    expect(result.canonicalUrl).toBe('https://soundcloud.com/nasa/houston-we-have-a-podcast-4');
+  });
+
+  it('rejects a bare SoundCloud profile URL rather than enumerating the whole channel', () => {
+    expect(() => validateAndNormalizeUrl('https://soundcloud.com/nasa')).toThrow(BlazfetchError);
+  });
+
+  it('rejects SoundCloud browse pages like /you or /discover', () => {
+    expect(() => validateAndNormalizeUrl('https://soundcloud.com/discover')).toThrow(BlazfetchError);
+  });
 });
