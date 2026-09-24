@@ -9,7 +9,6 @@ import { normalizeFormats, normalizeYtdlpInfo, YtdlpRawInfo } from './ytdlpNorma
 import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
 import { fetchInstagramViaBtchDownloader } from '../fallback/instagram/btchDownloader';
 import { fetchInstagramViaCakkatrok } from '../fallback/instagram/cakkatrokAdapter';
-import { fetchInstagramProfileViaInstaloader, isInstaloaderConfigured } from '../fallback/instagram/instaloaderRunner';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
 import { BlazfetchItem, BlazfetchPlaylistItem, BlazfetchResponse } from '../../types/blazfetch';
 
@@ -17,22 +16,6 @@ interface YtdlpPlaylistInfo extends YtdlpRawInfo {
   _type?: string;
   entries?: YtdlpRawInfo[];
 }
-
-interface YtdlpFlatUserEntry {
-  id: string;
-  title?: string;
-  thumbnails?: { url: string }[];
-  duration?: number;
-  url?: string;
-}
-
-interface YtdlpFlatUserInfo {
-  id: string;
-  title?: string;
-  entries?: YtdlpFlatUserEntry[];
-}
-
-const INSTAGRAM_NON_PROFILE_SEGMENTS = new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct', 'about', 'developer', 'legal']);
 
 function guessExtFromUrl(url: string): string {
   const match = url.match(/\.(jpg|jpeg|png|webp|mp4|mov)(?:\?|$)/i);
@@ -57,19 +40,8 @@ export class InstagramAdapter implements PlatformAdapter {
     return normalizedUrl.platform === 'instagram';
   }
 
-  private isProfileUrl(canonicalUrl: string): string | null {
-    const segments = new URL(canonicalUrl).pathname.split('/').filter(Boolean);
-    if (segments.length !== 1 || INSTAGRAM_NON_PROFILE_SEGMENTS.has(segments[0].toLowerCase())) return null;
-    return segments[0];
-  }
-
   async fetchMetadata(ctx: AdapterFetchContext): Promise<BlazfetchResponse> {
     const targetUrl = ctx.normalizedUrl.canonicalUrl;
-
-    const username = this.isProfileUrl(targetUrl);
-    if (username) {
-      return this.fetchProfile(username, targetUrl, ctx.requestId);
-    }
 
     // Layer 1 & 2: yt-dlp, allowing playlist expansion so carousel posts return every entry.
     try {
@@ -101,105 +73,6 @@ export class InstagramAdapter implements PlatformAdapter {
       const items = await fetchInstagramViaCakkatrok(targetUrl);
       return this.normalizeFallbackItems(items, targetUrl, 'cakkatrok-instagram-downloader');
     }
-  }
-
-  /**
-   * Lists a profile's posts. Instagram requires an authenticated session for this even for
-   * public accounts (confirmed: the anonymous web_profile_info API returns 401 require_login —
-   * and Instaloader, the purpose-built tool for this exact job, hits the identical wall
-   * anonymously), so this only works when the operator has configured a session they created
-   * themselves — never anonymously, and never using credentials this backend obtained on its own.
-   *
-   * Instaloader (https://instaloader.github.io/) is preferred when configured
-   * (INSTAGRAM_INSTALOADER_SESSION_PATH + _USERNAME): it's purpose-built for Instagram and
-   * returns richer post metadata than yt-dlp's flat-playlist listing. yt-dlp + INSTAGRAM_COOKIES_PATH
-   * remains as a fallback engine if only that's configured.
-   */
-  private async fetchProfile(username: string, targetUrl: string, requestId: string): Promise<BlazfetchResponse> {
-    if (isInstaloaderConfigured()) {
-      return this.fetchProfileViaInstaloader(username, targetUrl, requestId);
-    }
-
-    const cookies = cookiesArgs();
-    if (cookies.length === 0) {
-      throw new BlazfetchError(
-        'LOGIN_REQUIRED',
-        'Listing an Instagram profile requires an authenticated session (Instagram blocks this anonymously). ' +
-          'Set INSTAGRAM_INSTALOADER_SESSION_PATH + INSTAGRAM_INSTALOADER_SESSION_USERNAME (preferred, via Instaloader), ' +
-          'or INSTAGRAM_COOKIES_PATH, to a session from an account authorized to view this profile.',
-      );
-    }
-
-    await assertUrlIsSafeToFetch(targetUrl);
-    logger.info({ requestId, username }, 'fetching Instagram profile via yt-dlp with configured session cookies');
-
-    const { stdout, stderr, exitCode } = await runYtdlp({
-      args: [...cookies, '-J', '--flat-playlist', '--no-warnings', '--playlist-end', String(env.MAX_PLAYLIST_ITEMS), targetUrl],
-    });
-    if (exitCode !== 0) throw classifyYtdlpFailure(stderr);
-
-    let info: YtdlpFlatUserInfo;
-    try {
-      info = JSON.parse(stdout);
-    } catch {
-      throw new BlazfetchError('EXTRACTOR_FAILED', 'Failed to parse Instagram profile listing.');
-    }
-
-    const items: BlazfetchPlaylistItem[] = (info.entries ?? []).map((entry) => ({
-      videoId: entry.id,
-      title: entry.title ?? entry.id,
-      thumbnail: entry.thumbnails?.at(-1)?.url,
-      durationSeconds: entry.duration,
-      url: entry.url ?? `https://www.instagram.com/p/${entry.id}/`,
-    }));
-
-    return {
-      success: true,
-      platform: 'instagram',
-      mediaType: 'playlist',
-      mediaId: info.id ?? username,
-      canonicalUrl: targetUrl,
-      title: info.title ?? username,
-      isPlaylist: true,
-      itemCount: items.length,
-      playlist: { title: info.title ?? username, itemCount: items.length, items },
-      formats: [],
-      audioFormats: [],
-      metadata: {},
-      extractor: 'yt-dlp-authenticated',
-    };
-  }
-
-  private async fetchProfileViaInstaloader(username: string, targetUrl: string, requestId: string): Promise<BlazfetchResponse> {
-    logger.info({ requestId, username }, 'fetching Instagram profile via Instaloader with configured session');
-    const profile = await fetchInstagramProfileViaInstaloader(username, env.MAX_PLAYLIST_ITEMS);
-
-    const items: BlazfetchPlaylistItem[] = profile.items.map((post) => ({
-      videoId: post.shortcode,
-      title: post.caption ?? post.shortcode,
-      thumbnail: post.displayUrl,
-      durationSeconds: undefined,
-      url: post.url,
-    }));
-
-    return {
-      success: true,
-      platform: 'instagram',
-      mediaType: 'playlist',
-      mediaId: username,
-      canonicalUrl: targetUrl,
-      title: profile.fullName || username,
-      description: profile.biography,
-      author: { name: profile.fullName || username, url: targetUrl },
-      thumbnail: profile.profilePicUrl,
-      isPlaylist: true,
-      itemCount: items.length,
-      playlist: { title: profile.fullName || username, thumbnail: profile.profilePicUrl, itemCount: items.length, items },
-      formats: [],
-      audioFormats: [],
-      metadata: { followerCount: profile.followerCount, postCount: profile.postCount },
-      extractor: 'instaloader',
-    };
   }
 
   private normalizeCarousel(info: YtdlpPlaylistInfo, canonicalUrl: string): BlazfetchResponse {

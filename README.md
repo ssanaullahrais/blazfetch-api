@@ -12,7 +12,7 @@ straight through to whoever asked, and deletes any temporary files afterward.
 |---|---|---|
 | YouTube | ✅ Confirmed | Video, playlists, best-quality auto-select |
 | TikTok | ✅ Confirmed | yt-dlp primary, `@tobyg74/tiktok-api-dl` fallback |
-| Instagram | ✅ Confirmed (single post/reel/carousel) | Profile listing needs a session — see below |
+| Instagram | ✅ Confirmed | Posts, reels, carousels |
 | X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com` |
 | Facebook | ✅ Confirmed | Reels |
 | Reddit | ✅ Confirmed | Including separate video+audio DASH streams |
@@ -26,7 +26,7 @@ straight through to whoever asked, and deletes any temporary files afterward.
 | Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
 | Pinterest | ✅ Confirmed (pins + boards) | Public API, no auth needed — see below |
 | Loom, Newgrounds, Tumblr | ⚠️ Wired, untested | Newgrounds correctly blocks age-restricted content |
-| Instagram (profile listing) | ⚠️ Requires your own session | See below |
+
 
 ## Install
 
@@ -87,28 +87,6 @@ GET    /api/v1/platforms        list supported platforms + domains
 GET    /health / /health/ready  liveness / readiness (DB, yt-dlp, ffmpeg)
 ```
 
-## Instagram profile listing (optional)
-
-Single posts/reels/carousels work with no setup. Listing everything a profile has posted
-requires your own logged-in session (Instagram blocks this anonymously, even for public
-accounts):
-
-```bash
-pip install instaloader
-instaloader --login <your_username>
-```
-
-Then in `.env`:
-
-```
-PYTHON_PATH=python
-INSTAGRAM_INSTALOADER_SESSION_PATH=/path/to/session/file
-INSTAGRAM_INSTALOADER_SESSION_USERNAME=<your_username>
-```
-
-The backend never requests or stores Instagram credentials itself — only a session you created
-yourself. Without this set, a profile URL returns a clear `LOGIN_REQUIRED` error.
-
 ## Production
 
 ```bash
@@ -119,7 +97,7 @@ Full VPS deployment guide (Nginx, PM2, SSL, firewall): [docs/REQUIREMENTS.md](do
 
 ## Troubleshooting
 
-- `npm run diagnostics` — Node/PostgreSQL/yt-dlp/ffmpeg/Instaloader status and versions.
+- `npm run diagnostics` — Node/PostgreSQL/yt-dlp/ffmpeg status and versions.
 - `GET /health/ready` — same checks over HTTP.
 - Update yt-dlp regularly: `pip install -U yt-dlp` (platforms change extraction often).
 - Extractor errors return a normalized code (`EXTRACTOR_FAILED`, `LOGIN_REQUIRED`, etc.); raw

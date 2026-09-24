@@ -12,7 +12,7 @@ real video/audio file was downloaded and ffprobe-validated (correct streams, val
 |---|---|---|
 | YouTube | ✅ Confirmed | Video, playlists (flat listing), best-quality auto-select |
 | TikTok | ✅ Confirmed | yt-dlp primary, `@tobyg74/tiktok-api-dl` fallback |
-| Instagram | ✅ Confirmed (single post/reel/carousel) | Profile listing needs a session — see below |
+| Instagram | ✅ Confirmed | Posts, reels, carousels |
 | X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com` |
 | Facebook | ✅ Confirmed | Reels |
 | Reddit | ✅ Confirmed | Including separate video+audio DASH streams |
@@ -26,7 +26,7 @@ real video/audio file was downloaded and ffprobe-validated (correct streams, val
 | Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
 | Pinterest | ✅ Confirmed (pins + boards) | Public `PinResource`/`BoardResource` API, no auth needed — see below |
 | Loom, Newgrounds, Tumblr | ⚠️ Wired, untested | No real test URL exercised yet; Newgrounds correctly blocks age-restricted content |
-| Instagram (profile listing) | ⚠️ Requires your own session | See "Instagram profile listing" below |
+
 
 Authentication is not yet implemented in this scaffold — every endpoint currently runs as a
 guest, tracked by a `blazfetch_guest_id` cookie the server sets automatically. `req.userId` is
@@ -208,51 +208,6 @@ cache. A single individual pin URL (`/pin/<id>`) ignores range params entirely.
   "extractor": "yt-dlp"
 }
 ```
-
-### Instagram profile example
-
-`POST { "url": "https://www.instagram.com/<username>/" }` — lists a profile's posts. **Requires
-an authenticated session you configure yourself** (`INSTAGRAM_INSTALOADER_SESSION_PATH` via
-Instaloader, or `INSTAGRAM_COOKIES_PATH` via yt-dlp — see the main [README](../README.md#instagram-profile-listing-optional)).
-Instagram blocks this anonymously even for public accounts; the backend never bypasses that.
-
-```json
-{
-  "success": true,
-  "platform": "instagram",
-  "mediaType": "playlist",
-  "isPlaylist": true,
-  "itemCount": 50,
-  "title": "Full Name",
-  "thumbnail": "https://...",
-  "playlist": {
-    "title": "Full Name",
-    "itemCount": 50,
-    "items": [
-      { "videoId": "ABC123xyz", "title": "caption text...", "thumbnail": "https://...", "url": "https://www.instagram.com/p/ABC123xyz/" }
-    ]
-  },
-  "formats": [],
-  "audioFormats": [],
-  "metadata": { "followerCount": 12345, "postCount": 890 },
-  "extractor": "instaloader"
-}
-```
-
-Without a configured session:
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "LOGIN_REQUIRED",
-    "message": "Listing an Instagram profile requires an authenticated session (Instagram blocks this anonymously). Set INSTAGRAM_INSTALOADER_SESSION_PATH + INSTAGRAM_INSTALOADER_SESSION_USERNAME (preferred, via Instaloader), or INSTAGRAM_COOKIES_PATH, to a session from an account authorized to view this profile."
-  },
-  "requestId": "b3f1..."
-}
-```
-
-Fetch full details for one post by calling `POST /fetch` again with that item's `url`.
 
 ### Failed request examples
 
@@ -490,15 +445,10 @@ or orchestrator readiness probe:
     "ytdlp": true,
     "ytdlpVersion": "2026.08.19",
     "ffmpeg": false,
-    "ffmpegVersion": null,
-    "instaloader": false,
-    "instaloaderVersion": null
+    "ffmpegVersion": null
   }
 }
 ```
-
-`instaloader` is informational only (optional dependency, only needed for Instagram profile
-listing) and never affects the overall `ready`/`not_ready` status.
 
 ---
 
