@@ -1,0 +1,68 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "youtube",
+    "mediaType": "playlist",
+    "mediaId": "PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
+    "canonicalUrl": "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
+    "title": "Popular Music Videos",
+    "thumbnail": "https://i.ytimg.com/vi/fOT0BUpITw8/hqdefault.jpg?sqp=-oaymwEXCNACELwBSFryq4qpAwkIARUAAIhCGAE=&rs...",
+    "isPlaylist": true,
+    "itemCount": 183,
+    "playlist": {
+      "title": "Popular Music Videos",
+      "thumbnail": "https://i.ytimg.com/vi/fOT0BUpITw8/hqdefault.jpg?sqp=-oaymwEXCNACELwBSFryq4qpAwkIARUAAIhCGAE=&rs...",
+      "channel": "Music",
+      "itemCount": 183,
+      "items": [
+        {
+          "videoId": "fOT0BUpITw8",
+          "title": "BELLAKEO (Video Oficial) - Peso Pluma, Anitta",
+          "thumbnail": "https://i.ytimg.com/vi/fOT0BUpITw8/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcA...",
+          "durationSeconds": 235,
+          "url": "https://www.youtube.com/watch?v=fOT0BUpITw8"
+        },
+        {
+          "videoId": "NFvDHYMzj9U",
+          "title": "Arcángel - FN8 ( Video Lyric )",
+          "thumbnail": "https://i.ytimg.com/vi/NFvDHYMzj9U/hqdefault.jpg?sqp=-oaymwE2CNACELwBSFXyq4qpAygIARUAAIhCGAFwAcA...",
+          "durationSeconds": 650,
+          "url": "https://www.youtube.com/watch?v=NFvDHYMzj9U"
+        }
+      ]
+    },
+    "formats": [],
+    "audioFormats": [],
+    "metadata": {},
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/youtube/playlist/PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
+      "sourceUrl": "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:14.511Z",
+      "lastFetchedAt": "2026-09-24T19:09:14.511Z",
+      "validatedAt": "2026-09-24T19:09:14.511Z",
+      "nextCheckAt": "2026-10-01T19:09:14.511Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

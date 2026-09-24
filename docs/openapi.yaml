@@ -3,8 +3,11 @@ info:
   title: Blazfetch Backend API
   version: 0.1.0
   description: >
-    Resolves media metadata/formats and orchestrates downloads from supported social platforms.
-    See docs/API.md for full narrative documentation and examples.
+    Resolves media metadata/formats and orchestrates downloads from supported social platforms
+    (YouTube, TikTok, Instagram, X/Twitter, Facebook, Reddit, Vimeo, Dailymotion, Bluesky, Streamable,
+    Rutube, SoundCloud, Snapchat, Twitch, Pinterest, Loom, Newgrounds). Everything fetched is stored
+    (metadata only) with a stable path and re-checked weekly. See docs/API.md for the narrative
+    documentation and a real response for every platform, and docs/examples/ for them as JSON files.
 servers:
   - url: /api/v1
 paths:
@@ -214,13 +217,15 @@ components:
       required: [url]
       properties:
         url: { type: string }
-        forceRefresh: { type: boolean }
+        forceRefresh: { type: boolean, description: Skip the stored copy and extract again now. }
+        rangeStart: { type: integer, minimum: 1, description: Collection URLs (Pinterest boards) only. }
+        rangeEnd: { type: integer, minimum: 1, description: Collection URLs (Pinterest boards) only. }
     DownloadRequest:
       type: object
       required: [url, formatId, kind]
       properties:
         url: { type: string }
-        formatId: { type: string }
+        formatId: { type: string, default: best, description: A formatId from /fetch, or "best". }
         kind: { type: string, enum: [video, audio] }
         quality: { type: string }
     BlazfetchFormat:
@@ -244,24 +249,106 @@ components:
       type: object
       properties:
         success: { type: boolean }
-        platform: { type: string }
+        platform:
+          type: string
+          enum: [youtube, tiktok, instagram, twitter, facebook, vimeo, reddit, soundcloud, pinterest, snapchat, dailymotion, bluesky, loom, newgrounds, rutube, streamable, twitch, tumblr]
         mediaType: { type: string, enum: [video, audio, image, carousel, playlist] }
-        mediaId: { type: string }
+        mediaId: { type: string, description: The platform's own id; also the last part of stored.path. }
         canonicalUrl: { type: string }
         title: { type: string }
         description: { type: string }
+        author:
+          type: object
+          properties:
+            name: { type: string }
+            url: { type: string }
         thumbnail: { type: string }
         durationSeconds: { type: number, nullable: true }
+        uploadDate: { type: string, description: 'YYYYMMDD' }
         formats:
           type: array
           items: { $ref: '#/components/schemas/BlazfetchFormat' }
         audioFormats:
           type: array
+          items: { $ref: '#/components/schemas/BlazfetchAudioFormat' }
+        items:
+          type: array
+          description: For carousels and Pinterest boards, one entry per photo or video.
           items:
             type: object
+            properties:
+              id: { type: string }
+              type: { type: string, enum: [image, video] }
+              thumbnail: { type: string }
+              source: { type: string }
+              durationSeconds: { type: number }
+              formats:
+                type: array
+                items: { $ref: '#/components/schemas/BlazfetchFormat' }
+        playlist:
+          type: object
+          description: For playlists.
+          properties:
+            title: { type: string }
+            channel: { type: string }
+            itemCount: { type: integer }
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  videoId: { type: string }
+                  title: { type: string }
+                  thumbnail: { type: string }
+                  durationSeconds: { type: number }
+                  url: { type: string }
+        isPlaylist: { type: boolean }
+        isCarousel: { type: boolean }
+        itemCount: { type: integer }
         metadata:
           type: object
-        extractor: { type: string }
+        extractor: { type: string, description: yt-dlp, or the name of a fallback provider. }
+        fallbackUsed: { type: string, description: Set when a fallback provider produced the answer. }
+        stored: { $ref: '#/components/schemas/StoredInfo' }
+    BlazfetchAudioFormat:
+      type: object
+      properties:
+        formatId: { type: string }
+        ext: { type: string }
+        bitrate: { type: number, nullable: true }
+        codec: { type: string }
+        quality: { type: string, nullable: true }
+        filesizeBytes: { type: integer }
+        filesizeApprox: { type: boolean }
+        isConverted: { type: boolean, description: True when the audio must be produced with ffmpeg. }
+        url: { type: string }
+    StoredInfo:
+      type: object
+      description: What we know about a stored item, added to fetch and media responses.
+      properties:
+        path: { type: string, example: /youtube/Cwkej79U3ek }
+        playlistPath: { type: string, example: /youtube/Cwkej79U3ek/playlist/RDCwkej79U3ek }
+        sourceUrl: { type: string }
+        status: { type: string, enum: [available, unavailable] }
+        cached: { type: boolean, description: True when answered from the database without extracting. }
+        urlsStale: { type: boolean, description: The direct media URLs are past their trust window and refresh in the background. }
+        validationFailed: { type: boolean, description: A live check failed without proving the media gone, so the last answer is served. }
+        firstFetchedAt: { type: string, format: date-time }
+        lastFetchedAt: { type: string, format: date-time }
+        validatedAt: { type: string, format: date-time, nullable: true }
+        nextCheckAt: { type: string, format: date-time, nullable: true }
+        stats:
+          type: object
+          properties:
+            fetchCount: { type: integer }
+            hitCount: { type: integer }
+            viewCount: { type: integer }
+            downloadCount: { type: integer }
+            streamCount: { type: integer }
+            prepareCount: { type: integer }
+            bytesServed: { type: integer }
+            lastAccessedAt: { type: string, format: date-time, nullable: true }
+            lastDownloadedAt: { type: string, format: date-time, nullable: true }
     AudioFetchResponse:
       type: object
       properties:
@@ -296,6 +383,11 @@ components:
         error:
           type: object
           properties:
-            code: { type: string }
+            code:
+              type: string
+              enum: [UNSUPPORTED_PLATFORM, INVALID_URL, MEDIA_NOT_FOUND, MEDIA_UNAVAILABLE, PRIVATE_MEDIA, LOGIN_REQUIRED, AGE_RESTRICTED, GEO_RESTRICTED, EXTRACTOR_FAILED, PLATFORM_RATE_LIMITED, DOWNLOAD_FAILED, FORMAT_UNAVAILABLE, PROCESS_TIMEOUT, FILE_TOO_LARGE, SERVER_BUSY, VALIDATION_ERROR, JOB_NOT_FOUND, NOT_FOUND, INTERNAL_ERROR]
             message: { type: string }
+            details:
+              type: object
+              description: Only for MEDIA_UNAVAILABLE. details.tombstone says what the media was (title, thumbnail, reason, unavailableSince, lastSeenAvailable, path, sourceUrl).
         requestId: { type: string }

@@ -1,0 +1,92 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.pinterest.com/pin/424605071136961057/"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "pinterest",
+    "mediaType": "video",
+    "mediaId": "424605071136961057",
+    "canonicalUrl": "https://www.pinterest.com/pin/424605071136961057/",
+    "title": "The journey to a more inclusive Pinterest starts here. 📌",
+    "description": "Your favorite plus-size fashion tastemakers helped Pinterest develop new tech that champions diversity. Now you'll see more body shapes, ...",
+    "author": {
+      "name": "Pinterest"
+    },
+    "thumbnail": "https://i.pinimg.com/originals/dc/59/c7/dc59c78056607f0250deb7611d387731.jpg",
+    "durationSeconds": 43.333,
+    "uploadDate": "20230907",
+    "formats": [
+      {
+        "formatId": "V_HLSV3_MOBILE-426",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "234x416",
+        "width": 234,
+        "height": 416,
+        "fps": 30,
+        "bitrate": 426.81,
+        "codec": "avc1.4d400d",
+        "filesizeApprox": false,
+        "url": "https://v1.pinimg.com/videos/mc/hls/91/ee/22/91ee22f657cd9bf8979623646d9b26fb_240w.m3u8",
+        "requiresMerge": true,
+        "compatible": true
+      },
+      {
+        "formatId": "V_EXP7",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "1080x1920",
+        "width": 1080,
+        "height": 1920,
+        "bitrate": null,
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "url": "https://v1.pinimg.com/videos/mc/720p/91/ee/22/91ee22f657cd9bf8979623646d9b26fb.mp4",
+        "requiresMerge": false,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "V_HLSV3_MOBILE-program_audio_0-Alternate_Audio",
+        "ext": "mp4",
+        "bitrate": null,
+        "quality": "Alternate Audio",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://v1.pinimg.com/videos/mc/hls/91/ee/22/91ee22f657cd9bf8979623646d9b26fb_audio.m3u8"
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/pinterest/424605071136961057",
+      "sourceUrl": "https://www.pinterest.com/pin/424605071136961057/",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:12:21.249Z",
+      "lastFetchedAt": "2026-09-24T19:12:21.249Z",
+      "validatedAt": "2026-09-24T19:12:21.249Z",
+      "nextCheckAt": "2026-10-01T19:12:21.249Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

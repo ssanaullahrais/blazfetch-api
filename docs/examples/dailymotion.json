@@ -1,0 +1,83 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.dailymotion.com/video/x84sh87"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "dailymotion",
+    "mediaType": "video",
+    "mediaId": "x84sh87",
+    "canonicalUrl": "https://www.dailymotion.com/video/x84sh87",
+    "title": "Dailymotion demo video",
+    "description": "",
+    "author": {
+      "name": "Dailymotion"
+    },
+    "thumbnail": "https://s2.dmcdn.net/v/TJ-et1gM9ma29OOy8/x1080",
+    "durationSeconds": 25,
+    "uploadDate": "20211011",
+    "formats": [
+      {
+        "formatId": "hls-380",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "512x288",
+        "width": 512,
+        "height": 288,
+        "fps": null,
+        "bitrate": 460.56,
+        "codec": "avc1.42001e",
+        "filesizeApprox": false,
+        "url": "https://vod3.cf.dmcdn.net/sec2(DeyrKU57lyyNj5se3eeL0x_lWcEZ6pfRLP1E7vOiXAAtfPNJJ9JEWR8yAIcObWXAj...",
+        "requiresMerge": false,
+        "compatible": true
+      },
+      {
+        "formatId": "hls-1080",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "1920x1080",
+        "width": 1920,
+        "height": 1080,
+        "fps": null,
+        "bitrate": 6221.6,
+        "codec": "avc1.640028",
+        "filesizeApprox": false,
+        "url": "https://vod3.cf.dmcdn.net/sec2(3O4NYZpyhz3FwHhynqXQY8EL6jgCATNA9JLL-eTlAI2iAEIhHqO3cCFFhtPn_-z74...",
+        "requiresMerge": false,
+        "compatible": true
+      }
+    ],
+    "audioFormats": [],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/dailymotion/x84sh87",
+      "sourceUrl": "https://www.dailymotion.com/video/x84sh87",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:07.115Z",
+      "lastFetchedAt": "2026-09-24T19:10:07.115Z",
+      "validatedAt": "2026-09-24T19:10:07.115Z",
+      "nextCheckAt": "2026-10-01T19:10:07.115Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

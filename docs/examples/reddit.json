@@ -1,0 +1,91 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.reddit.com/r/funny/comments/1bx4vqy/in_hot_pursuit/"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "reddit",
+    "mediaType": "video",
+    "mediaId": "vq983vm21tsc1",
+    "canonicalUrl": "https://www.reddit.com/r/funny/comments/1bx4vqy/in_hot_pursuit",
+    "title": "In hot pursuit.",
+    "author": {
+      "name": "xgodlesssaintx"
+    },
+    "durationSeconds": 66,
+    "uploadDate": "20240406",
+    "formats": [
+      {
+        "formatId": "dash-1",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "DASH video",
+        "width": 392,
+        "height": 214,
+        "fps": null,
+        "bitrate": 214.274,
+        "codec": "avc1.4d401e",
+        "filesizeApprox": false,
+        "url": "https://v.redd.it/vq983vm21tsc1/DASH_220.mp4",
+        "requiresMerge": true,
+        "compatible": true
+      },
+      {
+        "formatId": "fallback",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "DASH video, mp4_dash",
+        "width": 640,
+        "height": 350,
+        "bitrate": 800,
+        "codec": "h264",
+        "filesizeBytes": 6600000,
+        "filesizeApprox": true,
+        "url": "https://v.redd.it/vq983vm21tsc1/DASH_360.mp4?source=fallback",
+        "requiresMerge": true,
+        "compatible": true
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "hls-3-audio_0",
+        "ext": "mp4",
+        "bitrate": null,
+        "quality": "audio 0, low",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://v.redd.it/vq983vm21tsc1/HLS_AUDIO_64.m3u8"
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/reddit/vq983vm21tsc1",
+      "sourceUrl": "https://www.reddit.com/r/funny/comments/1bx4vqy/in_hot_pursuit/",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:51.772Z",
+      "lastFetchedAt": "2026-09-24T19:09:51.772Z",
+      "validatedAt": "2026-09-24T19:09:51.772Z",
+      "nextCheckAt": "2026-10-01T19:09:51.772Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

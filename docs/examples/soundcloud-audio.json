@@ -1,0 +1,31 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch/audio",
+    "body": {
+      "url": "https://soundcloud.com/nasa/houston-we-have-a-podcast-4"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "soundcloud",
+    "mediaId": "2403099432",
+    "canonicalUrl": "https://soundcloud.com/nasa/houston-we-have-a-podcast-4",
+    "title": "Houston We Have a Podcast: Cosmic Perspectives",
+    "durationSeconds": 3211.642,
+    "audioFormats": [
+      {
+        "formatId": "hls_mp3_1_0",
+        "ext": "mp3",
+        "bitrate": 128,
+        "codec": "mp3",
+        "quality": null,
+        "filesizeBytes": 51386272,
+        "filesizeApprox": true,
+        "isConverted": false,
+        "url": "https://cf-hls-media.sndcdn.com/playlist/RYIhjySuLlIK.128.mp3/playlist.m3u8?Policy=eyJTdGF0ZW1lb..."
+      }
+    ],
+    "requiresConversion": false
+  }
+}

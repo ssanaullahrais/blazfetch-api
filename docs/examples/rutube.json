@@ -1,0 +1,83 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://rutube.ru/video/private/caafe83ff1c6ed38d394635b83ece578/?p=IBgzQQrKH4qB1bqm_91x7Q"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "rutube",
+    "mediaType": "video",
+    "mediaId": "caafe83ff1c6ed38d394635b83ece578",
+    "canonicalUrl": "https://rutube.ru/video/private/caafe83ff1c6ed38d394635b83ece578?p=IBgzQQrKH4qB1bqm_91x7Q",
+    "title": "Провал с покупкой объектива Вега-3",
+    "description": "00:00 Вступление\n00:33 Что не так\n02:02 Что делать?\n02:10 Как должно быть - Scopar\n02:40 Как работает диафрагма и шкала ГРИП\n03:26 Ещё пр...",
+    "author": {
+      "name": "Borislavo"
+    },
+    "thumbnail": "https://pic.rtbcdn.ru/video/36/93/3693afc41f9f026a19bd933d3b536246.jpg",
+    "durationSeconds": 287,
+    "uploadDate": "20221121",
+    "formats": [
+      {
+        "formatId": "default-567-0",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "432x232",
+        "width": 432,
+        "height": 232,
+        "fps": 59.94,
+        "bitrate": 567,
+        "codec": "avc1.42c01f",
+        "filesizeApprox": false,
+        "url": "https://river-4-411.rtbcdn.ru/hls-vod/tVYoHo-MxingiDTe_Bzcrg/1790881825/3304/0x5000c500e9cfbcd5/...",
+        "requiresMerge": false,
+        "compatible": true
+      },
+      {
+        "formatId": "m3u8-8205-1",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "1920x1080",
+        "width": 1920,
+        "height": 1080,
+        "fps": 59.94,
+        "bitrate": 8205,
+        "codec": "avc1.640029",
+        "filesizeApprox": false,
+        "url": "https://river-1.rutube.ru/hls-vod/ou22qbh-omckPQbYxgruew/1790881825/2470/0x5000c500e8774eb8/8096...",
+        "requiresMerge": false,
+        "compatible": true
+      }
+    ],
+    "audioFormats": [],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/rutube/caafe83ff1c6ed38d394635b83ece578",
+      "sourceUrl": "https://rutube.ru/video/private/caafe83ff1c6ed38d394635b83ece578/?p=IBgzQQrKH4qB1bqm_91x7Q",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:27.147Z",
+      "lastFetchedAt": "2026-09-24T19:10:27.147Z",
+      "validatedAt": "2026-09-24T19:10:27.147Z",
+      "nextCheckAt": "2026-10-01T19:10:27.147Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

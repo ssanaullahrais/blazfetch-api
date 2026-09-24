@@ -1,0 +1,95 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "youtube",
+    "mediaType": "video",
+    "mediaId": "dQw4w9WgXcQ",
+    "canonicalUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "title": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+    "description": "The official video for “Never Gonna Give You Up” by Rick Astley. \n\nNever: The Autobiography 📚 OUT NOW! \nFollow this link to get your copy...",
+    "author": {
+      "name": "Rick Astley",
+      "url": "https://www.youtube.com/@RickAstleyYT"
+    },
+    "thumbnail": "https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/maxresdefault.webp",
+    "durationSeconds": 213,
+    "uploadDate": "20091025",
+    "formats": [
+      {
+        "formatId": "394",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "144p",
+        "width": 256,
+        "height": 144,
+        "fps": 25,
+        "bitrate": 56.534,
+        "codec": "av01.0.00M.08",
+        "filesizeBytes": 1505504,
+        "filesizeApprox": false,
+        "url": "https://rr1---sn-o5t5uxa-pnck.googlevideo.com/videoplayback?expire=1790298525&ei=PXW1ar_5FfSr8uM...",
+        "requiresMerge": true,
+        "compatible": false
+      },
+      {
+        "formatId": "625",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "3840x2160",
+        "width": 3840,
+        "height": 2160,
+        "fps": 25,
+        "bitrate": 19117.677,
+        "codec": "vp09.00.50.08",
+        "filesizeApprox": false,
+        "url": "https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1790298525/ei/PXW1ar_5FfSr8uMP...",
+        "requiresMerge": true,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "233",
+        "ext": "mp4",
+        "bitrate": null,
+        "quality": "Default, low",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1790298525/ei/PXW1ar_5FfSr8uMP..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/youtube/dQw4w9WgXcQ",
+      "sourceUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "status": "available",
+      "cached": true,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:08:54.620Z",
+      "lastFetchedAt": "2026-09-24T19:08:54.620Z",
+      "validatedAt": "2026-09-24T19:08:54.620Z",
+      "nextCheckAt": "2026-10-01T19:08:54.620Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

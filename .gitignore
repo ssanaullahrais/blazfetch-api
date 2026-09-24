@@ -9,5 +9,5 @@ temp/
 .DS_Store
 coverage/
 *.tsbuildinfo
-examples/
+/examples/
 data/

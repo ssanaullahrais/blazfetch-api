@@ -129,6 +129,16 @@ production. The other limits (concurrency, timeouts, sizes) have sensible defaul
 
 `.env` is already in `.gitignore`; never commit it.
 
+Settings you may want to review for a public deployment:
+
+| Setting | Why |
+|---|---|
+| `DEFAULT_DOWNLOAD_MODE` | `stream` (default) is fastest; `auto` falls back to a server-prepared file when a source can't be streamed. Clients can always choose with `?mode=` |
+| `YOUTUBE_FALLBACK_ENABLED` | Leave `true`: if YouTube blocks the server's IP, a fallback provider serves the request |
+| `REVALIDATE_AFTER_SECONDS` | How often stored media is re-checked for deletion (default 7 days) |
+| `RATE_LIMIT_MAX_GUEST`, `RATE_LIMIT_MAX_DOWNLOAD`, `MAX_CONCURRENT_DOWNLOADS_*` | Protect the server's bandwidth and CPU |
+
+
 ### 6. Check, build and start
 
 ```bash
@@ -202,6 +212,12 @@ git pull && npm ci && npm run build && npm run migrate && pm2 restart blazfetch-
 ```
 
 `npm run migrate` applies any database changes that have not run yet (it keeps a `schema_migrations` record) and does nothing when up to date, so it is safe to run on every deploy. It upgrades an existing database in place without losing stored data.
+
+**Background work:** the app runs two small jobs by itself, nothing to schedule: a sweep of old files in
+`TEMP_DIR` (every 10 minutes) and the weekly re-check of stored media (a batch every 30 minutes, one item
+at a time with a pause between, so source sites are never hammered). Run **one app instance per
+database**: both jobs and the concurrency limits live inside the process, so a second instance would
+only repeat some checks. Tune or disable the re-check with `REVALIDATE_*` in `.env` (`REVALIDATE_ENABLED=false`).
 
 **Update yt-dlp** (do this regularly: extractors break when platforms change):
 

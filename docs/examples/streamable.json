@@ -1,0 +1,83 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://streamable.com/hn8hq"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "streamable",
+    "mediaType": "video",
+    "mediaId": "hn8hq",
+    "canonicalUrl": "https://streamable.com/hn8hq",
+    "title": "Gravity Rush 2's world traversal is so goddamn addictive. [Video]",
+    "description": "",
+    "author": {},
+    "thumbnail": "https://cdn-cf-east.streamable.com/image/hn8hq.jpg?Expires=1790284186266&Key-Pair-Id=APKAIEYUVEN...",
+    "durationSeconds": 24.002,
+    "uploadDate": "20170208",
+    "formats": [
+      {
+        "formatId": "mp4-mobile",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "640x360",
+        "width": 640,
+        "height": 360,
+        "fps": 30,
+        "bitrate": null,
+        "codec": "h264",
+        "filesizeBytes": 4746054,
+        "filesizeApprox": false,
+        "url": "https://cdn-cf-east.streamable.com/video/mp4-mobile/hn8hq.mp4?Expires=1790536186263&Key-Pair-Id=...",
+        "requiresMerge": false,
+        "compatible": true
+      },
+      {
+        "formatId": "mp4",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "1280x720",
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "bitrate": null,
+        "codec": "h264",
+        "filesizeBytes": 14230108,
+        "filesizeApprox": false,
+        "url": "https://cdn-cf-east.streamable.com/video/mp4/hn8hq.mp4?Expires=1790536186264&Key-Pair-Id=APKAIEY...",
+        "requiresMerge": false,
+        "compatible": true
+      }
+    ],
+    "audioFormats": [],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/streamable/hn8hq",
+      "sourceUrl": "https://streamable.com/hn8hq",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:19.360Z",
+      "lastFetchedAt": "2026-09-24T19:10:19.360Z",
+      "validatedAt": "2026-09-24T19:10:19.360Z",
+      "nextCheckAt": "2026-10-01T19:10:19.360Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

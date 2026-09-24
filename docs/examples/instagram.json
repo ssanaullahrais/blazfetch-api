@@ -1,0 +1,93 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.instagram.com/reel/DZYvGYIv1nr/"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "instagram",
+    "mediaType": "video",
+    "mediaId": "DZYvGYIv1nr",
+    "canonicalUrl": "https://www.instagram.com/reel/DZYvGYIv1nr",
+    "title": "Video by nasa",
+    "description": "Get ready for Earth joy!\n\nEarlier today, we announced the four astronauts who will go to space as part of Artemis III. The four crew memb...",
+    "author": {
+      "name": "NASA"
+    },
+    "thumbnail": "https://instagram.fisb1-2.fna.fbcdn.net/v/t51.82787-15/720823070_18616586722049152_3387319240174...",
+    "durationSeconds": null,
+    "uploadDate": "20260610",
+    "formats": [
+      {
+        "formatId": "1",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": null,
+        "bitrate": null,
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "url": "https://instagram.fisb17-1.fna.fbcdn.net/o1/v/t2/f2/m86/AQMqJP2UYHhTDAmd1a0m5cG59yX0bsZ90xP3GaoR...",
+        "requiresMerge": false,
+        "compatible": false
+      },
+      {
+        "formatId": "dash-1580359426785355v",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "DASH video",
+        "width": 1080,
+        "height": 1920,
+        "fps": null,
+        "bitrate": 1619.782,
+        "codec": "vp09.00.40.08.00.01.01.01.00",
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "url": "https://instagram.fisb17-1.fna.fbcdn.net/o1/v/t2/f2/m367/AQPy1iSi9CEXopxAsnO3MjmxzkCd7pXRfqSil96...",
+        "requiresMerge": true,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "dash-1544861667001560a",
+        "ext": "m4a",
+        "bitrate": 63.635,
+        "codec": "mp4a.40.5",
+        "quality": "DASH audio",
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://instagram.fisb17-1.fna.fbcdn.net/o1/v/t2/f2/m78/AQNxyOVDVb0RzSZSzMJ8V8cf-wQXrsI4iVwmu5uX..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/instagram/DZYvGYIv1nr",
+      "sourceUrl": "https://www.instagram.com/reel/DZYvGYIv1nr/",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:26.301Z",
+      "lastFetchedAt": "2026-09-24T19:09:26.301Z",
+      "validatedAt": "2026-09-24T19:09:26.301Z",
+      "nextCheckAt": "2026-10-01T19:09:26.301Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

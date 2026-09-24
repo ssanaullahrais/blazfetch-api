@@ -1,0 +1,93 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://x.com/BenGeskin/status/2102909808542154887/video/1"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "twitter",
+    "mediaType": "video",
+    "mediaId": "2102909714132508672",
+    "canonicalUrl": "https://x.com/BenGeskin/status/2102909808542154887/video/1",
+    "title": "Ben Geskin - This is exactly what I’ve been waiting for 🔥  Meta just announced its...",
+    "description": "This is exactly what I’ve been waiting for 🔥  Meta just announced its new VR Glasses. Basically an Apple Vision Pro-like experience, but ...",
+    "author": {
+      "name": "Ben Geskin",
+      "url": "https://twitter.com/BenGeskin"
+    },
+    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2102909714132508672/img/ES0qFlpiERcNTZj-.jpg?name=orig",
+    "durationSeconds": 69.314,
+    "uploadDate": "20260923",
+    "formats": [
+      {
+        "formatId": "hls-105",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "480x270",
+        "width": 480,
+        "height": 270,
+        "fps": null,
+        "bitrate": 105.758,
+        "codec": "avc1.4D4015",
+        "filesizeApprox": false,
+        "url": "https://video.twimg.com/amplify_video/2102909714132508672/pl/avc1/480x270/HPRhEq7Opc_KYk5M.m3u8",
+        "requiresMerge": true,
+        "compatible": true
+      },
+      {
+        "formatId": "http-2176",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "1280x720",
+        "width": 1280,
+        "height": 720,
+        "bitrate": 2176,
+        "filesizeBytes": 18853408,
+        "filesizeApprox": true,
+        "url": "https://video.twimg.com/amplify_video/2102909714132508672/vid/avc1/1280x720/eD2VgAMpNh9c9VQy.mp4...",
+        "requiresMerge": false,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "hls-audio-32000-Audio",
+        "ext": "mp4",
+        "bitrate": 32,
+        "quality": "Audio, low",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://video.twimg.com/amplify_video/2102909714132508672/pl/mp4a/32000/sQDZF5shczK7C3DD.m3u8"
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/twitter/2102909714132508672",
+      "sourceUrl": "https://x.com/BenGeskin/status/2102909808542154887/video/1",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:39.157Z",
+      "lastFetchedAt": "2026-09-24T19:09:39.157Z",
+      "validatedAt": "2026-09-24T19:09:39.157Z",
+      "nextCheckAt": "2026-10-01T19:09:39.157Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

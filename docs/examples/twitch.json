@@ -1,0 +1,93 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.twitch.tv/videos/2702797838"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "twitch",
+    "mediaType": "video",
+    "mediaId": "v2702797838",
+    "canonicalUrl": "https://www.twitch.tv/videos/2702797838",
+    "title": "RatSpiderFrog [Steam Next Fest 2026 - Key Provided]",
+    "description": "We playthrough the Demo of RatSpiderFrog that was provided by the developers who also gave us the keys for the giveaway! This game will b...",
+    "author": {
+      "name": "Manaricelle"
+    },
+    "thumbnail": "https://static-cdn.jtvnw.net/cf_vods/d1m7jfoe9zdc1j/20f1f1029224a57f7708_manaricelle_23530583983...",
+    "durationSeconds": 3008,
+    "uploadDate": "20260220",
+    "formats": [
+      {
+        "formatId": "160p",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "284x160",
+        "width": 284,
+        "height": 160,
+        "fps": 30,
+        "bitrate": 291.297,
+        "codec": "avc1.4D400C",
+        "filesizeApprox": false,
+        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/16...",
+        "requiresMerge": false,
+        "compatible": true
+      },
+      {
+        "formatId": "1080p60",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "Source",
+        "width": 1920,
+        "height": 1080,
+        "fps": 60,
+        "bitrate": 5367.945,
+        "codec": "avc1.64002A",
+        "filesizeApprox": false,
+        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/ch...",
+        "requiresMerge": false,
+        "compatible": true
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "Audio_Only",
+        "ext": "mp4",
+        "bitrate": 209.541,
+        "codec": "mp4a.40.2",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/au..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/twitch/v2702797838",
+      "sourceUrl": "https://www.twitch.tv/videos/2702797838",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:52.509Z",
+      "lastFetchedAt": "2026-09-24T19:10:52.509Z",
+      "validatedAt": "2026-09-24T19:10:52.509Z",
+      "nextCheckAt": "2026-10-01T19:10:52.509Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}
