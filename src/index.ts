@@ -1,20 +1,20 @@
 import { env } from './config/env';
 import { logger } from './lib/logger';
 import { createApp } from './app';
-import { pool, checkDatabaseConnection } from './db/pool';
+import { getDb } from './db';
 import { checkFfmpeg, checkFfprobe, checkYtdlp } from './lib/dependencyCheck';
 import { cleanupAbandonedTempDirs } from './core/jobs/tempFiles';
 
 async function verifyStartupDependencies(): Promise<void> {
   const [database, ytdlp, ffmpeg, ffprobe] = await Promise.all([
-    checkDatabaseConnection(),
+    getDb().checkConnection(),
     checkYtdlp(),
     checkFfmpeg(),
     checkFfprobe(),
   ]);
 
   const failures: string[] = [];
-  if (!database) failures.push('PostgreSQL connection failed. Check DATABASE_URL.');
+  if (!database) failures.push(`${env.DATABASE_DRIVER} database connection failed. Check DATABASE_URL / DATABASE_SQLITE_PATH.`);
   if (!ytdlp.ok) failures.push(`yt-dlp not found or not runnable at "${env.YTDLP_PATH}": ${ytdlp.error}`);
   if (!ffmpeg.ok) failures.push(`ffmpeg not found or not runnable at "${env.FFMPEG_PATH}": ${ffmpeg.error}`);
   if (!ffprobe.ok) failures.push(`ffprobe not found or not runnable at "${env.FFPROBE_PATH}": ${ffprobe.error}`);
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
       logger.info('http server closed');
     });
 
-    await pool.end();
+    await getDb().close();
     process.exit(0);
   };
 

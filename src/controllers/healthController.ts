@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { checkDatabaseConnection } from '../db/pool';
+import { getDb } from '../db';
+import { env } from '../config/env';
 import { checkYtdlp, checkFfmpeg, checkInstaloader } from '../lib/dependencyCheck';
 
 export function getHealth(_req: Request, res: Response): void {
@@ -8,7 +9,7 @@ export function getHealth(_req: Request, res: Response): void {
 
 export async function getReadiness(_req: Request, res: Response): Promise<void> {
   const [database, ytdlp, ffmpeg, instaloader] = await Promise.all([
-    checkDatabaseConnection(),
+    getDb().checkConnection(),
     checkYtdlp(),
     checkFfmpeg(),
     checkInstaloader(),
@@ -22,6 +23,7 @@ export async function getReadiness(_req: Request, res: Response): Promise<void> 
     status: ready ? 'ready' : 'not_ready',
     checks: {
       database,
+      databaseDriver: env.DATABASE_DRIVER,
       ytdlp: ytdlp.ok,
       ytdlpVersion: ytdlp.version,
       ffmpeg: ffmpeg.ok,

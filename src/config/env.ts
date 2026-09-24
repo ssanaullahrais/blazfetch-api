@@ -15,8 +15,15 @@ const envSchema = z.object({
   APP_URL: z.string().default('http://localhost:4000'),
   LOG_LEVEL: z.string().default('info'),
 
-  DATABASE_URL: z.string(),
+  // DATABASE_DRIVER picks the storage backend. All four store the exact same data (metadata
+  // cache, jobs, fetch/download stats) — never the downloaded media itself — through one shared
+  // repository interface (src/db/types.ts), so the rest of the app never knows which one is active.
+  DATABASE_DRIVER: z.enum(['postgres', 'mysql', 'sqlite', 'mongodb']).default('postgres'),
+  // Connection string for postgres/mysql/mongodb. Not required for sqlite (uses DATABASE_SQLITE_PATH).
+  DATABASE_URL: z.string().optional().default(''),
   DATABASE_SSL: boolFromString(false),
+  // File path for the sqlite driver only, e.g. ./data/blazfetch.sqlite3. Created automatically.
+  DATABASE_SQLITE_PATH: z.string().default('./data/blazfetch.sqlite3'),
 
   YTDLP_PATH: z.string().default('yt-dlp'),
   FFMPEG_PATH: z.string().default('ffmpeg'),
