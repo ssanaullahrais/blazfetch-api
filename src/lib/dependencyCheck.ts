@@ -41,3 +41,26 @@ export function checkFfmpeg(): Promise<DependencyCheckResult> {
 export function checkFfprobe(): Promise<DependencyCheckResult> {
   return runVersionCheck(env.FFPROBE_PATH, ['-version']);
 }
+
+/** Optional — only needed for Instagram profile listing. Not part of startup's fatal checks. */
+export function checkInstaloader(): Promise<DependencyCheckResult> {
+  return new Promise((resolve) => {
+    const child = spawn(env.PYTHON_PATH, ['-c', 'import instaloader; print(instaloader.__version__)'], { shell: false, windowsHide: true });
+    let stdout = '';
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      resolve({ ok: false, error: 'timed out' });
+    }, 5000);
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf-8');
+    });
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: err.message });
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve(code === 0 ? { ok: true, version: stdout.trim() } : { ok: false, error: `python/instaloader not available (exit ${code})` });
+    });
+  });
+}

@@ -9,6 +9,7 @@ import { normalizeFormats, normalizeYtdlpInfo, YtdlpRawInfo } from './ytdlpNorma
 import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
 import { fetchInstagramViaBtchDownloader } from '../fallback/instagram/btchDownloader';
 import { fetchInstagramViaCakkatrok } from '../fallback/instagram/cakkatrokAdapter';
+import { fetchInstagramProfileViaInstaloader, isInstaloaderConfigured } from '../fallback/instagram/instaloaderRunner';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
 import { BlazfetchItem, BlazfetchPlaylistItem, BlazfetchResponse } from '../../types/blazfetch';
 
@@ -104,18 +105,28 @@ export class InstagramAdapter implements PlatformAdapter {
 
   /**
    * Lists a profile's posts. Instagram requires an authenticated session for this even for
-   * public accounts (confirmed: the anonymous web_profile_info API returns 401 require_login),
-   * so this only works when the operator has configured INSTAGRAM_COOKIES_PATH with their own
-   * exported session for an account authorized to view this profile — never anonymously, and
-   * never using credentials this backend obtained on its own.
+   * public accounts (confirmed: the anonymous web_profile_info API returns 401 require_login —
+   * and Instaloader, the purpose-built tool for this exact job, hits the identical wall
+   * anonymously), so this only works when the operator has configured a session they created
+   * themselves — never anonymously, and never using credentials this backend obtained on its own.
+   *
+   * Instaloader (https://instaloader.github.io/) is preferred when configured
+   * (INSTAGRAM_INSTALOADER_SESSION_PATH + _USERNAME): it's purpose-built for Instagram and
+   * returns richer post metadata than yt-dlp's flat-playlist listing. yt-dlp + INSTAGRAM_COOKIES_PATH
+   * remains as a fallback engine if only that's configured.
    */
   private async fetchProfile(username: string, targetUrl: string, requestId: string): Promise<BlazfetchResponse> {
+    if (isInstaloaderConfigured()) {
+      return this.fetchProfileViaInstaloader(username, targetUrl, requestId);
+    }
+
     const cookies = cookiesArgs();
     if (cookies.length === 0) {
       throw new BlazfetchError(
         'LOGIN_REQUIRED',
         'Listing an Instagram profile requires an authenticated session (Instagram blocks this anonymously). ' +
-          'Set INSTAGRAM_COOKIES_PATH to a cookies.txt exported from an account authorized to view this profile.',
+          'Set INSTAGRAM_INSTALOADER_SESSION_PATH + INSTAGRAM_INSTALOADER_SESSION_USERNAME (preferred, via Instaloader), ' +
+          'or INSTAGRAM_COOKIES_PATH, to a session from an account authorized to view this profile.',
       );
     }
 
@@ -156,6 +167,38 @@ export class InstagramAdapter implements PlatformAdapter {
       audioFormats: [],
       metadata: {},
       extractor: 'yt-dlp-authenticated',
+    };
+  }
+
+  private async fetchProfileViaInstaloader(username: string, targetUrl: string, requestId: string): Promise<BlazfetchResponse> {
+    logger.info({ requestId, username }, 'fetching Instagram profile via Instaloader with configured session');
+    const profile = await fetchInstagramProfileViaInstaloader(username, env.MAX_PLAYLIST_ITEMS);
+
+    const items: BlazfetchPlaylistItem[] = profile.items.map((post) => ({
+      videoId: post.shortcode,
+      title: post.caption ?? post.shortcode,
+      thumbnail: post.displayUrl,
+      durationSeconds: undefined,
+      url: post.url,
+    }));
+
+    return {
+      success: true,
+      platform: 'instagram',
+      mediaType: 'playlist',
+      mediaId: username,
+      canonicalUrl: targetUrl,
+      title: profile.fullName || username,
+      description: profile.biography,
+      author: { name: profile.fullName || username, url: targetUrl },
+      thumbnail: profile.profilePicUrl,
+      isPlaylist: true,
+      itemCount: items.length,
+      playlist: { title: profile.fullName || username, thumbnail: profile.profilePicUrl, itemCount: items.length, items },
+      formats: [],
+      audioFormats: [],
+      metadata: { followerCount: profile.followerCount, postCount: profile.postCount },
+      extractor: 'instaloader',
     };
   }
 

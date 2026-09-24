@@ -46,7 +46,8 @@ src/
     ffmpeg/     ffmpeg (merge/transcode/extract-audio) + ffprobe validation
     cache/      Postgres-backed metadata cache
     jobs/       job manager, concurrency limiter, temp file cleanup
-    fallback/   TikTok (@tobyg74/tiktok-api-dl) and Instagram (btch-downloader, cakkatrok) fallbacks
+    fallback/   TikTok (@tobyg74/tiktok-api-dl), Instagram (btch-downloader, cakkatrok, Instaloader),
+                Pinterest (public PinResource/BoardResource API) fallbacks
   services/     fetchService, audioService, downloadService, statsService
   controllers/  thin HTTP handlers
   routes/       versioned route definitions
@@ -66,6 +67,30 @@ Dailymotion, Bluesky, Loom, Newgrounds, Rutube, Streamable, Twitch, Tumblr. See
 - ffmpeg + ffprobe on PATH (or set `FFMPEG_PATH` / `FFPROBE_PATH`)
 
 See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for full VPS deployment requirements.
+
+### Instagram profile listing (optional)
+
+Single Instagram posts/reels/carousels work anonymously out of the box. Listing a profile's
+posts requires an authenticated session — Instagram returns `401 require_login` on that endpoint
+for anonymous requests, even for public accounts. To enable it:
+
+```bash
+pip install instaloader
+instaloader --login <your_username>   # creates a session file; you do this yourself, once
+```
+
+Then set in `.env`:
+
+```
+PYTHON_PATH=python
+INSTAGRAM_INSTALOADER_SESSION_PATH=/path/to/the/session/file
+INSTAGRAM_INSTALOADER_SESSION_USERNAME=<your_username>
+```
+
+The backend never requests, stores, or generates Instagram credentials itself — it only loads a
+session you already created outside of it, exactly like Instaloader's own `--login` flow is
+meant to be used for content that account has legitimate access to. Without this configured,
+`POST /fetch` on a profile URL returns a clear `LOGIN_REQUIRED` error instead of a broken result.
 
 ## Installation (development)
 
