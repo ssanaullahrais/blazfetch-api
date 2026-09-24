@@ -78,4 +78,16 @@ describe('sqlite database driver', () => {
     await expect(db.stats.recordFetchStat({ platform: 'youtube', success: true } as never)).resolves.toBeUndefined();
     await expect(db.stats.recordDownloadStat({ platform: 'youtube', kind: 'video', success: true } as never)).resolves.toBeUndefined();
   });
+
+  it('counts successful fetches and downloads for the public totals', async () => {
+    const before = await db.stats.totals();
+    await db.stats.recordFetchStat({ platform: 'youtube', success: true } as never);
+    await db.stats.recordFetchStat({ platform: 'youtube', success: false } as never); // failed: not counted
+    await db.stats.recordFetchStat({ platform: 'youtube', success: true, source: 'revalidation' } as never); // weekly check: not counted
+    await db.stats.recordDownloadStat({ platform: 'youtube', kind: 'video', success: true } as never);
+    await db.stats.recordDownloadStat({ platform: 'youtube', kind: 'video', success: false } as never);
+    const after = await db.stats.totals();
+    expect(after.fetches - before.fetches).toBe(1);
+    expect(after.downloads - before.downloads).toBe(1);
+  });
 });

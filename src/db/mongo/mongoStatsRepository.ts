@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getMongoDb } from './mongoClient';
 import { DownloadStatParams, FetchStatParams } from '../../services/statsService';
-import { StatsStore } from '../types';
+import { StatsStore, StatsTotals } from '../types';
 
 export class MongoStatsRepository implements StatsStore {
   async recordFetchStat(params: FetchStatParams): Promise<void> {
@@ -46,5 +46,14 @@ export class MongoStatsRepository implements StatsStore {
       fellBack: params.fellBack ?? null,
       createdAt: new Date(),
     } as never);
+  }
+
+  async totals(): Promise<StatsTotals> {
+    const db = await getMongoDb();
+    const [fetches, downloads] = await Promise.all([
+      db.collection('fetch_stats').countDocuments({ success: true, source: { $ne: 'revalidation' } }),
+      db.collection('download_stats').countDocuments({ success: true }),
+    ]);
+    return { fetches, downloads };
   }
 }

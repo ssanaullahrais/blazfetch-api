@@ -168,6 +168,7 @@ GET    /api/v1/downloads/:id             stream the file once the job is ready
 DELETE /api/v1/downloads/:id             cancel + clean up temp files
 DELETE /api/v1/jobs/:id                  cancel a job
 GET    /api/v1/platforms                 list supported platforms + domains
+GET    /api/v1/stats                     public all-time totals: successful fetches and downloads
 GET    /api/v1/config                    public settings (is Turnstile on, and its site key)
 POST   /api/v1/turnstile/verify          swap a solved Turnstile token for a pass cookie (only when Turnstile is on)
 GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpeg)

@@ -105,9 +105,18 @@ export interface JobStore {
   updateProgress(id: string, downloadedBytes: number, totalBytes?: number, percent?: number): Promise<void>;
 }
 
+export interface StatsTotals {
+  /** Successful lookups requested by visitors (answers from the stored media count too). */
+  fetches: number;
+  /** Successful downloads (stream and prepare). */
+  downloads: number;
+}
+
 export interface StatsStore {
   recordFetchStat(params: FetchStatParams): Promise<void>;
   recordDownloadStat(params: DownloadStatParams): Promise<void>;
+  /** All-time totals, for the public counter. */
+  totals(): Promise<StatsTotals>;
 }
 
 export interface Database {
