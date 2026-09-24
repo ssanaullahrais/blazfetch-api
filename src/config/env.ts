@@ -48,6 +48,9 @@ const envSchema = z.object({
   // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
   // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).
   STREAM_MODE_ENABLED: boolFromString(true),
+  // Delivery mode for GET /api/v1/stream when the request has no ?mode=: "stream" pipes straight through,
+  // "prepare" builds the file on the server first, "auto" tries stream and falls back to prepare.
+  DEFAULT_DOWNLOAD_MODE: z.enum(['stream', 'prepare', 'auto']).default('stream'),
   // How old (ms) a file/folder in TEMP_DIR must be before the periodic sweep deletes it.
   TEMP_SWEEP_MAX_AGE_MS: z.coerce.number().default(3600000),
   TEMP_SWEEP_INTERVAL_MS: z.coerce.number().default(600000),

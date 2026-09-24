@@ -429,15 +429,15 @@ Returns all 18 configured platforms (see "Platform status" above for which are v
 
 ---
 
-## `GET /api/v1/stream` (direct stream)
+## `GET /api/v1/stream` (direct stream, prepare, or auto)
 
-The fast alternative to `POST /download`. The media is piped from the source straight to the HTTP
-response, so bytes start arriving as soon as the source produces them. There is **no job, no
-polling, no "Preparing…" wait and no file on the server's disk**. It is a plain `GET`, so a browser
-can start the download simply by navigating to the URL (the guest cookie is sent automatically).
+One URL with three delivery modes, chosen per request with `?mode=` (or server-wide with
+`DEFAULT_DOWNLOAD_MODE`). It is a plain `GET`, so a browser can start the download simply by
+navigating to the URL (the guest cookie is sent automatically). There is **no job and no polling**:
+the file comes back in this one response.
 
 ```
-GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename=<optional>
+GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename=<optional>&mode=stream|prepare|auto
 ```
 
 | Query param | Required | Description |
@@ -446,14 +446,37 @@ GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename
 | `formatId` | no (default `best`) | A `formatId` from `/fetch` or `/fetch/audio`, or `best` for the highest quality |
 | `kind` | no (default `video`) | `video` or `audio` |
 | `filename` | no | Suggested file name; the correct extension is added if missing |
+| `mode` | no (default `DEFAULT_DOWNLOAD_MODE`, which is `stream`) | `stream`, `prepare` or `auto` (below) |
+
+### Delivery modes
+
+| Mode | What happens | Best for |
+|---|---|---|
+| `stream` (default) | Bytes are piped from the source straight to the response. No file on the server, first byte in 1 to 3 s. Original codecs are kept (no transcode). | Speed |
+| `prepare` | The server builds the file first (download, merge, and a transcode to H.264/AAC when the source is not browser-compatible), then sends it with its exact size, then deletes it. All in this one request, so nothing arrives until it is ready. | Guaranteed H.264/AAC, or sources that cannot stream |
+| `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. | Recommended for the frontend: fast when possible, works when not |
+
+`auto` falls back only for failures that preparing can get around (the source could not be
+streamed, ffmpeg or extraction failed, a timeout). It does **not** fall back for errors that would
+fail the same way, such as `PRIVATE_MEDIA`, `LOGIN_REQUIRED`, `AGE_RESTRICTED`, `MEDIA_NOT_FOUND`,
+DRM-protected media, or `SERVER_BUSY`; those come straight back as JSON.
+
+Two limits to be aware of:
+- A failure **after** the first byte cannot fall back, because bytes have already been sent. The
+  connection is aborted, so treat a connection that ends early as a failed download.
+- While a fallback is being prepared, the client receives nothing until the file is ready (it can
+  take a minute or more for long videos). If you need a progress bar for that, use `POST /download`
+  and poll `/jobs/:id`.
+
+Every successful response includes **`X-Blazfetch-Mode: stream | prepare`** telling you which path
+served the file (exposed to browsers through CORS), so you can see how often `auto` falls back.
 
 **Success `200`:** `Content-Disposition: attachment`, the right `Content-Type`, and chunked transfer
-(no `Content-Length`) unless the exact size is known (a single file passed through untouched).
+(no `Content-Length`) in stream mode unless the exact size is known; prepare mode always sends
+`Content-Length`.
 
 **Errors before the first byte** come back as the normal JSON envelope with the usual codes and
-HTTP status (`success:false`, `error:{code,message}`, `requestId`). **After** the first byte the only
-way to signal a problem is to abort the connection, so treat a connection that ends early as a
-failed download.
+HTTP status (`success:false`, `error:{code,message}`, `requestId`).
 
 ### How the bytes are produced
 
@@ -467,10 +490,9 @@ failed download.
 - **No H.264 transcode in stream mode.** Codecs are copied as-is (for example VP9 or AV1 + AAC in
   MP4), which is what makes it fast. Modern browsers and players handle this, but if you need
   guaranteed H.264/AAC output use `POST /download` (prepare mode), which transcodes when needed.
-- **When to fall back to prepare mode:** if the source cannot be streamed, the response is a normal
-  JSON error (for example `DOWNLOAD_FAILED` with a message pointing at `POST /api/v1/download`).
-  This happens for sources whose HLS playlists ffmpeg cannot read (Loom is one). A frontend should
-  retry those with `POST /download`.
+- **Sources that cannot stream:** some sources cannot be streamed directly (Loom's signed HLS playlists
+  are one, because ffmpeg cannot read them). With `mode=stream` they return a JSON error
+  (`DOWNLOAD_FAILED`); with `mode=auto` they are served by prepare mode automatically.
 - For the quickest start call `POST /fetch` first: the stream reuses the URLs it resolved, so the
   first byte typically arrives in 1 to 3 seconds. Without a prior fetch it has to resolve the media
   first, which can add several seconds on sites like YouTube.
@@ -484,8 +506,9 @@ failed download.
   the download slot is released.
 - URLs go through the same validation and SSRF checks as every other endpoint.
 - Every stream (finished, failed or disconnected) is recorded with `recordDownloadStat`.
-- Disable the endpoint with `STREAM_MODE_ENABLED=false`; the route then returns `404 NOT_FOUND`.
-  `POST /download` and the rest are unaffected.
+- Disable the endpoint (all three modes) with `STREAM_MODE_ENABLED=false`; the route then returns
+  `404 NOT_FOUND`. `POST /download` and the rest are unaffected. Change the default mode with
+  `DEFAULT_DOWNLOAD_MODE=stream|prepare|auto` (an explicit `?mode=` always wins).
 
 ---
 
@@ -538,10 +561,11 @@ Typical flow for "user pastes a URL, picks a quality, downloads":
 5. Navigate to (or `fetch()`) `GET /downloads/:id` to get the actual file — the browser can
    treat this as a normal download link since it sets `Content-Disposition: attachment`.
 
-**Faster alternative (direct stream):** skip steps 3 to 5 and navigate to
-`GET /stream?url=...&formatId=best&kind=video`. The download starts immediately with no job and no
-polling. Use `POST /download` only when you need H.264/AAC output guaranteed, progress from the
-server, or as the fallback when `/stream` reports the source can't be streamed.
+**Faster alternative (one request):** skip steps 3 to 5 and navigate to
+`GET /stream?url=...&formatId=best&kind=video&mode=auto`. The download starts immediately with no
+job and no polling, and if direct streaming isn't possible for that source the server prepares the
+file itself in the same request. Use `POST /download` only when you need server-side progress for a
+long preparation.
 
 For a live progress bar while downloading, `job.progress` (0-100) and `job.downloadedBytes`/
 `totalBytes` from the `/jobs/:id` poll response are the numbers to drive it with.

@@ -67,7 +67,7 @@ paths:
                   job: { $ref: '#/components/schemas/Job' }
   /stream:
     get:
-      summary: Direct stream. Pipes the media straight to the response with no temp file or job
+      summary: Download in one request (direct stream, prepare, or auto)
       description: >
         Plain GET so a browser can start it by navigating to the URL. Failures before the first byte
         return the normal JSON error envelope; after the first byte the connection is aborted.
@@ -88,10 +88,20 @@ paths:
         - name: filename
           in: query
           schema: { type: string, maxLength: 200 }
+        - name: mode
+          in: query
+          description: >
+            stream pipes straight through (default, no temp file). prepare builds the file on the server
+            first (H.264/AAC guaranteed) then sends it. auto tries stream and, if that fails before the
+            first byte, prepares in the same request. Default comes from DEFAULT_DOWNLOAD_MODE.
+          schema: { type: string, enum: [stream, prepare, auto] }
       responses:
         '200':
-          description: Media bytes (chunked; Content-Length only when the exact size is known)
+          description: Media bytes (chunked in stream mode unless the exact size is known; Content-Length in prepare mode)
           headers:
+            X-Blazfetch-Mode:
+              schema: { type: string, enum: [stream, prepare] }
+              description: Which delivery mode actually served the file.
             Content-Disposition:
               schema: { type: string }
               description: attachment; filename="..."

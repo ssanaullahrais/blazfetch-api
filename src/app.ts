@@ -17,6 +17,8 @@ export function createApp(): Express {
     cors({
       origin: env.CORS_ALLOWED_ORIGINS === '*' ? true : env.CORS_ALLOWED_ORIGINS.split(','),
       credentials: true,
+      // Lets a browser fetch() read which delivery mode served the file and its suggested name.
+      exposedHeaders: ['X-Blazfetch-Mode', 'Content-Disposition', 'X-Request-Id'],
     }),
   );
   app.use(express.json({ limit: '1mb' }));

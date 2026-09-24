@@ -7,10 +7,17 @@ import { PassThrough } from 'node:stream';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blazfetch-stream-'));
-process.env.TEMP_DIR = tempDir;
-process.env.LOG_LEVEL = 'silent';
-process.env.RATE_LIMIT_MAX_DOWNLOAD = '1000';
+// vi.hoisted runs before the imports below are evaluated, so the app's config really sees these values.
+const tempDir = await vi.hoisted(async () => {
+  const nodeFs = await import('node:fs');
+  const nodeOs = await import('node:os');
+  const nodePath = await import('node:path');
+  const dir = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'blazfetch-stream-'));
+  process.env.TEMP_DIR = dir;
+  process.env.LOG_LEVEL = 'silent';
+  process.env.RATE_LIMIT_MAX_DOWNLOAD = '1000';
+  return dir;
+});
 
 interface FakeChild extends EventEmitter {
   pid: number;
@@ -71,12 +78,40 @@ vi.mock('../../src/services/fetchService', () => ({
   })),
 }));
 
+/** Test hook: what the fake prepare pipeline (POST /download's job runner) does. */
+let prepareBehaviour: (jobId: string) => Promise<void> = async () => undefined;
+const preparedJobs: string[] = [];
+const cancelledJobs: string[] = [];
+
+vi.mock('../../src/services/downloadService', async () => {
+  const actual = await vi.importActual<typeof import('../../src/services/downloadService')>('../../src/services/downloadService');
+  return {
+    ...actual,
+    startDownloadJob: vi.fn(async (params: { url: string }) => ({ id: `job-${preparedJobs.length + 1}`, platform: 'youtube', canonicalUrl: params.url })),
+    runDownloadJob: vi.fn(async (job: { id: string }) => {
+      preparedJobs.push(job.id);
+      await prepareBehaviour(job.id);
+      const dir = path.join(tempDir, job.id);
+      fs.mkdirSync(dir, { recursive: true });
+      const filePath = path.join(dir, 'out.mp4');
+      fs.writeFileSync(filePath, 'prepared-bytes');
+      return { filePath, filename: 'out.mp4', mimeType: 'video/mp4', bytes: 14, job };
+    }),
+  };
+});
+
+vi.mock('../../src/core/jobs/jobManager', async () => {
+  const actual = await vi.importActual<typeof import('../../src/core/jobs/jobManager')>('../../src/core/jobs/jobManager');
+  return { ...actual, cancelJob: vi.fn(async (id: string) => void cancelledJobs.push(id)) };
+});
+
 vi.mock('../../src/utils/url', async () => {
   const actual = await vi.importActual<typeof import('../../src/utils/url')>('../../src/utils/url');
   return { ...actual, assertUrlIsSafeToFetch: vi.fn(async (raw: string) => new URL(raw)) };
 });
 
 import { createApp } from '../../src/app';
+import { BlazfetchError } from '../../src/constants/errors';
 import { activeStreamProcessCount } from '../../src/core/ytdlp/ytdlpStream';
 
 let server: http.Server;
@@ -97,6 +132,9 @@ beforeEach(() => {
   children.length = 0;
   stats.length = 0;
   behaviour = () => undefined;
+  prepareBehaviour = async () => undefined;
+  preparedJobs.length = 0;
+  cancelledJobs.length = 0;
 });
 
 const VIDEO = encodeURIComponent('https://www.youtube.com/watch?v=abc123');
@@ -253,5 +291,114 @@ describe('GET /api/v1/stream', () => {
     await new Promise<void>((resolve) => disabled.close(() => resolve()));
     delete process.env.STREAM_MODE_ENABLED;
     expect(status).toBe(404);
+  });
+});
+
+describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
+  const failingStream = (child: FakeChild): void => {
+    child.stderr.write('ERROR: something odd happened');
+    setTimeout(() => child.emit('close', 1), 10);
+  };
+
+  it('uses stream by default and says so in X-Blazfetch-Mode', async () => {
+    behaviour = (child) => {
+      child.stdout.write('streamed');
+      child.emit('close', 0);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18`);
+    expect(res.headers['x-blazfetch-mode']).toBe('stream');
+    expect(await body(res)).toBe('streamed');
+    expect(preparedJobs).toHaveLength(0);
+  });
+
+  it('mode=prepare builds the file on the server, sends it with its size, and deletes it', async () => {
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=prepare`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(res.headers['content-length']).toBe('14');
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="Test Video.mp4"/);
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(children).toHaveLength(0); // no direct-stream process was ever started
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
+  });
+
+  it('mode=auto streams when streaming works (no fallback)', async () => {
+    behaviour = (child) => {
+      child.stdout.write('streamed');
+      child.emit('close', 0);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=auto`);
+    expect(res.headers['x-blazfetch-mode']).toBe('stream');
+    expect(await body(res)).toBe('streamed');
+    expect(preparedJobs).toHaveLength(0);
+  });
+
+  it('mode=auto falls back to prepare in the same request when streaming fails before the first byte', async () => {
+    behaviour = failingStream;
+    const guest = 'fallback-guest';
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=auto`, guest);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(preparedJobs).toHaveLength(1);
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
+    await waitFor(() => activeStreamProcessCount() === 0);
+
+    // The failed stream attempt must have released its download slot (per-guest limit is 1).
+    behaviour = (child) => {
+      child.stdout.write('again');
+      child.emit('close', 0);
+    };
+    const next = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=stream`, guest);
+    expect(next.res.statusCode).toBe(200);
+    expect(await body(next.res)).toBe('again');
+  });
+
+  it('mode=stream never falls back: the failure comes back as JSON', async () => {
+    behaviour = failingStream;
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=stream`);
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(JSON.parse(await body(res)).error.code).toBe('EXTRACTOR_FAILED');
+    expect(preparedJobs).toHaveLength(0);
+  });
+
+  it('mode=auto does not fall back for errors prepare cannot fix (private video)', async () => {
+    behaviour = (child) => {
+      child.stderr.write('ERROR: This video is private video');
+      setTimeout(() => child.emit('close', 1), 10);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=auto`);
+    expect(JSON.parse(await body(res)).error.code).toBe('PRIVATE_MEDIA');
+    expect(preparedJobs).toHaveLength(0);
+  });
+
+  it('mode=auto returns the prepare error when the fallback fails too', async () => {
+    behaviour = failingStream;
+    prepareBehaviour = async () => {
+      throw new BlazfetchError('DOWNLOAD_FAILED', 'prepare failed too');
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=auto`);
+    expect(res.statusCode).toBe(502);
+    expect(JSON.parse(await body(res)).error.message).toBe('prepare failed too');
+    await waitFor(() => activeStreamProcessCount() === 0);
+  });
+
+  it('cancels the prepare job and removes its file when the client disconnects while the file is being prepared', async () => {
+    let release: () => void = () => undefined;
+    prepareBehaviour = () => new Promise<void>((resolve) => (release = resolve));
+    const req = http.get({ port, path: `/api/v1/stream?url=${VIDEO}&formatId=18&mode=prepare`, headers: { cookie: 'blazfetch_guest_id=disconnect-prepare' }, agent: false });
+    req.on('error', () => undefined);
+    await waitFor(() => preparedJobs.length === 1);
+    req.destroy(); // the browser cancelled while the server was still preparing
+    await waitFor(() => cancelledJobs.length === 1);
+    expect(cancelledJobs[0]).toBe(preparedJobs[0]);
+    release(); // the fake runner now writes its file; the controller must delete it, nobody is listening
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
+  });
+
+  it('rejects an unknown mode with VALIDATION_ERROR', async () => {
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&mode=turbo`);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(await body(res)).error.code).toBe('VALIDATION_ERROR');
   });
 });

@@ -95,7 +95,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
     if (!chosen) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'The requested format is not available for this media.');
 
     if (!isYtdlp) {
-      if (!chosen.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.');
+      if (!chosen.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
       return { type: 'proxy', url: chosen.url, contentType: contentTypeFor(chosen.ext, 'video'), ext: chosen.ext };
     }
     if (chosen.requiresMerge) {
@@ -120,7 +120,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
   const audio: BlazfetchAudioFormat | undefined = media.audioFormats.find((f) => f.formatId === format.formatId);
   if (audio && !audio.isConverted) {
     if (!isYtdlp) {
-      if (!audio.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.');
+      if (!audio.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
       return { type: 'proxy', url: audio.url, contentType: contentTypeFor(audio.ext, 'audio'), ext: audio.ext };
     }
     return {
@@ -137,7 +137,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
   const sourceId = format.formatId.startsWith('mp3-from-') ? format.formatId.slice('mp3-from-'.length) : format.formatId;
   const source = media.formats.find((f) => f.formatId === sourceId) ?? media.formats[0];
   if (!source || !isYtdlp) {
-    throw new BlazfetchError('FORMAT_UNAVAILABLE', 'MP3 conversion is not available in stream mode for this media. Use POST /api/v1/download.');
+    throw new BlazfetchError('FORMAT_UNAVAILABLE', 'MP3 conversion is not available in stream mode for this media. Use POST /api/v1/download.', { streamUnsupported: true });
   }
   const audioSource = bestAudioWithUrl(media);
   const mp3Url = source.requiresMerge ? audioSource?.url : (source.url ?? audioSource?.url);
@@ -208,7 +208,7 @@ export function buildFilename(requested: string | undefined, media: BlazfetchRes
 }
 
 /** Streams a plain HTTP(S) file through untouched. A source that ends early errors instead of finishing quietly. */
-async function openProxy(url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
+export async function openProxy(url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
   await assertUrlIsSafeToFetch(url);
   const upstream = await fetch(url, { signal, headers: { 'accept-encoding': 'identity' } });
   if (!upstream.ok || !upstream.body) {
@@ -306,7 +306,7 @@ export async function openStream(params: OpenStreamParams): Promise<OpenedStream
   }
 
   if (lastError instanceof BlazfetchError && lastError.code === 'DOWNLOAD_FAILED' && plan.type === 'ffmpeg') {
-    throw new BlazfetchError('DOWNLOAD_FAILED', 'This source could not be streamed directly. Use POST /api/v1/download for it instead.');
+    throw new BlazfetchError('DOWNLOAD_FAILED', 'This source could not be streamed directly. Use mode=auto or mode=prepare (or POST /api/v1/download) for it instead.', { streamUnsupported: true });
   }
   throw lastError instanceof BlazfetchError ? lastError : new BlazfetchError('DOWNLOAD_FAILED', 'Failed to start the stream.');
 }
