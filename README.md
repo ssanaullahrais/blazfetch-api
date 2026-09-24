@@ -216,7 +216,8 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | Setting | Default | What it does |
 |---|---|---|
 | `DATABASE_DRIVER`, `DATABASE_URL` | `sqlite` | Which database, and where (`npm run setup` sets these) |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Your frontend's origin(s), comma separated |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Your frontend's origin(s), comma separated. `*` is refused in production |
+| `TRUST_PROXY` | `0` | Set to `1` behind Nginx so real visitor IPs are seen |
 | `DEFAULT_DOWNLOAD_MODE` | `stream` | Default for `GET /stream` when a request has no `?mode=` |
 | `STREAM_MODE_ENABLED` | `true` | Turn `GET /stream` off entirely |
 | `REVALIDATE_AFTER_SECONDS` | `604800` (7 days) | How often each stored item is re-checked |
@@ -225,6 +226,10 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | `MAX_CONCURRENT_DOWNLOADS_GLOBAL` / `_PER_GUEST` | `10` / `1` | Concurrency limits |
 | `RATE_LIMIT_MAX_GUEST` / `RATE_LIMIT_MAX_DOWNLOAD` | `30` / `10` per minute | Rate limits |
 | `MAX_DOWNLOAD_SIZE_BYTES`, `TEMP_DIR` | 2 GB, `./tmp` | Size cap and temporary folder |
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for how to report a problem, what the project already protects against, and what to do when you deploy.
 
 ## Documentation
 

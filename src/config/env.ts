@@ -110,6 +110,9 @@ const envSchema = z.object({
   CAKKATROK_API_BASE: z.string().optional().default(''),
 
   CORS_ALLOWED_ORIGINS: z.string().default('*'),
+  // Number of reverse proxies in front of the app (1 behind Nginx). Leave 0 when clients connect directly: trusting
+  // X-Forwarded-For without a proxy would let anyone fake their IP.
+  TRUST_PROXY: z.coerce.number().default(0),
 });
 
 export type Env = z.infer<typeof envSchema>;

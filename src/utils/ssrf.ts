@@ -23,7 +23,12 @@ function isPrivateOrReservedIp(ip: string): boolean {
   }
   if (net.isIPv6(ip)) {
     const lower = ip.toLowerCase();
-    if (lower === '::1') return true;
+    if (lower === '::1' || lower === '::') return true;
+    if (/^::ffff:[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(lower)) {
+      // IPv4-mapped in hex form (::ffff:7f00:1 is 127.0.0.1)
+      const [hi, lo] = lower.slice(7).split(':').map((h) => parseInt(h, 16));
+      return isPrivateOrReservedIp(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+    }
     if (lower.startsWith('fe80:')) return true;
     if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
     if (lower.startsWith('::ffff:')) {

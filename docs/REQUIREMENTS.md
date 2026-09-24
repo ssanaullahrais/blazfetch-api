@@ -123,6 +123,8 @@ APP_URL=https://api.your-domain.example
 CORS_ALLOWED_ORIGINS=https://your-frontend.example
 ```
 
+`TRUST_PROXY=1` tells the app it sits behind Nginx, so it sees real visitor IPs (leave it at 0 if clients reach the app directly).
+
 `CORS_ALLOWED_ORIGINS` must list your real frontend origin(s) (comma separated). Never use `*` in
 production. If the frontend and `/api` share one domain (recommended), CORS is not used at all, so do not add
 `localhost` origins in production. The other limits (concurrency, timeouts, sizes) have sensible defaults: see

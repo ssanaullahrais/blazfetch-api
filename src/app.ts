@@ -8,14 +8,29 @@ import { requestId } from './middleware/requestId';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import routes from './routes';
 
+/**
+ * Which browser origins may call the API with cookies. A wildcard would let any website use a visitor's cookies, so
+ * in production it is treated as "no cross-origin access" (same-origin deployments do not need CORS at all).
+ */
+function corsOrigin(): boolean | string[] {
+  const configured = env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
+  if (!configured.includes('*')) return configured;
+  if (env.APP_ENV === 'production') {
+    logger.warn('CORS_ALLOWED_ORIGINS is "*": cross-origin access is disabled in production. List your frontend origin instead.');
+    return false;
+  }
+  return true;
+}
+
 export function createApp(): Express {
   const app = express();
 
   app.disable('x-powered-by');
+  if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY);
   app.use(helmet());
   app.use(
     cors({
-      origin: env.CORS_ALLOWED_ORIGINS === '*' ? true : env.CORS_ALLOWED_ORIGINS.split(','),
+      origin: corsOrigin(),
       credentials: true,
       // Lets a browser fetch() read which delivery mode served the file and its suggested name.
       exposedHeaders: ['X-Blazfetch-Mode', 'Content-Disposition', 'X-Request-Id'],
