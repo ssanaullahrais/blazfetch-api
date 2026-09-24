@@ -21,6 +21,12 @@ export const streamQuerySchema = z.object({
   formatId: z.string().min(1).optional().default('best'),
   kind: z.enum(['video', 'audio']).optional().default('video'),
   filename: z.string().max(200).optional(),
+  // A random id chosen by the page. When bytes start flowing the server sets the short-lived cookie
+  // `blazfetch_dl_<token>`, so a page that starts the download by navigation can tell it began.
+  token: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{8,64}$/)
+    .optional(),
   // stream: pipe straight through. prepare: build the file on the server first, then send it.
   // auto: try stream, and if that fails before any byte, prepare instead. Default: DEFAULT_DOWNLOAD_MODE.
   mode: z.enum(DOWNLOAD_MODES).optional(),
@@ -57,7 +63,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   if (!parsed.success) {
     throw new BlazfetchError('VALIDATION_ERROR', 'Invalid query parameters.', parsed.error.flatten());
   }
-  const { url, formatId, kind, filename } = parsed.data;
+  const { url, formatId, kind, filename, token } = parsed.data;
   const mode = parsed.data.mode ?? env.DEFAULT_DOWNLOAD_MODE;
 
   const startedAt = Date.now();
@@ -147,6 +153,11 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     cleanup();
   });
 
+  /** Tells the page the download has really started (headers are about to go out, so this cookie travels with them). */
+  const announceStart = (): void => {
+    if (token) res.cookie(`blazfetch_dl_${token}`, '1', { maxAge: 60_000, sameSite: 'lax', path: '/', httpOnly: false });
+  };
+
   /** Direct stream: resolves once the response has been handed to the pipe (or the client left). */
   const runStream = async (): Promise<void> => {
     const userKey = req.userId ?? req.guestId ?? 'anonymous';
@@ -172,6 +183,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     if (clientClosed) return;
 
     res.status(200);
+    announceStart();
     res.setHeader('Content-Type', opened.contentType);
     res.setHeader('Content-Disposition', contentDisposition(opened.filename));
     res.setHeader('Cache-Control', 'no-store');
@@ -235,6 +247,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     armTimeout();
     res.status(200);
+    announceStart();
     res.setHeader('Content-Type', result.mimeType);
     res.setHeader('Content-Disposition', contentDisposition(name));
     res.setHeader('Cache-Control', 'no-store');

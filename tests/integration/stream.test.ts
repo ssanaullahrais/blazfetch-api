@@ -306,6 +306,32 @@ describe('GET /api/v1/stream', () => {
     }
   });
 
+  it('sets the start cookie for ?token= only once bytes are flowing, and never on an error', async () => {
+    behaviour = (child) => {
+      child.stdout.write('data');
+      child.emit('close', 0);
+    };
+    const ok = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video&token=abcd1234efgh`);
+    expect(ok.res.statusCode).toBe(200);
+    expect(String(ok.res.headers['set-cookie'])).toMatch(/blazfetch_dl_abcd1234efgh=1/);
+    await body(ok.res);
+
+    behaviour = (child) => {
+      child.stderr.write('ERROR: This video is private video');
+      setTimeout(() => child.emit('close', 1), 10);
+    };
+    const failed = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video&token=zzzz9999yyyy`);
+    expect(failed.res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(String(failed.res.headers['set-cookie'] ?? '')).not.toMatch(/blazfetch_dl_/);
+    await body(failed.res);
+  });
+
+  it('rejects a malformed token', async () => {
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&token=${encodeURIComponent('bad token!')}`);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(await body(res)).error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('aborts the connection (no JSON) when the source fails after the first byte', async () => {
     behaviour = (child) => {
       child.stdout.write('partial');

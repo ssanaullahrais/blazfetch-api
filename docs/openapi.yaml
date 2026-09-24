@@ -91,6 +91,12 @@ paths:
         - name: filename
           in: query
           schema: { type: string, maxLength: 200 }
+        - name: token
+          in: query
+          description: >
+            8 to 64 characters chosen by the page. When bytes start flowing the response sets the cookie
+            blazfetch_dl_<token>=1 (60 seconds) so a navigation-started download can detect that it began.
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }
         - name: mode
           in: query
           description: >

@@ -1419,6 +1419,7 @@ GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename
 | `formatId` | no (default `best`) | A `formatId` from `/fetch` or `/fetch/audio`, or `best` for the highest quality |
 | `kind` | no (default `video`) | `video` or `audio` |
 | `filename` | no | Suggested file name; the correct extension is added if missing |
+| `token` | no | 8 to 64 characters (`A-Z a-z 0-9 _ -`) chosen by your page. When bytes start flowing the response sets the cookie `blazfetch_dl_<token>=1` (60 s), so a page that starts the download by navigation (an `<a>` or hidden `<iframe>`) can detect that it really began |
 | `mode` | no (default `DEFAULT_DOWNLOAD_MODE`, which is `stream`) | `stream`, `prepare` or `auto` (below) |
 
 ### Delivery modes
