@@ -40,7 +40,21 @@ function etaToSeconds(eta: string): number {
   return 0;
 }
 
+/** Prefers ffmpeg for HLS assembly (more reliable on most sites), but some hosts (e.g. Loom's
+ *  signed playlists) make ffmpeg fail to open the stream while yt-dlp's native downloader works,
+ *  so retry once without it when ffmpeg is what failed. */
 export async function downloadWithYtdlp(options: YtdlpDownloadOptions): Promise<string> {
+  const state = { ffmpegFailed: false };
+  try {
+    return await runYtdlpDownload(options, true, state);
+  } catch (err) {
+    if (!state.ffmpegFailed || options.signal.aborted) throw err;
+    logger.warn({ url: options.url }, 'ffmpeg HLS download failed, retrying with the native downloader');
+    return runYtdlpDownload(options, false, state);
+  }
+}
+
+async function runYtdlpDownload(options: YtdlpDownloadOptions, preferFfmpegHls: boolean, state: { ffmpegFailed: boolean }): Promise<string> {
   const { url, formatId, outputDir, signal, onProgress, timeoutMs = env.DOWNLOAD_TOTAL_TIMEOUT_MS } = options;
 
   await fs.promises.mkdir(outputDir, { recursive: true });
@@ -55,7 +69,7 @@ export async function downloadWithYtdlp(options: YtdlpDownloadOptions): Promise<
     // Forces ffmpeg to assemble HLS/DASH fragments (rather than yt-dlp's native downloader,
     // which can leave a file that "completes" while missing fragments) and remuxes merged
     // video+audio into MP4 so the output container matches what we validate afterward.
-    '--hls-prefer-ffmpeg',
+    ...(preferFfmpegHls ? ['--hls-prefer-ffmpeg'] : []),
     '--merge-output-format', 'mp4',
     '--print', 'after_move:filepath',
     url,
@@ -126,6 +140,7 @@ export async function downloadWithYtdlp(options: YtdlpDownloadOptions): Promise<
       if (code === 0 && finalPath) {
         resolve(finalPath);
       } else {
+        state.ffmpegFailed = /ffmpeg exited with code/.test(stderr);
         logger.warn({ code, stderr: stderr.slice(-2000) }, 'yt-dlp download failed');
         reject(classifyYtdlpFailure(stderr));
       }
