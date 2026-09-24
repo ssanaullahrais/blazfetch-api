@@ -17,9 +17,25 @@ interface YtdlpPlaylistInfo extends YtdlpRawInfo {
   entries?: YtdlpRawInfo[];
 }
 
-/** Providers hand out extensionless tokenised links (e.g. rapidcdn `/v2?token=`) for videos, so only a real image extension means an image. */
-function looksLikeImage(url: string): boolean {
-  return /\.(jpg|jpeg|png|webp)(?:\?|$)/i.test(url);
+const VIDEO_EXT = /\.(mp4|m4v|mov|webm)(?:\?|$)/i;
+const IMAGE_EXT = /\.(jpg|jpeg|png|webp|heic)(?:\?|$)/i;
+
+/**
+ * Fallback providers (rapidcdn) hand out extensionless links such as `/v2?token=<jwt>` for both photos and videos.
+ * The token's payload carries the real file name and source URL, so the type is read from there.
+ */
+export function fallbackItemType(url: string): 'image' | 'video' {
+  try {
+    const token = new URL(url).searchParams.get('token');
+    const payload = token ? (JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf-8')) as { url?: string; filename?: string }) : undefined;
+    for (const hint of [payload?.filename, payload?.url]) {
+      if (hint && VIDEO_EXT.test(hint)) return 'video';
+      if (hint && IMAGE_EXT.test(hint)) return 'image';
+    }
+  } catch {
+    // not a tokenised link: fall through to the plain extension check
+  }
+  return VIDEO_EXT.test(url) ? 'video' : 'image';
 }
 
 /** Resolves the operator-supplied cookies file, only if configured and actually present on disk. */
@@ -64,7 +80,7 @@ export class InstagramAdapter implements PlatformAdapter {
     try {
       const items = await fetchInstagramViaBtchDownloader(targetUrl);
       return this.normalizeFallbackItems(
-        items.map((i) => ({ url: i.url, type: looksLikeImage(i.url) ? 'image' as const : 'video' as const, thumbnail: i.thumbnail })),
+        items.map((i) => ({ url: i.url, type: fallbackItemType(i.url), thumbnail: i.thumbnail })),
         targetUrl,
         'btch-downloader',
       );
