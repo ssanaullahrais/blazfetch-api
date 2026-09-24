@@ -318,4 +318,4 @@ sudo journalctl -u nginx -n 100
 
 ## License
 
-This project is licensed for educational, non-commercial use only. Public or commercial deployment (including on a VPS for other people) needs the author's written permission, and the official frontend must keep its footer credit. See [LICENSE](../LICENSE) and [AGENTS.md](../AGENTS.md).
+Open source (MIT with required attribution): free to use, modify and deploy, including commercially, as long as the official frontend keeps its footer credit and the license notices are kept. See [LICENSE](../LICENSE) and [AGENTS.md](../AGENTS.md).
