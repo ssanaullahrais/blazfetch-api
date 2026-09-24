@@ -1,27 +1,53 @@
-# Blazfetch Backend
+<div align="center">
 
-A server that takes a link from a social platform (YouTube, TikTok, Instagram, X/Twitter, Facebook,
-Reddit, Vimeo, Dailymotion, Bluesky, Streamable, Rutube, SoundCloud, Snapchat, Twitch, Pinterest,
-Loom or Newgrounds) and lets you download the video, audio, or photos in it. It doesn't keep a copy of
-anyone's media on its own server: it fetches the file, checks that it actually works, sends it
-straight through to whoever asked, and deletes any temporary files afterward. (It does remember each
-link's details, such as title and formats, so repeat requests are instant. See [Stored media](#stored-media).)
+# BlazFetch Backend
 
-## What you get
+**One API to fetch and download media from 18 social platforms.**<br/>
+Paste a link, get every quality option, download it. Nothing is stored except the metadata.
 
-- **One API for 17 confirmed platforms (plus Tumblr, wired but not yet verified).** Paste a link, get the title, thumbnail and every quality option, then download.
-- **Three ways to download** with a single request: direct stream (starts immediately), prepare (a
-  guaranteed H.264/AAC file), or `auto` (stream, and fall back to prepare if the source can't be streamed).
-- **Everything fetched is remembered forever** (metadata only), with stable page paths like
-  `/youtube/Cwkej79U3ek`, a weekly check that notices deleted videos, and usage statistics.
+![Node](https://img.shields.io/badge/Node.js-20+-5FA04E?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
+![Databases](https://img.shields.io/badge/DB-SQLite%20%7C%20PostgreSQL%20%7C%20MySQL%20%7C%20MongoDB-4169E1)
+![Platforms](https://img.shields.io/badge/platforms-17%20confirmed-2EA44F)
+![Tests](https://img.shields.io/badge/tests-137%20passing-2EA44F)
+
+[Frontend repository](https://github.com/ssanaullahrais/blazfetch-frontend) ·
+[API reference](docs/API.md) ·
+[VPS deployment](docs/REQUIREMENTS.md) ·
+[OpenAPI](docs/openapi.yaml)
+
+</div>
+
+---
+
+> [!TIP]
+> **Want the web app?** The ready-made frontend for this API is
+> **[ssanaullahrais/blazfetch-frontend](https://github.com/ssanaullahrais/blazfetch-frontend)**:
+> start this backend, then run the frontend on top of it.
+
+It takes a link from YouTube, TikTok, Instagram, X/Twitter, Facebook, Reddit, Vimeo, Dailymotion, Bluesky,
+Streamable, Rutube, SoundCloud, Snapchat, Twitch, Pinterest, Loom, Newgrounds or Tumblr and lets you download
+the video, audio or photos in it. It doesn't keep a copy of anyone's media: it fetches the file, checks that it
+actually works, sends it straight through to whoever asked, and deletes any temporary files afterward. (It does
+remember each link's details, such as title and formats, so repeat requests are instant. See
+[Stored media](#stored-media).)
+
+## Highlights
+
+- **One API for 17 confirmed platforms** (plus Tumblr, wired but not yet verified): title, thumbnail and every quality option, then download.
+- **Three ways to download** with a single request: direct stream (starts immediately), prepare (a guaranteed
+  H.264/AAC file), or `auto` (stream, and fall back to prepare if the source can't be streamed).
+- **Everything fetched is remembered forever** (metadata only), with stable page paths like `/youtube/Cwkej79U3ek`,
+  a weekly check that notices deleted videos, and usage statistics.
 - **Works when a platform blocks it.** If YouTube blocks the server's IP, a fallback provider answers instead.
 - **Your choice of database:** SQLite (default, nothing to install), PostgreSQL, MySQL/MariaDB or MongoDB.
-- **Clean by design:** no media is kept on disk, temporary files are always removed, and cancelling a
-  download stops every process it started.
+- **Clean by design:** no media is kept on disk, temporary files are always removed, and cancelling a download
+  stops every process it started.
 
-## Try it in two minutes
+## Quick start
 
-(Needs Node.js 20+, yt-dlp and ffmpeg installed: see [Install](#install) below.)
+Needs Node.js 20+, yt-dlp and ffmpeg (see [Install](#install)).
 
 ```bash
 npm install
@@ -31,14 +57,10 @@ npm run dev          # http://localhost:4000
 
 ```bash
 # 1. look up a link (metadata, thumbnail, formats)
-curl -X POST http://localhost:4000/api/v1/fetch \
-  -H "content-type: application/json" \
-  -d '{"url":"https://www.tiktok.com/@scout2015/video/6718335390845095173"}'
+curl -X POST http://localhost:4000/api/v1/fetch   -H "content-type: application/json"   -d '{"url":"https://www.tiktok.com/@scout2015/video/6718335390845095173"}'
 
 # 2. download it in one request (best quality; falls back automatically if it can't be streamed)
-curl -G http://localhost:4000/api/v1/stream \
-  --data-urlencode "url=https://www.tiktok.com/@scout2015/video/6718335390845095173" \
-  -d mode=auto -o video.mp4
+curl -G http://localhost:4000/api/v1/stream   --data-urlencode "url=https://www.tiktok.com/@scout2015/video/6718335390845095173"   -d mode=auto -o video.mp4
 ```
 
 Real responses for every platform are in [docs/API.md](docs/API.md#responses-by-platform).
@@ -149,6 +171,8 @@ GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpe
 
 ### Building a frontend
 
+The official one already exists: [blazfetch-frontend](https://github.com/ssanaullahrais/blazfetch-frontend). To build your own:
+
 - Send `credentials: 'include'` on every request: the server identifies visitors with a guest cookie
   (rate limits and concurrency use it).
 - Put your frontend's exact origin in `CORS_ALLOWED_ORIGINS` (`*` does not work with cookies).
@@ -203,6 +227,8 @@ process (several instances would just repeat some checks).
 
 ## Testing
 
+137 tests (unit and integration) cover the API, stream modes, the media store and every database driver path.
+
 ```bash
 npm test             # unit + integration tests (no network needed)
 npm run typecheck
@@ -221,3 +247,9 @@ npm run typecheck
   private or age-gated, or was deleted. Nothing to fix on the server.
 - Extractor errors return a normalized code (`EXTRACTOR_FAILED`, ...); raw yt-dlp output is only in the server logs.
 - A download that fails with `mode=stream` for one source (Loom is one) works with `mode=auto` or `mode=prepare`.
+
+---
+
+<div align="center">
+Frontend: <a href="https://github.com/ssanaullahrais/blazfetch-frontend">blazfetch-frontend</a>
+</div>
