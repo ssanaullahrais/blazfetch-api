@@ -70,6 +70,25 @@ function proxyFastPath(url: string | undefined): FastPath | undefined {
   return url && !isManifestUrl(url) ? { kind: 'proxy', url } : undefined;
 }
 
+/**
+ * Streaming can only hand over what the source already is, and phones (WhatsApp, iOS/Android galleries) play
+ * nothing but a plain MP4 with H.264. VP9/AV1/HEVC, WebM, and the fragmented MP4 a live merge produces show a
+ * black screen or "cannot be shared". Those cases are refused here so `auto` prepares a proper file instead.
+ */
+function isPhoneSafeVideo(format: BlazfetchFormat): boolean {
+  const codec = (format.codec ?? '').toLowerCase();
+  const codecOk = !codec || codec === 'unknown' || codec.startsWith('avc') || codec.startsWith('h264');
+  return format.ext.toLowerCase() === 'mp4' && codecOk;
+}
+
+function notPhoneSafe(): BlazfetchError {
+  return new BlazfetchError(
+    'DOWNLOAD_FAILED',
+    'This format would not play on phones when streamed as-is. Use mode=auto or mode=prepare for a compatible MP4.',
+    { streamUnsupported: true },
+  );
+}
+
 /** AAC audio merges into MP4 without re-encoding; otherwise the highest-bitrate track wins. */
 function bestAudioWithUrl(media: BlazfetchResponse): BlazfetchAudioFormat | undefined {
   const withUrl = media.audioFormats.filter((a) => a.url && !a.isConverted);
@@ -99,11 +118,12 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
 
     if (!isYtdlp) {
       if (!chosen.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
+      if (!isPhoneSafeVideo(chosen)) throw notPhoneSafe();
       return { type: 'proxy', url: chosen.url, contentType: contentTypeFor(chosen.ext, 'video'), ext: chosen.ext };
     }
+    if (chosen.requiresMerge || isHls(chosen)) throw notPhoneSafe(); // fragmented MP4 from a live merge/remux
+    if (!isPhoneSafeVideo(chosen)) throw notPhoneSafe();
     if (chosen.requiresMerge) {
-      // Video-only source: pair it with the best AAC audio and combine on the fly. The result is a
-      // fragmented MP4 with the original codecs copied (no H.264 transcode in stream mode).
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }
     if (isHls(chosen)) {

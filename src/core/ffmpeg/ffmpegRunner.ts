@@ -82,7 +82,8 @@ export function mergeVideoAudioArgs(
     '-map', '0:v:0',
     '-map', '1:a:0',
     '-c:v', options.transcodeVideo ? 'libx264' : 'copy',
-    ...(options.transcodeVideo ? ['-preset', 'veryfast', '-crf', '20'] : []),
+    // yuv420p: 10-bit or 4:4:4 sources otherwise play as a black screen on phones.
+    ...(options.transcodeVideo ? ['-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p'] : []),
     '-c:a', options.transcodeAudio ? 'aac' : 'copy',
     ...(options.transcodeAudio ? ['-b:a', '192k'] : []),
     '-avoid_negative_ts', 'make_zero',
@@ -100,6 +101,7 @@ export function transcodeToCompatibleMp4Args(inputPath: string, outputPath: stri
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-crf', '20',
+    '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '192k',
     '-avoid_negative_ts', 'make_zero',

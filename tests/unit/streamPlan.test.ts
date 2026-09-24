@@ -30,14 +30,25 @@ describe('planStream', () => {
     expect(plan).toMatchObject({ type: 'ytdlp', selector: '18', contentType: 'video/mp4', ext: 'mp4', contentLength: 1000 });
   });
 
-  it('merges a video-only format with AAC audio through ffmpeg', () => {
-    const plan = planStream(media(), { formatId: '137', kind: 'video' });
-    expect(plan).toMatchObject({ type: 'ffmpeg', mode: 'merge', contentType: 'video/mp4' });
-    expect((plan as { selector: string }).selector).toContain('137+bestaudio[acodec^=mp4a]');
+  it('refuses to stream a live merge (fragmented MP4 goes black on phones), so auto prepares it', () => {
+    expect(() => planStream(media(), { formatId: '137', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 
-  it('remuxes HLS sources through ffmpeg', () => {
-    expect(planStream(media(), { formatId: 'hls-720', kind: 'video' })).toMatchObject({ type: 'ffmpeg', mode: 'remux' });
+  it('refuses to stream HLS through a live remux for the same reason', () => {
+    expect(() => planStream(media(), { formatId: 'hls-720', kind: 'video' })).toThrowError(/would not play on phones/);
+  });
+
+  it('refuses formats phones cannot play as-is (VP9/AV1/HEVC, WebM)', () => {
+    const codecs = media({
+      formats: [
+        { formatId: 'vp9', ext: 'mp4', kind: 'video', codec: 'vp09.00.40.08' },
+        { formatId: 'av1', ext: 'mp4', kind: 'video', codec: 'av01.0.08M.08' },
+        { formatId: 'webm', ext: 'webm', kind: 'video', codec: 'avc1.64001f' },
+        { formatId: 'h264', ext: 'mp4', kind: 'video', codec: 'avc1.64001f' },
+      ],
+    });
+    for (const id of ['vp9', 'av1', 'webm']) expect(() => planStream(codecs, { formatId: id, kind: 'video' })).toThrowError(/would not play on phones/);
+    expect(planStream(codecs, { formatId: 'h264', kind: 'video' })).toMatchObject({ type: 'ytdlp' });
   });
 
   it('pipes a real audio track as-is', () => {
@@ -72,15 +83,13 @@ describe('planStream fast path', () => {
     ],
   });
 
-  it('merges from the cached video + AAC audio URLs so yt-dlp does not have to re-extract', () => {
-    const plan = planStream(withUrls, { formatId: '137', kind: 'video' });
-    expect(plan).toMatchObject({ fast: { kind: 'ffmpeg', mode: 'merge' } });
-    expect((plan as { fast: { inputs: { url: string }[] } }).fast.inputs.map((i) => i.url)).toEqual(['https://cdn.example/v.mp4', 'https://cdn.example/aac.m4a']);
+  it('passes a plain H.264 MP4 through untouched (no ffmpeg)', () => {
+    expect(planStream(withUrls, { formatId: '18', kind: 'video' })).toMatchObject({ type: 'ytdlp', fast: { kind: 'proxy', url: 'https://cdn.example/18.mp4' } });
   });
 
-  it('passes a plain single file through untouched (no ffmpeg), whatever its container', () => {
-    expect(planStream(withUrls, { formatId: '18', kind: 'video' })).toMatchObject({ type: 'ytdlp', fast: { kind: 'proxy', url: 'https://cdn.example/18.mp4' } });
-    expect(planStream(withUrls, { formatId: '43', kind: 'video' })).toMatchObject({ fast: { kind: 'proxy', url: 'https://cdn.example/43.webm' } });
+  it('does not stream a WebM or a video-only format, which would not play on phones', () => {
+    expect(() => planStream(withUrls, { formatId: '43', kind: 'video' })).toThrowError(/would not play on phones/);
+    expect(() => planStream(withUrls, { formatId: '137', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 
   it('passes a standalone audio track through untouched from its cached URL', () => {
@@ -93,7 +102,7 @@ describe('planStream fast path', () => {
   });
 
   it('has no fast path when the cached format has no URL', () => {
-    expect((planStream(media(), { formatId: '137', kind: 'video' }) as { fast?: unknown }).fast).toBeUndefined();
+    expect((planStream(media(), { formatId: '18', kind: 'video' }) as { fast?: unknown }).fast).toBeUndefined();
   });
 });
 

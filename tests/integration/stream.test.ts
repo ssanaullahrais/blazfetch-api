@@ -187,25 +187,22 @@ describe('GET /api/v1/stream', () => {
     await waitFor(() => activeStreamProcessCount() === 0);
   });
 
-  it('resolves formatId=best and honours a custom filename', async () => {
-    behaviour = (child, args) => {
-      if (args.includes('--dump-single-json')) {
-        // yt-dlp resolving the merge: one video URL and one audio URL for ffmpeg to combine.
-        child.stdout.write(JSON.stringify({ requested_formats: [{ url: 'https://cdn.example/v.mp4', http_headers: {} }, { url: 'https://cdn.example/a.m4a' }] }));
-      } else {
-        child.stdout.write('merged-bytes'); // ffmpeg output
-      }
+  it('honours a custom filename for a phone-safe MP4', async () => {
+    behaviour = (child) => {
+      child.stdout.write('file-bytes');
       child.emit('close', 0);
     };
-    const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&filename=${encodeURIComponent('my clip')}`);
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&formatId=18&filename=${encodeURIComponent('my clip')}`);
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-disposition']).toContain('filename="my clip.mp4"');
-    expect(await body(res)).toBe('merged-bytes');
-    // "best" picks the highest resolution (137, video-only), so it is merged through ffmpeg into fragmented MP4.
-    const { spawn } = await import('node:child_process');
-    const ffmpegCall = vi.mocked(spawn).mock.calls.map((c) => c[1] as string[]).find((a) => a.includes('pipe:1'));
-    expect(ffmpegCall?.join(' ')).toContain('frag_keyframe+empty_moov+default_base_moof');
+    expect(await body(res)).toBe('file-bytes');
     expect(fs.readdirSync(tempDir)).toEqual([]);
+  });
+
+  it('refuses to live-merge "best" in stream mode (it would not play on phones)', async () => {
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&mode=stream`);
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(JSON.parse(await body(res))).toMatchObject({ success: false, error: { code: 'DOWNLOAD_FAILED' } });
   });
 
   it('returns a JSON error with the right status when yt-dlp fails before the first byte', async () => {
