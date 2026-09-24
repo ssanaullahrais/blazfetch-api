@@ -17,6 +17,10 @@ export class SqlStatsRepository implements StatsStore {
       fallback_used: params.fallbackUsed ?? null,
       duration_ms: params.durationMs ?? null,
       error_code: params.errorCode ?? null,
+      cache_hit: params.cacheHit ?? null,
+      cache_stale: params.cacheStale ?? null,
+      kind: params.kind ?? null,
+      source: params.source ?? 'user',
       created_at: knex.fn.now(),
     });
   }
@@ -37,6 +41,9 @@ export class SqlStatsRepository implements StatsStore {
       bytes_transferred: params.bytesTransferred ?? null,
       processing_duration_ms: params.processingDurationMs ?? null,
       error_code: params.errorCode ?? null,
+      mode: params.mode ?? null,
+      first_byte_ms: params.firstByteMs ?? null,
+      fell_back: params.fellBack ?? null,
       created_at: knex.fn.now(),
     });
   }

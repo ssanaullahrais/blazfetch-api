@@ -85,6 +85,42 @@ export interface BlazfetchResponse {
   metadata: Record<string, unknown>;
   extractor: string;
   fallbackUsed?: string;
+  /** Added by the server when the answer comes from (or was saved to) the permanent media store. */
+  stored?: StoredInfo;
+}
+
+/** What we know about a stored item: its stable path, how fresh it is, and its usage statistics. */
+export interface StoredInfo {
+  /** Stable path for this media, e.g. `/youtube/Cwkej79U3ek`. */
+  path: string;
+  /** For a YouTube URL carrying both `v=` and `list=`: the path of that playlist in the video's context. */
+  playlistPath?: string;
+  /** The URL the media was first fetched from. */
+  sourceUrl: string;
+  status: 'available' | 'unavailable';
+  /** True when this answer came from the store without extracting. */
+  cached: boolean;
+  /** The direct media URLs in this response are past their trust window and will be refreshed. */
+  urlsStale: boolean;
+  /** A live existence check failed without proving the media gone, so the last known answer is served. */
+  validationFailed?: boolean;
+  firstFetchedAt: string;
+  lastFetchedAt: string;
+  /** Last time the media was confirmed to still exist. */
+  validatedAt: string | null;
+  /** When the next existence check is due. */
+  nextCheckAt: string | null;
+  stats: {
+    fetchCount: number;
+    hitCount: number;
+    viewCount: number;
+    downloadCount: number;
+    streamCount: number;
+    prepareCount: number;
+    bytesServed: number;
+    lastAccessedAt: string | null;
+    lastDownloadedAt: string | null;
+  };
 }
 
 export interface FetchOptions {

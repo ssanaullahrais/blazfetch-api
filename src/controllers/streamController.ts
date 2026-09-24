@@ -68,6 +68,12 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   let bytes = 0;
   let statRecorded = false;
   let platformForStat = 'unknown';
+  let mediaKeyForStat: string | undefined;
+  let firstByteMs: number | undefined;
+  let fellBack = false;
+  /** Set when the exact size is announced (Content-Length): a client may close right after the last byte. */
+  let expectedLength: number | undefined;
+  let deliveredMode: 'stream' | 'prepare' = 'stream';
   let timer: NodeJS.Timeout | undefined;
   let releaseUser: (() => void) | undefined;
   let releaseGlobal: (() => void) | undefined;
@@ -101,11 +107,15 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     statRecorded = true;
     void recordDownloadStat({
       platform: platformForStat,
+      mediaId: mediaKeyForStat,
       format: formatId,
       kind,
       userId: req.userId,
       guestId: req.guestId,
       success,
+      mode: deliveredMode,
+      firstByteMs,
+      fellBack,
       bytesTransferred: bytes,
       processingDurationMs: Date.now() - startedAt,
       errorCode,
@@ -124,10 +134,15 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
   // Fires for both a finished response and a client that went away mid-download.
   res.on('close', () => {
-    if (!res.writableFinished) {
+    // A client that knows the exact size (Content-Length) may hang up the moment it has the last byte,
+    // before we have finished ending the response. That is a completed download, not a disconnect.
+    const gotEverything = expectedLength !== undefined && bytes >= expectedLength;
+    if (!res.writableFinished && !gotEverything) {
       clientClosed = true;
       logger.info({ requestId: req.requestId, bytes, mode }, 'client disconnected, stopping processes');
       recordStat(false, 'CLIENT_DISCONNECTED');
+    } else if (gotEverything) {
+      recordStat(true);
     }
     cleanup();
   });
@@ -152,6 +167,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     });
     killSource = opened.kill;
     platformForStat = opened.platform;
+    mediaKeyForStat = opened.mediaKey;
+    firstByteMs = Date.now() - startedAt;
     if (clientClosed) return;
 
     res.status(200);
@@ -160,7 +177,10 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Accel-Buffering', 'no'); // stop nginx buffering the whole response
     res.setHeader('X-Blazfetch-Mode', 'stream');
-    if (opened.contentLength) res.setHeader('Content-Length', String(opened.contentLength));
+    if (opened.contentLength) {
+      res.setHeader('Content-Length', String(opened.contentLength));
+      expectedLength = opened.contentLength;
+    }
     // No Content-Length otherwise: Node falls back to chunked transfer encoding.
 
     bytes += opened.firstChunk.length;
@@ -191,6 +211,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     });
     prepareJob = job;
     platformForStat = job.platform;
+    deliveredMode = 'prepare';
     statRecorded = true; // the job pipeline records its own download stat
     if (clientClosed) {
       await cancelJob(job.id).catch(() => undefined);
@@ -199,7 +220,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      result = await runDownloadJob(job, req.requestId);
+      result = await runDownloadJob(job, req.requestId, { fellBack });
     } finally {
       prepareFinished = true;
     }
@@ -265,6 +286,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
           'direct stream failed before the first byte, falling back to prepare mode',
         );
         statRecorded = true; // the prepare run records the outcome instead
+        fellBack = true;
         stopStreamAttempt();
         abort = new AbortController(); // the stream attempt's signal is spent
       }

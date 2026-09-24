@@ -72,6 +72,7 @@ vi.mock('../../src/services/fetchService', () => ({
     formats: [
       { formatId: '18', ext: 'mp4', kind: 'video', height: 360 },
       { formatId: '137', ext: 'mp4', kind: 'video_only', height: 1080, requiresMerge: true },
+      { formatId: '22', ext: 'mp4', kind: 'video', height: 720, filesizeBytes: 11 },
     ],
     audioFormats: [{ formatId: '140', ext: 'm4a', bitrate: 128, isConverted: false }],
     extractor: 'yt-dlp',
@@ -249,6 +250,26 @@ describe('GET /api/v1/stream', () => {
     const second = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video`, guest);
     expect(second.res.statusCode).toBe(200);
     expect(await body(second.res)).toBe('again');
+  });
+
+  it('counts a client that hangs up right after the last byte of a known-size file as a completed download', async () => {
+    behaviour = (child) => {
+      child.stdout.write('hello world'); // exactly filesizeBytes (11), then the process lingers
+    };
+    const { req, res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=22&kind=video`);
+    expect(res.headers['content-length']).toBe('11');
+    let got = 0;
+    await new Promise<void>((resolve) =>
+      res.on('data', (chunk: Buffer) => {
+        got += chunk.length;
+        if (got >= 11) resolve();
+      }),
+    );
+    req.destroy(); // like curl/browsers do once Content-Length bytes have arrived
+
+    await waitFor(() => stats.length === 1);
+    expect(stats[0]).toMatchObject({ success: true, bytesTransferred: 11 });
+    await waitFor(() => activeStreamProcessCount() === 0);
   });
 
   it('aborts the connection (no JSON) when the source fails after the first byte', async () => {

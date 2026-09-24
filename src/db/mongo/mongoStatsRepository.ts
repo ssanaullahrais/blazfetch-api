@@ -17,6 +17,10 @@ export class MongoStatsRepository implements StatsStore {
       fallbackUsed: params.fallbackUsed ?? null,
       durationMs: params.durationMs ?? null,
       errorCode: params.errorCode ?? null,
+      cacheHit: params.cacheHit ?? null,
+      cacheStale: params.cacheStale ?? null,
+      kind: params.kind ?? null,
+      source: params.source ?? 'user',
       createdAt: new Date(),
     } as never);
   }
@@ -37,6 +41,9 @@ export class MongoStatsRepository implements StatsStore {
       bytesTransferred: params.bytesTransferred ?? null,
       processingDurationMs: params.processingDurationMs ?? null,
       errorCode: params.errorCode ?? null,
+      mode: params.mode ?? null,
+      firstByteMs: params.firstByteMs ?? null,
+      fellBack: params.fellBack ?? null,
       createdAt: new Date(),
     } as never);
   }

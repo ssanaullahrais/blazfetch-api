@@ -1,17 +1,26 @@
 import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// vi.hoisted runs before the imports, so the app's config really sees the temporary database path.
+const dir = await vi.hoisted(async () => {
+  const nodeFs = await import('node:fs');
+  const nodeOs = await import('node:os');
+  const nodePath = await import('node:path');
+  const tmp = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'blazfetch-db-'));
+  process.env.DATABASE_DRIVER = 'sqlite';
+  process.env.DATABASE_SQLITE_PATH = nodePath.join(tmp, 'test.sqlite3');
+  process.env.LOG_LEVEL = 'silent';
+  return tmp;
+});
+
+import { getDb } from '../../src/db';
 import type { Database } from '../../src/db/types';
+import { getKnex } from '../../src/db/sql/knexClient';
 
 let db: Database;
-let dir: string;
 
 beforeAll(async () => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blazfetch-db-'));
-  process.env.DATABASE_DRIVER = 'sqlite';
-  process.env.DATABASE_SQLITE_PATH = path.join(dir, 'test.sqlite3');
-  db = (await import('../../src/db')).getDb();
+  db = getDb();
   await db.migrate();
 });
 
@@ -43,13 +52,26 @@ describe('sqlite database driver', () => {
     await expect(db.jobs.get('missing')).rejects.toMatchObject({ code: 'JOB_NOT_FOUND' });
   });
 
-  it('upserts and reads the metadata cache', async () => {
-    const meta = { success: true, platform: 'youtube', title: 't', formats: [], audioFormats: [] } as never;
-    await db.metadataCache.set('youtube', 'abc', 'https://y/abc', meta);
-    await db.metadataCache.set('youtube', 'abc', 'https://y/abc', { ...(meta as object), title: 't2' } as never);
-    expect((await db.metadataCache.get('youtube', 'abc'))?.title).toBe('t2');
-    expect((await db.metadataCache.getByUrl('youtube', 'https://y/abc'))?.title).toBe('t2');
-    expect(await db.metadataCache.get('youtube', 'nope')).toBeNull();
+  it('stores media permanently: upsert keeps counters and first_fetched_at, lookups work by key and by URL', async () => {
+    const meta = { success: true, platform: 'youtube', mediaId: 'abc', mediaType: 'video', canonicalUrl: 'https://y/abc', title: 't', formats: [], audioFormats: [], extractor: 'yt-dlp' } as never;
+    const input = { platform: 'youtube', mediaKey: 'abc', canonicalUrl: 'https://y/abc', sourceUrl: 'https://y/abc?x=1', path: '/youtube/abc', isPublic: true, urlsExpireAt: new Date(Date.now() + 3600_000), nextCheckAt: new Date(Date.now() + 7 * 86400_000) };
+    await db.metadataCache.upsert({ ...input, metadata: meta });
+    await db.metadataCache.recordAccess('youtube', 'abc', 'hit');
+    await db.metadataCache.upsert({ ...input, metadata: { ...(meta as object), title: 't2' } as never });
+
+    const byKey = await db.metadataCache.findByKey('youtube', 'abc');
+    expect(byKey?.metadata.title).toBe('t2');
+    expect(byKey).toMatchObject({ kind: 'video', sourceUrl: 'https://y/abc?x=1', path: '/youtube/abc', status: 'available', isPublic: true });
+    expect(byKey?.counters).toMatchObject({ fetchCount: 2, hitCount: 1 });
+    expect((await db.metadataCache.findByUrl('youtube', 'https://y/abc'))?.metadata.title).toBe('t2');
+    expect(await db.metadataCache.findByKey('youtube', 'nope')).toBeNull();
+  });
+
+  it('migrations are versioned and idempotent', async () => {
+    await db.migrate();
+    await db.migrate();
+    const versions = (await getKnex()('schema_migrations').select('version').orderBy('version')).map((r: { version: number }) => r.version);
+    expect(versions).toEqual([1, 2, 3]);
   });
 
   it('records fetch and download stats', async () => {

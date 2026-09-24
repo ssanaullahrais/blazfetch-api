@@ -55,7 +55,25 @@ const envSchema = z.object({
   TEMP_SWEEP_MAX_AGE_MS: z.coerce.number().default(3600000),
   TEMP_SWEEP_INTERVAL_MS: z.coerce.number().default(600000),
 
+  // How long the direct media URLs inside a stored response are trusted (they expire at the source).
+  // Everything else about a stored item is kept forever; see the REVALIDATE_* settings.
   CACHE_TTL_SECONDS: z.coerce.number().default(3600),
+  // Playlists change, so a stored playlist is refreshed after this long (YouTube Mixes use CACHE_TTL_SECONDS).
+  PLAYLIST_REFRESH_SECONDS: z.coerce.number().default(86400),
+  // Every stored item is re-checked (does it still exist?) this often, both by the background job and
+  // on demand when a user requests an item that is due.
+  REVALIDATE_AFTER_SECONDS: z.coerce.number().default(604800),
+  REVALIDATE_ENABLED: boolFromString(true),
+  REVALIDATE_INTERVAL_MS: z.coerce.number().default(1800000),
+  REVALIDATE_BATCH_SIZE: z.coerce.number().default(10),
+  // Pause between two checks in the background job so source sites are never hammered.
+  REVALIDATE_DELAY_MS: z.coerce.number().default(3000),
+  // Consecutive "not found / private" answers before an item is marked unavailable (one flaky 404 is not enough).
+  UNAVAILABLE_AFTER_FAILURES: z.coerce.number().default(2),
+  // After a timeout or rate limit, try again after this long. After a "gone" answer below the threshold, 1 day.
+  TRANSIENT_RETRY_SECONDS: z.coerce.number().default(3600),
+  // A user re-requesting a known-unavailable item is not re-extracted more often than this.
+  UNAVAILABLE_RECHECK_SECONDS: z.coerce.number().default(600),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   RATE_LIMIT_MAX_GUEST: z.coerce.number().default(30),

@@ -12,6 +12,7 @@ import { pickBestAudioFormat, pickBestVideoFormat } from '../core/adapters/forma
 import { logger } from '../lib/logger';
 import { recordDownloadStat } from './statsService';
 import { fetchMedia } from './fetchService';
+import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { fetchAudio } from './audioService';
 import { JobRecord, RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchError } from '../constants/errors';
@@ -72,7 +73,12 @@ export interface RunDownloadResult extends DownloadResult {
  * the adapter's result (a direct CDN URL or a yt-dlp-produced file) is returned as-is so the
  * controller can stream it straight to the client.
  */
-export async function runDownloadJob(job: JobRecord, requestId: string): Promise<RunDownloadResult> {
+export interface RunDownloadOptions {
+  /** GET /stream?mode=auto fell back to preparing the file after direct streaming failed. */
+  fellBack?: boolean;
+}
+
+export async function runDownloadJob(job: JobRecord, requestId: string, options: RunDownloadOptions = {}): Promise<RunDownloadResult> {
   const normalizedUrl = validateAndNormalizeUrl(job.canonicalUrl);
   const adapter = getAdapter(normalizedUrl);
   const signal = getJobSignal(job.id);
@@ -82,6 +88,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string): Promise
   const releaseGlobalSlot = await globalDownloadSemaphore.acquire();
 
   const startedAt = Date.now();
+  const ctx: StatContext = { fellBack: options.fellBack };
   await updateJobStatus(job.id, 'preparing');
 
   try {
@@ -90,12 +97,14 @@ export async function runDownloadJob(job: JobRecord, requestId: string): Promise
 
     if (job.requestedFormat.kind === 'audio') {
       const metadata = await fetchMedia({ url: job.canonicalUrl, requestId });
+      ctx.mediaKey = mediaKeyForResponse(metadata);
       const hasStandaloneAudio = metadata.audioFormats.some((f) => f.formatId === job.requestedFormat.formatId);
       if (!hasStandaloneAudio) {
-        return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt);
+        return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt, ctx);
       }
     } else {
       const metadata = await fetchMedia({ url: job.canonicalUrl, requestId });
+      ctx.mediaKey = mediaKeyForResponse(metadata);
       const format = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
       if (format?.requiresMerge) {
         // Prefer an AAC/mp4a audio track so the merged output is H.264+AAC MP4 without needing
@@ -119,10 +128,10 @@ export async function runDownloadJob(job: JobRecord, requestId: string): Promise
     );
 
     result = await ensureValidAndCompatible(job, result, signal);
-    await finalizeSuccess(job, result, startedAt);
+    await finalizeSuccess(job, result, startedAt, ctx);
     return { ...result, job: await refreshJob(job.id) };
   } catch (err) {
-    await finalizeFailure(job, err, startedAt, signal.aborted);
+    await finalizeFailure(job, err, startedAt, signal.aborted, ctx);
     throw err;
   } finally {
     releaseUserSlot();
@@ -139,6 +148,7 @@ async function runAudioExtraction(
   signal: AbortSignal,
   requestId: string,
   startedAt: number,
+  ctx: StatContext,
 ): Promise<RunDownloadResult> {
   await updateJobStatus(job.id, 'streaming');
 
@@ -175,7 +185,7 @@ async function runAudioExtraction(
     bytes: stat.size,
   };
 
-  await finalizeSuccess(job, result, startedAt);
+  await finalizeSuccess(job, result, startedAt, ctx);
   return { ...result, job: await refreshJob(job.id) };
 }
 
@@ -212,7 +222,13 @@ async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, 
   return { ...result, filePath: compatiblePath, filename: path.basename(compatiblePath), mimeType: 'video/mp4', bytes: stat.size };
 }
 
-async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt: number): Promise<void> {
+/** Facts about the media a download job worked on, for the statistics rows. */
+interface StatContext {
+  mediaKey?: string;
+  fellBack?: boolean;
+}
+
+async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt: number, ctx: StatContext): Promise<void> {
   await updateJobStatus(job.id, result.directUrl ? 'ready' : 'completed', {
     filename: result.filename,
     mime_type: result.mimeType,
@@ -229,12 +245,15 @@ async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt
     userId: job.userId,
     guestId: job.guestId,
     success: true,
+    mediaId: ctx.mediaKey,
+    mode: 'prepare',
+    fellBack: ctx.fellBack,
     bytesTransferred: result.bytes,
     processingDurationMs: Date.now() - startedAt,
   });
 }
 
-async function finalizeFailure(job: JobRecord, err: unknown, startedAt: number, cancelled: boolean): Promise<void> {
+async function finalizeFailure(job: JobRecord, err: unknown, startedAt: number, cancelled: boolean, ctx: StatContext): Promise<void> {
   const code = err instanceof BlazfetchError ? err.code : 'DOWNLOAD_FAILED';
   const status = cancelled || (code === 'DOWNLOAD_FAILED' && err instanceof BlazfetchError && err.message === 'Request was cancelled.') ? 'cancelled' : 'failed';
   await updateJobStatus(job.id, status, { error_code: code, error_message: (err as Error).message });
@@ -246,6 +265,9 @@ async function finalizeFailure(job: JobRecord, err: unknown, startedAt: number, 
     userId: job.userId,
     guestId: job.guestId,
     success: false,
+    mediaId: ctx.mediaKey,
+    mode: 'prepare',
+    fellBack: ctx.fellBack,
     processingDurationMs: Date.now() - startedAt,
     errorCode: code,
   });

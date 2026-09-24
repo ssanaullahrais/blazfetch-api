@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { getDb } from './db';
 import { checkFfmpeg, checkFfprobe, checkYtdlp } from './lib/dependencyCheck';
 import { cleanupAbandonedTempDirs, startTempSweeper, sweepTempDir } from './core/jobs/tempFiles';
+import { startRevalidationJob } from './core/media/revalidationJob';
 
 async function verifyStartupDependencies(): Promise<void> {
   const [database, ytdlp, ffmpeg, ffprobe] = await Promise.all([
@@ -33,6 +34,7 @@ async function main(): Promise<void> {
   await cleanupAbandonedTempDirs();
   await sweepTempDir();
   const stopSweeper = startTempSweeper();
+  const stopRevalidation = startRevalidationJob();
 
   const app = createApp();
   const server = app.listen(env.PORT, () => {
@@ -46,6 +48,7 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'shutting down');
 
     stopSweeper();
+    stopRevalidation();
     server.close(() => {
       logger.info('http server closed');
     });

@@ -15,7 +15,8 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     logger.warn({ requestId: req.requestId, code: err.code, err: err.message }, 'handled error');
     res.status(err.status).json({
       success: false,
-      error: { code: err.code, message: err.message },
+      // A tombstone explains what the media was, so a page can still show that it existed.
+      error: { code: err.code, message: err.message, ...(err.code === 'MEDIA_UNAVAILABLE' ? { details: err.details } : {}) },
       requestId: req.requestId,
     });
     return;

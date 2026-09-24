@@ -8,6 +8,8 @@ export async function runMongoMigrations(): Promise<void> {
   await db.collection('metadata_cache').createIndex({ platform: 1, mediaId: 1 }, { unique: true });
   await db.collection('metadata_cache').createIndex({ platform: 1, canonicalUrl: 1 });
   await db.collection('metadata_cache').createIndex({ expiresAt: 1 });
+  await db.collection('metadata_cache').createIndex({ nextCheckAt: 1 });
+  await db.collection('metadata_cache').createIndex({ platform: 1, kind: 1 });
 
   await db.collection('jobs').createIndex({ status: 1 });
   await db.collection('jobs').createIndex({ userId: 1 });

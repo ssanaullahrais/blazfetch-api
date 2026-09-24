@@ -3,6 +3,7 @@ import { getKnex } from './knexClient';
 import { BlazfetchError } from '../../constants/errors';
 import { JobRecord, JobStatus } from '../../core/jobs/jobTypes';
 import { CreateJobParams, JobStore } from '../types';
+import { toIso } from './time';
 
 interface JobRow {
   id: string;
@@ -29,15 +30,6 @@ interface JobRow {
 
 function parseJson<T>(value: T | string): T {
   return typeof value === 'string' ? (JSON.parse(value) as T) : value;
-}
-
-/** SQLite's CURRENT_TIMESTAMP yields a UTC string with no zone ("2026-01-01 12:00:00"), which
- *  `new Date()` would read as server-local time. Mark it as UTC so every driver agrees. */
-function toIso(value: Date | string | number): string {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)) {
-    return new Date(value.replace(' ', 'T') + 'Z').toISOString();
-  }
-  return new Date(value).toISOString();
 }
 
 function rowToJob(row: JobRow): JobRecord {

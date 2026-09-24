@@ -102,13 +102,19 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   if (lower.includes('login required') || lower.includes('sign in')) {
     return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.');
   }
-  if (/age|age-restricted|age restricted/.test(lower)) {
+  if (/\bage\b|age-restricted|age restricted/.test(lower)) {
     return new BlazfetchError('AGE_RESTRICTED', 'This media is age-restricted.');
   }
-  if (lower.includes('not available in your country') || /geo/.test(lower)) {
+  if (lower.includes('not available in your country') || /\bgeo/.test(lower)) {
     return new BlazfetchError('GEO_RESTRICTED', 'This media is not available in this region.');
   }
-  if (/http error 404|404: not found|video (?:has been|was) removed|does not exist/.test(lower)) {
+  // Deleted, removed or never-existing media. These are the answers a weekly recheck relies on to
+  // notice that something is really gone, so they must be recognised as MEDIA_NOT_FOUND.
+  if (
+    /http error 404|404: not found|does not exist|no longer available|has been removed|was removed|has been deleted|has been terminated|is unavailable|video unavailable|content is not available|isn.t available|no video could be found/.test(
+      lower,
+    )
+  ) {
     return new BlazfetchError('MEDIA_NOT_FOUND', 'Media could not be found at the given URL.');
   }
   if (lower.includes('unable to download webpage') || lower.includes('429') || /rate.?limit|too many requests/.test(lower)) {

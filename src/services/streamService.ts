@@ -14,6 +14,7 @@ import {
   spawnYtdlpToStdout,
 } from '../core/ytdlp/ytdlpStream';
 import { fetchMedia } from './fetchService';
+import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { resolveFormat } from './downloadService';
 
 export interface OpenStreamParams {
@@ -36,6 +37,8 @@ export interface OpenedStream {
   /** Only set when the exact size is known up front (single file piped straight through). */
   contentLength?: number;
   platform: string;
+  /** Storage key of the media (item id, or `playlist:<id>`), for per-media statistics. */
+  mediaKey: string;
   formatId: string;
   kill(): void;
 }
@@ -252,7 +255,8 @@ export async function openStream(params: OpenStreamParams): Promise<OpenedStream
   await assertUrlIsSafeToFetch(normalized.canonicalUrl);
 
   const resolved = await resolveFormat(params.url, params.requestId, { formatId: params.formatId, kind: params.kind });
-  const media = await fetchMedia({ url: params.url, requestId: params.requestId, userId: params.userId, guestId: params.guestId });
+  // requireFreshUrls: the fast path below feeds the stored direct URLs to ffmpeg, so they must not be stale.
+  const media = await fetchMedia({ url: params.url, requestId: params.requestId, userId: params.userId, guestId: params.guestId, requireFreshUrls: true });
   const plan = planStream(media, resolved);
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);
@@ -290,6 +294,7 @@ export async function openStream(params: OpenStreamParams): Promise<OpenedStream
           // The exact size is only known when the file is passed through untouched.
           contentLength: source.contentLength ?? (plan.type === 'ytdlp' && !opener.fast ? plan.contentLength : undefined),
           platform: normalized.platform,
+          mediaKey: mediaKeyForResponse(media),
           formatId: resolved.formatId,
           kill: source.kill,
         };

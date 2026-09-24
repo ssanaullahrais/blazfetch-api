@@ -51,7 +51,8 @@ Every error response has this shape:
 |---|---|---|
 | `UNSUPPORTED_PLATFORM` | 422 | Domain isn't in the platform whitelist |
 | `INVALID_URL` | 400 | Malformed URL or disallowed protocol/host |
-| `MEDIA_NOT_FOUND` | 404 | Extractor found nothing at the URL |
+| `MEDIA_NOT_FOUND` | 404 | Extractor found nothing at the URL (deleted, removed or never existed) |
+| `MEDIA_UNAVAILABLE` | 410 | Was stored earlier, but re-checks found it gone. `error.details.tombstone` says what it was |
 | `PRIVATE_MEDIA` | 403 | Source reports the media as private |
 | `LOGIN_REQUIRED` | 401 | Source requires authentication to view |
 | `AGE_RESTRICTED` | 403 | Source reports age restriction |
@@ -509,6 +510,123 @@ HTTP status (`success:false`, `error:{code,message}`, `requestId`).
 - Disable the endpoint (all three modes) with `STREAM_MODE_ENABLED=false`; the route then returns
   `404 NOT_FOUND`. `POST /download` and the rest are unaffected. Change the default mode with
   `DEFAULT_DOWNLOAD_MODE=stream|prepare|auto` (an explicit `?mode=` always wins).
+
+---
+
+## Stored media and stable paths
+
+Everything `POST /fetch` extracts is **kept in the database forever** (metadata only, never the media
+files): the complete response, the platform, the original URL you gave, the title, author, duration,
+formats, and usage statistics. The next request for the same media is answered from the database in
+milliseconds instead of re-extracting it (which can take 3 to 15 seconds).
+
+### The `stored` block
+
+Every `/fetch` (and `/media`) response carries a `stored` object:
+
+```json
+"stored": {
+  "path": "/youtube/Cwkej79U3ek",
+  "playlistPath": "/youtube/Cwkej79U3ek/playlist/RDCwkej79U3ek",
+  "sourceUrl": "https://www.youtube.com/watch?v=Cwkej79U3ek&list=RDCwkej79U3ek",
+  "status": "available",
+  "cached": true,
+  "urlsStale": false,
+  "firstFetchedAt": "2026-09-24T14:21:00.000Z",
+  "lastFetchedAt": "2026-09-24T14:21:00.000Z",
+  "validatedAt": "2026-09-24T14:21:00.000Z",
+  "nextCheckAt": "2026-10-01T14:21:00.000Z",
+  "stats": { "fetchCount": 1, "hitCount": 4, "viewCount": 2, "downloadCount": 1, "streamCount": 1,
+             "prepareCount": 0, "bytesServed": 5485612, "lastAccessedAt": "...", "lastDownloadedAt": "..." }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `path` | Stable path for this media. Use it for your own page URL, e.g. `website.com/youtube/Cwkej79U3ek` |
+| `playlistPath` | Only when the URL had both `v=` and `list=`: the playlist in that video's context |
+| `cached` | `true` when this answer came from the database, `false` when it was just extracted |
+| `urlsStale` | The direct media URLs inside `formats` are older than `CACHE_TTL_SECONDS`; they refresh in the background |
+| `validationFailed` | A live existence check failed without proving the media gone, so the last known answer is served |
+| `validatedAt` / `nextCheckAt` | Last time the media was confirmed to exist, and when the next check is due |
+| `stats` | Per-media usage counters (below) |
+
+Paths are `/<platform>/<id>` for an item and `/<platform>/<id>/playlist/<listId>` (or
+`/<platform>/playlist/<listId>`) for a playlist. Ids are the platform's own (YouTube video id, TikTok
+video id, Instagram shortcode, ...). YouTube `list=RD...` Mixes are generated per viewer, so they are
+refreshed hourly instead of daily.
+
+### `GET /api/v1/media/<platform>/<id>` (serve by stable path)
+
+```
+GET /api/v1/media/youtube/Cwkej79U3ek
+GET /api/v1/media/youtube/Cwkej79U3ek/playlist/RDCwkej79U3ek
+GET /api/v1/media/youtube/playlist/PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI
+```
+
+Returns the same response as `/fetch` (including `stored`). It is what a frontend page at
+`website.com/youtube/Cwkej79U3ek` calls.
+
+- **Stored:** answered from the database and counted as a view.
+- **Never fetched:** if the link can be rebuilt from the id alone (YouTube, Vimeo, Dailymotion, Twitch,
+  Streamable, Loom, Newgrounds, Pinterest, Rutube, Instagram, X/Twitter, TikTok, Facebook, Snapchat,
+  SoundCloud) it is fetched and stored now. For platforms that need more than the id (Bluesky needs the
+  handle, Reddit the subreddit, Tumblr the blog) it answers `404 MEDIA_NOT_FOUND`; call `POST /fetch`
+  with the original URL first.
+- `?cacheOnly=true` never contacts the source: not stored means `404 MEDIA_NOT_FOUND`.
+- Anything extracted with the operator's own login (`INSTAGRAM_COOKIES_PATH`) is never served by path.
+- Uses the fetch rate limiter.
+
+### Weekly revalidation and unavailable media
+
+Every stored item is re-checked **every 7 days** (`REVALIDATE_AFTER_SECONDS`) to see whether it still
+exists, in two ways:
+
+1. **On demand:** when a user requests an item whose check is due, it is re-extracted first, so the answer
+   is accurate. A deleted video is noticed the moment someone asks for it.
+2. **In the background:** a job (`REVALIDATE_INTERVAL_MS`, default every 30 minutes) checks due items
+   oldest first, one at a time with a pause between checks (`REVALIDATE_DELAY_MS`), so nothing is
+   hammered. It also notices items nobody has asked for.
+
+What a check finds:
+
+| Result | What happens |
+|---|---|
+| Still there | Stored answer refreshed, next check in 7 days |
+| "Not found" or "private" once | Not enough to conclude: the stored answer is still served (`validationFailed: true`), retried the next day |
+| "Not found" or "private" twice in a row (`UNAVAILABLE_AFTER_FAILURES`) | Marked **unavailable**. Requests answer `410 MEDIA_UNAVAILABLE` with a tombstone (below) |
+| Timeout, rate limit, extractor error | Says nothing about existence: never counted, retried after `TRANSIENT_RETRY_SECONDS` (1 hour) |
+| An unavailable item is found again | Marked available again automatically |
+
+A known-unavailable item is not re-extracted on every request: it is looked at again at most every
+`UNAVAILABLE_RECHECK_SECONDS` (10 minutes) and otherwise answered from the tombstone. Stored data is
+never deleted, so the tombstone can still show what the media was:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "MEDIA_UNAVAILABLE",
+    "message": "This media is no longer available at the source.",
+    "details": { "tombstone": { "platform": "youtube", "path": "/youtube/Cwkej79U3ek", "title": "...", "thumbnail": "...",
+                                "reason": "MEDIA_NOT_FOUND", "unavailableSince": "...", "lastSeenAvailable": "...", "sourceUrl": "..." } }
+  },
+  "requestId": "..."
+}
+```
+
+### Statistics that are stored
+
+**Per media** (on the stored row, shown in `stored.stats`): `fetchCount` (live extractions), `hitCount`
+(answered from the database), `viewCount` (reads through `/media`), `downloadCount`, `streamCount`,
+`prepareCount`, `bytesServed`, `lastAccessedAt`, `lastDownloadedAt`, plus `firstFetchedAt`,
+`validatedAt` and `unavailableSince`.
+
+**Per event** (one row each, for analysis): every fetch records whether it was a cache hit, whether the
+stored URLs were stale, the kind (video/playlist), whether it came from a user or the weekly check,
+duration and error code. Every download records the delivery mode (`stream` or `prepare`), time to first
+byte, whether `auto` mode fell back, format, quality, bytes, duration and error code, all tied to the
+media, the platform and the (guest) user.
 
 ---
 

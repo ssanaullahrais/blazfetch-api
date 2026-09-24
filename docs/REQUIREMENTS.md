@@ -201,7 +201,7 @@ cd blazfetch-backend
 git pull && npm ci && npm run build && npm run migrate && pm2 restart blazfetch-backend
 ```
 
-`npm run migrate` only creates tables that are missing, so it is safe to run on every deploy.
+`npm run migrate` applies any database changes that have not run yet (it keeps a `schema_migrations` record) and does nothing when up to date, so it is safe to run on every deploy. It upgrades an existing database in place without losing stored data.
 
 **Update yt-dlp** (do this regularly: extractors break when platforms change):
 
@@ -257,7 +257,7 @@ around your expected number of simultaneous transcodes, not just request volume.
 
 ### Backups
 
-- Back up the **database only**. It holds the metadata cache, stats and job records, never media.
+- Back up the **database only**. It holds the permanent media store (every fetched item's metadata, kept forever), statistics and job records, never media files. That store grows over time and cannot be rebuilt exactly, so a regular backup matters more than before.
   Use a scheduled dump: `pg_dump`, `mysqldump` or `mongodump`, or simply copy the SQLite file.
 - `TEMP_DIR` never needs backing up.
 - Keep a copy of `.env` in a secrets manager, separate from the repo.

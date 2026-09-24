@@ -114,6 +114,39 @@ paths:
           $ref: '#/components/responses/Error'
         '5XX':
           $ref: '#/components/responses/Error'
+  /media/{platform}/{id}:
+    get:
+      summary: Serve stored media by its stable path (also /media/{platform}/{id}/playlist/{listId} and /media/{platform}/playlist/{listId})
+      description: >
+        Answers from the permanent media store; fetches and stores never-seen media when its link can be
+        rebuilt from the id. Stored media is re-checked weekly, and media found gone answers 410 with a tombstone.
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: cacheOnly
+          in: query
+          description: Never contact the source; not stored means 404.
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: The stored response, with a `stored` block (path, freshness, statistics)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlazfetchResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '410':
+          description: Known to have existed but re-checks found it gone (error.details.tombstone)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
   /downloads/{id}:
     get:
       summary: Stream the resolved media for a ready/completed job

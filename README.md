@@ -6,6 +6,15 @@ or Pinterest) and lets you download the video, audio, or photos in it. It doesn'
 anyone's media on its own server. It fetches the file, checks that it actually works, sends it
 straight through to whoever asked, and deletes any temporary files afterward.
 
+## Stored media
+
+Everything fetched is kept in the database forever (metadata only, never the media files), so repeat
+requests are answered in milliseconds and every item gets a stable path such as
+`/youtube/Cwkej79U3ek` (playlists: `/youtube/Cwkej79U3ek/playlist/RDCwkej79U3ek`). Each item is
+re-checked every 7 days, so deleted or private videos are noticed and answer a clear
+`410 MEDIA_UNAVAILABLE` instead of stale data, and usage statistics are stored per item and per event.
+See [docs/API.md](docs/API.md#stored-media-and-stable-paths).
+
 ## Platform status
 
 | Platform | Status | Notes |
@@ -90,6 +99,7 @@ step-by-step "fetch → pick format → download → poll → stream" walkthroug
 POST   /api/v1/fetch            resolve metadata + formats (rangeStart/rangeEnd for Pinterest boards)
 POST   /api/v1/fetch/audio      resolve audio/MP3 options
 POST   /api/v1/download         start a download job (formatId defaults to "best")
+GET    /api/v1/media/<platform>/<id>  stored media by stable path (e.g. /youtube/Cwkej79U3ek)
 GET    /api/v1/stream           one-request download: ?mode=stream (default) | prepare | auto (stream, fall back to prepare)
 GET    /api/v1/downloads/:id    stream the resolved media once ready
 DELETE /api/v1/downloads/:id    cancel + clean up temp files
