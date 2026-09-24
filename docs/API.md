@@ -1,9 +1,47 @@
-# Blazfetch Backend API
+<div align="center">
 
-Base URL: `{APP_URL}/api/v1` (e.g. `http://localhost:4000/api/v1`). All request/response bodies
-are JSON unless noted. An OpenAPI 3.0 definition is available at [openapi.yaml](openapi.yaml), and
-every example in [Responses by platform](#responses-by-platform) is also saved as a JSON file in
+# BlazFetch API Reference
+
+**Every endpoint, error code and a real response for each platform.**
+
+![Version](https://img.shields.io/badge/API-v1-2EA44F)
+![Format](https://img.shields.io/badge/format-JSON-4169E1)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-6BA539?logo=openapiinitiative&logoColor=white)
+
+[Back to README](../README.md) ·
+[OpenAPI file](openapi.yaml) ·
+[Example responses](examples/) ·
+[Frontend repository](https://github.com/ssanaullahrais/blazfetch-frontend)
+
+</div>
+
+---
+
+Base URL: `{APP_URL}/api/v1` (e.g. `http://localhost:4000/api/v1`). All request and response bodies are JSON
+unless noted. Every example in [Responses by platform](#responses-by-platform) is also saved as a JSON file in
 [`examples/`](examples/).
+
+> [!NOTE]
+> Authentication is not implemented yet. Every endpoint runs as a guest, tracked by a `blazfetch_guest_id`
+> cookie the server sets automatically. `req.userId` is wired through the whole stack (jobs, stats, rate
+> limiting), so adding real auth later only means populating it from a session or JWT middleware.
+
+## Contents
+
+| Section | |
+|---|---|
+| [Endpoints at a glance](#endpoints-at-a-glance) | The whole API on one page, and which download method to use |
+| [Platform status](#platform-status) | What was tested and confirmed |
+| [Error format](#error-format) | The error envelope and every code |
+| [`POST /fetch`](#post-apiv1fetch) | Resolve a link |
+| [Responses by platform](#responses-by-platform) | A real response for every platform |
+| [`POST /fetch/audio`](#post-apiv1fetchaudio) | Audio options |
+| [`POST /download`](#post-apiv1download), [jobs](#get-apiv1jobsid), [downloads](#get-apiv1downloadsid) | Job flow with server-side progress |
+| [`GET /stream`](#get-apiv1stream-direct-stream-prepare-or-auto) | One-request download: stream, prepare or auto |
+| [YouTube blocks and the fallback](#youtube-blocks-and-the-fallback-provider) | What happens when YouTube blocks the server |
+| [Stored media](#stored-media-and-stable-paths) | Stable paths, weekly checks, statistics |
+| [`GET /health`](#get-health) | Liveness and readiness |
+| [Frontend integration](#quick-reference-for-frontend-integration) | The short version for building a UI |
 
 ## Endpoints at a glance
 
@@ -52,13 +90,6 @@ real video/audio file was downloaded and ffprobe-validated (correct streams, val
 | Loom | ✅ Confirmed | Video and audio, including HLS streams |
 | Newgrounds | ✅ Confirmed | Public movies with a video; ones with no video return a clear `MEDIA_NOT_FOUND` |
 | Tumblr | ⚠️ Wired, untested | |
-
-
-Authentication is not yet implemented in this scaffold — every endpoint currently runs as a
-guest, tracked by a `blazfetch_guest_id` cookie the server sets automatically. `req.userId` is
-wired through the whole stack (jobs, stats, rate limiting) so adding real auth later only means
-populating it from a session/JWT middleware.
-
 ## Error format
 
 Every error response has this shape:
@@ -91,8 +122,8 @@ Every error response has this shape:
 | `VALIDATION_ERROR` | 400 | Request body failed schema validation |
 | `JOB_NOT_FOUND` | 404 | Job id doesn't exist or isn't ready yet |
 
-Raw yt-dlp stderr is never returned to the client — it's logged server-side against the
-request id for debugging.
+> [!NOTE]
+> Raw yt-dlp output is never returned to the client. It is logged server-side against the `requestId`.
 
 ---
 
@@ -1669,6 +1700,10 @@ or orchestrator readiness probe:
 
 ## Quick reference for frontend integration
 
+> [!TIP]
+> The official frontend, [blazfetch-frontend](https://github.com/ssanaullahrais/blazfetch-frontend), already
+> implements everything below. Its [integration guide](https://github.com/ssanaullahrais/blazfetch-frontend/blob/main/docs/INTEGRATION.md) maps each screen to these endpoints.
+
 **Simplest flow (recommended):** the user pastes a URL.
 
 1. `POST /fetch` with the URL. You get the title, thumbnail, `formats[]`/`audioFormats[]` (or `items[]`
@@ -1697,3 +1732,9 @@ from the database, fetches never-seen media when the link can be rebuilt from th
 `error.code`. Handle at least `MEDIA_NOT_FOUND`, `MEDIA_UNAVAILABLE`, `PRIVATE_MEDIA`, `AGE_RESTRICTED`,
 `GEO_RESTRICTED`, `LOGIN_REQUIRED`, `FORMAT_UNAVAILABLE` (e.g. DRM), `SERVER_BUSY` and
 `PLATFORM_RATE_LIMITED` with friendly messages.
+
+---
+
+<div align="center">
+<a href="../README.md">Back to README</a> · <a href="https://github.com/ssanaullahrais/blazfetch-frontend">blazfetch-frontend</a>
+</div>
