@@ -18,7 +18,7 @@ const envSchema = z.object({
   // DATABASE_DRIVER picks the storage backend. All four store the exact same data (metadata
   // cache, jobs, fetch/download stats) — never the downloaded media itself — through one shared
   // repository interface (src/db/types.ts), so the rest of the app never knows which one is active.
-  DATABASE_DRIVER: z.enum(['postgres', 'mysql', 'sqlite', 'mongodb']).default('postgres'),
+  DATABASE_DRIVER: z.enum(['postgres', 'mysql', 'sqlite', 'mongodb']).default('sqlite'),
   // Connection string for postgres/mysql/mongodb. Not required for sqlite (uses DATABASE_SQLITE_PATH).
   DATABASE_URL: z.string().optional().default(''),
   DATABASE_SSL: boolFromString(false),

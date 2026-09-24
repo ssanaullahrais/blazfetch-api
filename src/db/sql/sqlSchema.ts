@@ -23,9 +23,14 @@ export async function runSqlMigrations(): Promise<void> {
       t.timestamp('last_fetched_at').notNullable().defaultTo(knex.fn.now());
       t.timestamp('expires_at').notNullable();
       t.unique(['platform', 'media_id']);
-      t.index(['canonical_url']);
       t.index(['expires_at']);
     });
+    // MySQL can't index a TEXT column without a prefix length; other drivers index it whole.
+    if (knex.client.config.client === 'mysql2') {
+      await knex.raw('create index metadata_cache_canonical_url_index on metadata_cache (canonical_url(255))');
+    } else {
+      await knex.schema.alterTable('metadata_cache', (t: Knex.AlterTableBuilder) => t.index(['canonical_url']));
+    }
   }
 
   if (!(await knex.schema.hasTable('jobs'))) {

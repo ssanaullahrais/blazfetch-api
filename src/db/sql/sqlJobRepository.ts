@@ -31,6 +31,15 @@ function parseJson<T>(value: T | string): T {
   return typeof value === 'string' ? (JSON.parse(value) as T) : value;
 }
 
+/** SQLite's CURRENT_TIMESTAMP yields a UTC string with no zone ("2026-01-01 12:00:00"), which
+ *  `new Date()` would read as server-local time. Mark it as UTC so every driver agrees. */
+function toIso(value: Date | string | number): string {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)) {
+    return new Date(value.replace(' ', 'T') + 'Z').toISOString();
+  }
+  return new Date(value).toISOString();
+}
+
 function rowToJob(row: JobRow): JobRecord {
   return {
     id: row.id,
@@ -50,9 +59,9 @@ function rowToJob(row: JobRow): JobRecord {
     errorMessage: row.error_message,
     tempPath: row.temp_path,
     sourceUrl: row.source_url,
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString(),
-    expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+    expiresAt: row.expires_at ? toIso(row.expires_at) : null,
   };
 }
 

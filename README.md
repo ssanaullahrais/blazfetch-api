@@ -30,10 +30,9 @@ straight through to whoever asked, and deletes any temporary files afterward.
 
 ## Install
 
-System tools (install first):
+**1. System tools** (install first; Node.js 20+ is also required):
 
 ```bash
-# Node.js 20+, PostgreSQL 14+, then:
 pip install -U yt-dlp
 # ffmpeg: sudo apt-get install ffmpeg (Linux) or https://ffmpeg.org/download.html
 ```
@@ -42,33 +41,40 @@ Verify each:
 
 ```bash
 node --version
-psql --version
 yt-dlp --version
 ffmpeg -version && ffprobe -version
 ```
 
-Create the database (one-time, `npm run migrate` builds tables inside it but doesn't create it):
-
-```bash
-createdb blazfetch
-# or: psql -c "CREATE DATABASE blazfetch;"
-```
-
-Project setup:
+**2. Project setup** (one command picks and configures your database):
 
 ```bash
 npm install
-cp .env.example .env
-# edit .env: set DATABASE_URL to point at the database you just created
-npm run migrate       # creates all tables inside it
-npm run diagnostics   # checks everything above is reachable
+npm run setup         # choose SQLite / PostgreSQL / MySQL / MongoDB; writes .env and creates the tables
+npm run diagnostics   # checks the database, yt-dlp and ffmpeg are all reachable
 npm run dev           # starts on http://localhost:4000
 ```
 
-npm packages: `express`, `pg`, `zod`, `helmet`, `cors`, `express-rate-limit`, `pino`/`pino-http`,
-`uuid`, `dotenv`, plus fallback providers `@tobyg74/tiktok-api-dl` and `btch-downloader`.
-`npm ls --depth=0` lists exact installed versions; `npm run typecheck` and `npm test` verify the
-project builds and passes its test suite.
+### Choosing a database
+
+`npm run setup` asks which database to use. **SQLite is the default and needs nothing installed**:
+just press Enter and you're running. Pick another if you already have a server:
+
+| Database | You need | Connection URL example |
+|---|---|---|
+| SQLite (default) | nothing | none (the file is created automatically) |
+| PostgreSQL 14+ | an empty database created first | `postgres://user:password@localhost:5432/blazfetch` |
+| MySQL 8+ / MariaDB | an empty database created first | `mysql://user:password@localhost:3306/blazfetch` |
+| MongoDB 6+ | a running server | `mongodb://localhost:27017/blazfetch` |
+
+Setup creates the tables, not the database itself. For PostgreSQL run `createdb blazfetch` first,
+for MySQL `CREATE DATABASE blazfetch;`. All four store the same data (metadata cache, jobs, stats,
+never the downloaded media) and the app behaves identically on each.
+
+Prefer to configure by hand? Copy `.env.example` to `.env`, set `DATABASE_DRIVER` (`sqlite`,
+`postgres`, `mysql` or `mongodb`) and `DATABASE_URL`, then run `npm run migrate`. Setup can also run
+non-interactively: `npm run setup -- --driver=postgres --url=postgres://user:pass@host:5432/blazfetch`.
+
+`npm run typecheck` and `npm test` verify the project builds and passes its test suite.
 
 ## Usage
 
@@ -97,7 +103,7 @@ Full VPS deployment guide (Nginx, PM2, SSL, firewall): [docs/REQUIREMENTS.md](do
 
 ## Troubleshooting
 
-- `npm run diagnostics` — Node/PostgreSQL/yt-dlp/ffmpeg status and versions.
+- `npm run diagnostics` — database/yt-dlp/ffmpeg status and versions.
 - `GET /health/ready` — same checks over HTTP.
 - Update yt-dlp regularly: `pip install -U yt-dlp` (platforms change extraction often).
 - Extractor errors return a normalized code (`EXTRACTOR_FAILED`, `LOGIN_REQUIRED`, etc.); raw

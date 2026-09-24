@@ -429,7 +429,7 @@ Returns all 18 configured platforms (see "Platform status" above for which are v
 {
   "success": true,
   "status": "ready",
-  "checks": { "database": true, "ytdlp": true, "ytdlpVersion": "2024.12.13", "ffmpeg": true, "ffmpegVersion": "ffmpeg version 6.1.1" }
+  "checks": { "database": true, "databaseDriver": "sqlite", "ytdlp": true, "ytdlpVersion": "2024.12.13", "ffmpeg": true, "ffmpegVersion": "ffmpeg version 6.1.1" }
 }
 ```
 
@@ -442,6 +442,7 @@ or orchestrator readiness probe:
   "status": "not_ready",
   "checks": {
     "database": true,
+    "databaseDriver": "sqlite",
     "ytdlp": true,
     "ytdlpVersion": "2026.08.19",
     "ffmpeg": false,
