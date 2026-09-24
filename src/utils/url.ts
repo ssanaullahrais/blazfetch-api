@@ -118,25 +118,50 @@ function normalizeReddit(url: URL): { canonicalUrl: string } {
   return { canonicalUrl: `https://www.reddit.com${path}` };
 }
 
+const PINTEREST_RESERVED_FIRST_SEGMENTS = new Set([
+  'search',
+  'pin',
+  'explore',
+  'categories',
+  'login',
+  'signup',
+  'business',
+  'about',
+  'today',
+  'ideas',
+  'ads',
+  'settings',
+  'topics',
+]);
+
 /**
  * pin.it short links can't be resolved synchronously (needs a network round trip), so they're
- * passed through as-is here and resolved to a canonical /pin/<id> URL later, in PinterestAdapter.
- * Direct pinterest.com URLs are validated immediately: only individual pin pages are supported —
- * yt-dlp has open issues with some board/search/collection URLs even when single pins work, so
- * those are rejected clearly here rather than silently mistreated as a single video.
+ * passed through as-is here and resolved to a canonical URL later, in PinterestAdapter.
+ * Direct pinterest.com URLs are validated immediately: individual pins (/pin/<id>) and user
+ * boards (/<username>/<board-slug>) are both supported — a board is treated as a collection and
+ * every pin in it is resolved individually. Pinterest's own reserved top-level paths (search,
+ * explore, categories, etc.) are never valid usernames, so they're rejected clearly instead of
+ * being misread as a board.
  */
 function normalizePinterest(url: URL): { canonicalUrl: string } {
   if (url.hostname === 'pin.it') {
     return { canonicalUrl: url.toString() };
   }
   const path = url.pathname.replace(/\/+$/, '') || '/';
-  if (!/^\/pin\/\d+/.test(path)) {
-    throw new BlazfetchError(
-      'INVALID_URL',
-      'Only individual Pinterest pin URLs (pinterest.com/pin/<id>) are supported, not boards, search, or collections.',
-    );
+  const segments = path.split('/').filter(Boolean);
+
+  if (/^\/pin\/\d+/.test(path)) {
+    return { canonicalUrl: `https://www.pinterest.com${path}` };
   }
-  return { canonicalUrl: `https://www.pinterest.com${path}` };
+
+  if (segments.length === 2 && !PINTEREST_RESERVED_FIRST_SEGMENTS.has(segments[0].toLowerCase())) {
+    return { canonicalUrl: `https://www.pinterest.com${path}` };
+  }
+
+  throw new BlazfetchError(
+    'INVALID_URL',
+    'Only individual Pinterest pin URLs (pinterest.com/pin/<id>) or a single user board (pinterest.com/<user>/<board>) are supported.',
+  );
 }
 
 const SOUNDCLOUD_NON_TRACK_SEGMENTS = new Set(['you', 'stream', 'discover', 'search', 'upload', 'charts', 'stations']);

@@ -123,6 +123,137 @@ export async function fetchPinterestViaResourceApi(pinId: string): Promise<Pinte
   };
 }
 
+function extractVideoOrImage(data: PinterestResourceData): {
+  type: 'video' | 'image';
+  mp4Url?: string;
+  mp4Width?: number;
+  mp4Height?: number;
+  hlsUrl?: string;
+  durationSeconds?: number;
+  thumbnail?: string;
+} {
+  const videoList = findVideoList(data);
+  const thumbnail = largestThumbnail(data.images);
+
+  if (!videoList || Object.keys(videoList).length === 0) {
+    return { type: 'image', thumbnail };
+  }
+
+  let mp4: { url: string; width?: number; height?: number } | undefined;
+  let hlsUrl: string | undefined;
+  let durationSeconds: number | undefined;
+  for (const [formatId, entry] of Object.entries(videoList)) {
+    if (!entry?.url) continue;
+    durationSeconds ??= entry.duration ? entry.duration / 1000 : undefined;
+    const isHls = formatId.toLowerCase().includes('hls') || entry.url.endsWith('.m3u8');
+    if (isHls) hlsUrl ??= entry.url;
+    else if (!mp4 || (entry.width ?? 0) > (mp4.width ?? 0)) mp4 = { url: entry.url, width: entry.width, height: entry.height };
+  }
+
+  return { type: 'video', mp4Url: mp4?.url, mp4Width: mp4?.width, mp4Height: mp4?.height, hlsUrl, durationSeconds, thumbnail };
+}
+
+interface PinterestBoardResourceData {
+  id: string;
+  name?: string;
+  pin_count?: number;
+  image_thumbnail_url?: string;
+}
+
+export interface PinterestBoardItem {
+  pinId: string;
+  type: 'video' | 'image';
+  thumbnail?: string;
+  mp4Url?: string;
+  mp4Width?: number;
+  mp4Height?: number;
+  hlsUrl?: string;
+  durationSeconds?: number;
+}
+
+export interface PinterestBoardResult {
+  boardId: string;
+  boardName?: string;
+  thumbnail?: string;
+  items: PinterestBoardItem[];
+  truncated: boolean;
+}
+
+async function callPinterestApi<T>(resource: string, options: Record<string, unknown>): Promise<{ data: T; bookmark?: string }> {
+  const apiUrl = new URL(`https://www.pinterest.com/resource/${resource}Resource/get/`);
+  apiUrl.searchParams.set('data', JSON.stringify({ options }));
+
+  await assertUrlIsSafeToFetch(apiUrl.toString());
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), env.FALLBACK_TIMEOUT_MS);
+  try {
+    const res = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'application/json',
+        'X-Pinterest-PWS-Handler': 'www/[username]/[slug].js',
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new BlazfetchError('EXTRACTOR_FAILED', `Pinterest ${resource} API responded with ${res.status}.`);
+    }
+    const body = (await res.json()) as { resource_response?: { data?: T; bookmark?: string } };
+    if (!body.resource_response?.data) {
+      throw new BlazfetchError('MEDIA_NOT_FOUND', `Pinterest ${resource} API returned no data.`);
+    }
+    return { data: body.resource_response.data, bookmark: body.resource_response.bookmark };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Lists every pin in a public Pinterest board (unauthenticated, same public BoardResource /
+ * BoardFeedResource endpoints yt-dlp's PinterestCollectionIE uses), resolving each pin's video
+ * or largest-image source directly from the feed response — no extra per-pin API call needed,
+ * since the feed already returns full pin objects in the same shape as PinResource.
+ */
+export async function fetchPinterestBoard(username: string, slug: string, maxItems: number): Promise<PinterestBoardResult> {
+  const { data: board } = await callPinterestApi<PinterestBoardResourceData>('Board', { username, slug, field_set_key: 'grid_item' });
+
+  const items: PinterestBoardItem[] = [];
+  let bookmark: string | undefined;
+  let truncated = false;
+
+  while (items.length < maxItems) {
+    const pageSize = Math.min(25, maxItems - items.length);
+    const options: Record<string, unknown> = { board_id: board.id, page_size: pageSize };
+    if (bookmark) options.bookmarks = [bookmark];
+
+    const { data: feedItems, bookmark: nextBookmark } = await callPinterestApi<PinterestResourceData[]>('BoardFeed', options);
+    const pins = (feedItems as unknown as (PinterestResourceData & { type?: string })[]).filter((i) => i.type === 'pin' || i.id);
+
+    for (const pin of pins) {
+      const resolved = extractVideoOrImage(pin);
+      items.push({
+        pinId: pin.id,
+        type: resolved.type,
+        thumbnail: resolved.thumbnail,
+        mp4Url: resolved.mp4Url,
+        mp4Width: resolved.mp4Width,
+        mp4Height: resolved.mp4Height,
+        hlsUrl: resolved.hlsUrl,
+        durationSeconds: resolved.durationSeconds,
+      });
+    }
+
+    if (!nextBookmark || nextBookmark === '-end-' || pins.length === 0) break;
+    bookmark = nextBookmark;
+    if (items.length >= maxItems) {
+      truncated = true;
+      break;
+    }
+  }
+
+  return { boardId: board.id, boardName: board.name, thumbnail: board.image_thumbnail_url, items, truncated };
+}
+
 /** Resolves a pin.it short link to its canonical pinterest.com/pin/<id> URL via HTTP redirect. */
 export async function resolvePinItRedirect(pinItUrl: string): Promise<string> {
   await assertUrlIsSafeToFetch(pinItUrl);

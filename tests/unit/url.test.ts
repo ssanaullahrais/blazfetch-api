@@ -76,8 +76,12 @@ describe('validateAndNormalizeUrl', () => {
     expect(result.platform).toBe('pinterest');
   });
 
-  it('rejects Pinterest board/search URLs, not just pin URLs', () => {
+  it('rejects Pinterest reserved paths like /search, not real usernames', () => {
     expect(() => validateAndNormalizeUrl('https://www.pinterest.com/search/pins/?q=cats')).toThrow(BlazfetchError);
-    expect(() => validateAndNormalizeUrl('https://www.pinterest.com/someuser/some-board/')).toThrow(BlazfetchError);
+  });
+
+  it('normalizes a Pinterest board URL (username/board-slug) as a collection', () => {
+    const result = validateAndNormalizeUrl('https://www.pinterest.com/someuser/some-board/');
+    expect(result.canonicalUrl).toBe('https://www.pinterest.com/someuser/some-board');
   });
 });
