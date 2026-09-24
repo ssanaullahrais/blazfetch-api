@@ -1737,3 +1737,7 @@ from the database, fetches never-seen media when the link can be rebuilt from th
 <div align="center">
 <a href="../README.md">Back to README</a> · <a href="https://github.com/ssanaullahrais/blazfetch-web">blazfetch-web</a>
 </div>
+
+## License
+
+This project is licensed for educational, non-commercial use only. Public or commercial deployment (including on a VPS for other people) needs the author's written permission, and the official frontend must keep its footer credit. See [LICENSE](../LICENSE) and [AGENTS.md](../AGENTS.md).

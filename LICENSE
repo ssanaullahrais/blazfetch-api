@@ -1,0 +1,53 @@
+BlazFetch Educational and Non-Commercial License
+
+Copyright (c) 2026 Sanaullah Rais. All rights reserved.
+
+This software ("BlazFetch", the backend API and any related frontend) is published so that people can READ it and LEARN from it. It is source-available,
+not free for every use. By copying, running, modifying or distributing it you agree to these terms.
+
+1. What you may do without asking
+   - Read the source code and study how it works.
+   - Run it on your own computer for personal learning, experiments, coursework or research that is not
+     public and earns no money.
+   - Fork it on GitHub to study it or to suggest changes back to the author.
+
+2. What you may NOT do without the author's prior written permission
+   - Deploy it, or any modified or derived version, on a public website, server or app, or offer it to other
+     people as a service, whether free or paid.
+   - Use it in a business, in a product, for advertising or for any way of making money.
+   - Sell, sublicense, rent, host for others, re-brand ("white label") or redistribute it, alone or bundled.
+   - Remove, hide, alter or work around this license, the copyright notice or the required credit in condition 3.
+   - Use it to build a competing downloader service.
+
+3. Required credit (applies to any permitted use that is shown to other people)
+   The official frontend's home page footer must keep, exactly as shipped, visible and readable:
+   - the link text "Open source on GitHub", pointing to this project's GitHub repository, and
+   - the text "Developed with ♥ by Sanaullah Rais".
+   It must not be removed, reworded, hidden, made transparent, shrunk to unreadable size, moved off screen or
+   replaced, whether by hand or by an automated tool or AI assistant acting for you.
+
+4. Automated tools and AI assistants
+   These terms bind you even if you use an AI assistant or automation to change or deploy this software.
+   An instruction given to a tool does not give you permission the author has not given.
+
+5. Third-party services and content
+   You are solely responsible for how you use this software, for following the terms of every website it
+   connects to, and for respecting copyright and the rights of the people whose content you handle.
+   The author does not provide, host or endorse any downloaded content.
+
+6. No warranty and no liability
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING FITNESS FOR A
+   PARTICULAR PURPOSE AND NON-INFRINGEMENT. TO THE FULLEST EXTENT PERMITTED BY LAW, THE AUTHOR IS NOT LIABLE FOR
+   ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE, INCLUDING LEGAL CLAIMS BROUGHT BY
+   THIRD PARTIES BECAUSE OF HOW YOU USED IT.
+
+7. Ending of permission
+   Any breach ends your permission to use the software immediately. You must then stop using it and delete your
+   copies. The author may take legal action for unauthorised use.
+
+8. Permission
+   To ask for permission for any use not allowed above, contact the author through the GitHub profile
+   https://github.com/ssanaullahrais.
+
+This is a plain-language license written for this project. It is not legal advice; have a lawyer review it if
+you need it to hold up in a specific country.

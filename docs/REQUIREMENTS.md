@@ -315,3 +315,7 @@ sudo journalctl -u nginx -n 100
 | The status button is red but the site works | `/health/ready` must be reachable through Nginx (`location /health`). Check `curl https://your-domain/health/ready`. |
 | Old localhost origin still in `CORS_ALLOWED_ORIGINS` | Remove `localhost` entries in production, and if the app and `/api` share a domain CORS is not used at all. |
 | Downloads cut off partway | Nginx `proxy_read_timeout` too low, or `proxy_buffering` left on. |
+
+## License
+
+This project is licensed for educational, non-commercial use only. Public or commercial deployment (including on a VPS for other people) needs the author's written permission, and the official frontend must keep its footer credit. See [LICENSE](../LICENSE) and [AGENTS.md](../AGENTS.md).

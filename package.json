@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Blazfetch backend API - media metadata resolution and download orchestration for supported social platforms",
   "main": "dist/index.js",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "engines": {
     "node": ">=20.0.0"
