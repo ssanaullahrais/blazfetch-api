@@ -12,13 +12,18 @@ export interface FetchMediaParams {
   userId?: string | null;
   guestId?: string | null;
   forceRefresh?: boolean;
+  /** 1-based, inclusive item range for collection URLs (Pinterest boards, etc). A ranged
+   *  request always bypasses the cache — caching one slice of a collection under the same key
+   *  as another would return the wrong items. */
+  range?: { start?: number; end?: number };
 }
 
 export async function fetchMedia(params: FetchMediaParams): Promise<BlazfetchResponse> {
   const normalizedUrl = validateAndNormalizeUrl(params.url);
   const adapter = getAdapter(normalizedUrl);
+  const isRanged = !!(params.range?.start || params.range?.end);
 
-  if (!params.forceRefresh) {
+  if (!params.forceRefresh && !isRanged) {
     const cached = await getCachedMetadataByUrl(normalizedUrl.platform, normalizedUrl.canonicalUrl);
     if (cached) return cached;
   }
@@ -26,9 +31,9 @@ export async function fetchMedia(params: FetchMediaParams): Promise<BlazfetchRes
   const release = await globalFetchSemaphore.acquire();
   const startedAt = Date.now();
   try {
-    const result = await adapter.fetchMetadata({ requestId: params.requestId, normalizedUrl });
+    const result = await adapter.fetchMetadata({ requestId: params.requestId, normalizedUrl, range: params.range });
 
-    await setCachedMetadata(result.platform, result.mediaId, result.canonicalUrl, result);
+    if (!isRanged) await setCachedMetadata(result.platform, result.mediaId, result.canonicalUrl, result);
     await recordFetchStat({
       platform: result.platform,
       mediaId: result.mediaId,

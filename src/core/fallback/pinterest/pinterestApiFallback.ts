@@ -175,7 +175,10 @@ export interface PinterestBoardResult {
   boardId: string;
   boardName?: string;
   thumbnail?: string;
+  totalPinCount?: number;
   items: PinterestBoardItem[];
+  rangeStart: number;
+  rangeEnd: number;
   truncated: boolean;
 }
 
@@ -208,21 +211,41 @@ async function callPinterestApi<T>(resource: string, options: Record<string, unk
   }
 }
 
+export interface PinterestBoardRange {
+  /** 1-based, inclusive. Defaults to the start/end of the board. */
+  start?: number;
+  end?: number;
+}
+
 /**
- * Lists every pin in a public Pinterest board (unauthenticated, same public BoardResource /
+ * Lists pins in a public Pinterest board (unauthenticated, same public BoardResource /
  * BoardFeedResource endpoints yt-dlp's PinterestCollectionIE uses), resolving each pin's video
  * or largest-image source directly from the feed response — no extra per-pin API call needed,
  * since the feed already returns full pin objects in the same shape as PinResource.
+ *
+ * Pinterest's feed pagination is cursor-based (an opaque bookmark token), not offset-based, so
+ * there's no way to jump straight to item 50 — pages are walked sequentially from the start and
+ * everything before `range.start` is discarded. Requesting items 950-1000 of a huge board is
+ * therefore just as slow as requesting 1-1000; that's an inherent limit of Pinterest's API, not
+ * something a smarter query can avoid.
  */
-export async function fetchPinterestBoard(username: string, slug: string, maxItems: number): Promise<PinterestBoardResult> {
+export async function fetchPinterestBoard(username: string, slug: string, maxItems: number, range?: PinterestBoardRange): Promise<PinterestBoardResult> {
   const { data: board } = await callPinterestApi<PinterestBoardResourceData>('Board', { username, slug, field_set_key: 'grid_item' });
+
+  const rangeStart = Math.max(1, range?.start ?? 1);
+  const rangeEnd = Math.max(rangeStart, range?.end ?? rangeStart + maxItems - 1);
+  const windowSize = rangeEnd - rangeStart + 1;
+  if (windowSize > maxItems) {
+    throw new BlazfetchError('VALIDATION_ERROR', `Requested range spans ${windowSize} pins, which exceeds the ${maxItems} pin limit per request.`);
+  }
 
   const items: PinterestBoardItem[] = [];
   let bookmark: string | undefined;
   let truncated = false;
+  let seen = 0;
 
-  while (items.length < maxItems) {
-    const pageSize = Math.min(25, maxItems - items.length);
+  while (seen < rangeEnd) {
+    const pageSize = 25;
     const options: Record<string, unknown> = { board_id: board.id, page_size: pageSize };
     if (bookmark) options.bookmarks = [bookmark];
 
@@ -230,6 +253,8 @@ export async function fetchPinterestBoard(username: string, slug: string, maxIte
     const pins = (feedItems as unknown as (PinterestResourceData & { type?: string })[]).filter((i) => i.type === 'pin' || i.id);
 
     for (const pin of pins) {
+      seen += 1;
+      if (seen < rangeStart || seen > rangeEnd) continue;
       const resolved = extractVideoOrImage(pin);
       items.push({
         pinId: pin.id,
@@ -243,15 +268,24 @@ export async function fetchPinterestBoard(username: string, slug: string, maxIte
       });
     }
 
-    if (!nextBookmark || nextBookmark === '-end-' || pins.length === 0) break;
-    bookmark = nextBookmark;
-    if (items.length >= maxItems) {
-      truncated = true;
+    if (seen >= rangeEnd) break;
+    if (!nextBookmark || nextBookmark === '-end-' || pins.length === 0) {
+      truncated = seen < rangeEnd;
       break;
     }
+    bookmark = nextBookmark;
   }
 
-  return { boardId: board.id, boardName: board.name, thumbnail: board.image_thumbnail_url, items, truncated };
+  return {
+    boardId: board.id,
+    boardName: board.name,
+    thumbnail: board.image_thumbnail_url,
+    totalPinCount: board.pin_count,
+    items,
+    rangeStart,
+    rangeEnd: Math.min(rangeEnd, seen),
+    truncated,
+  };
 }
 
 /** Resolves a pin.it short link to its canonical pinterest.com/pin/<id> URL via HTTP redirect. */

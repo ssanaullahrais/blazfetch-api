@@ -55,7 +55,7 @@ export class PinterestAdapter implements PlatformAdapter {
     const target = await this.resolveTarget(ctx.normalizedUrl.canonicalUrl);
 
     if (target.kind === 'board') {
-      return this.fetchBoard(target, ctx.requestId);
+      return this.fetchBoard(target, ctx.requestId, ctx.range);
     }
 
     const resolvedCtx: AdapterFetchContext = { ...ctx, normalizedUrl: { ...ctx.normalizedUrl, canonicalUrl: target.url } };
@@ -103,9 +103,13 @@ export class PinterestAdapter implements PlatformAdapter {
     };
   }
 
-  private async fetchBoard(target: { username: string; slug: string; url: string }, requestId: string): Promise<BlazfetchResponse> {
-    logger.info({ requestId, username: target.username, slug: target.slug }, 'fetching Pinterest board via BoardResource/BoardFeedResource API');
-    const board = await fetchPinterestBoard(target.username, target.slug, env.MAX_PLAYLIST_ITEMS);
+  private async fetchBoard(
+    target: { username: string; slug: string; url: string },
+    requestId: string,
+    range?: { start?: number; end?: number },
+  ): Promise<BlazfetchResponse> {
+    logger.info({ requestId, username: target.username, slug: target.slug, range }, 'fetching Pinterest board via BoardResource/BoardFeedResource API');
+    const board = await fetchPinterestBoard(target.username, target.slug, env.MAX_PLAYLIST_ITEMS, range);
 
     const items: BlazfetchItem[] = board.items.map((item) => ({
       id: item.pinId,
@@ -135,7 +139,13 @@ export class PinterestAdapter implements PlatformAdapter {
       items,
       formats: [],
       audioFormats: [],
-      metadata: { truncated: board.truncated, maxItems: env.MAX_PLAYLIST_ITEMS },
+      metadata: {
+        truncated: board.truncated,
+        maxItemsPerRequest: env.MAX_PLAYLIST_ITEMS,
+        totalPinCount: board.totalPinCount,
+        rangeStart: board.rangeStart,
+        rangeEnd: board.rangeEnd,
+      },
       extractor: 'pinterest-board-api',
       fallbackUsed: 'pinterest-board-api',
     };

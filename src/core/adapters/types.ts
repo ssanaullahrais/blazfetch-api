@@ -5,6 +5,9 @@ import { BlazfetchResponse } from '../../types/blazfetch';
 export interface AdapterFetchContext {
   requestId: string;
   normalizedUrl: NormalizedUrlResult;
+  /** 1-based, inclusive item range for collection URLs (Pinterest boards, etc). Ignored by
+   *  adapters that don't support ranged collections. */
+  range?: { start?: number; end?: number };
 }
 
 export interface DownloadTarget {
