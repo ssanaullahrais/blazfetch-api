@@ -1674,9 +1674,11 @@ media, the platform and the (guest) user.
 {
   "success": true,
   "status": "ready",
-  "checks": { "database": true, "databaseDriver": "sqlite", "ytdlp": true, "ytdlpVersion": "2024.12.13", "ffmpeg": true, "ffmpegVersion": "ffmpeg version 6.1.1" }
+  "checks": { "database": true, "ytdlp": true, "ffmpeg": true }
 }
 ```
+
+The response is public, so it holds only pass/fail flags: versions and the database type are left out (`npm run diagnostics` on the server shows them).
 
 Returns `503` with `success: false` if any dependency check fails — suitable as a load balancer
 or orchestrator readiness probe:
@@ -1687,11 +1689,8 @@ or orchestrator readiness probe:
   "status": "not_ready",
   "checks": {
     "database": true,
-    "databaseDriver": "sqlite",
     "ytdlp": true,
-    "ytdlpVersion": "2026.08.19",
-    "ffmpeg": false,
-    "ffmpegVersion": null
+    "ffmpeg": false
   }
 }
 ```
