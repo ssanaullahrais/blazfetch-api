@@ -245,6 +245,30 @@ before redeploying.
 
 ## Reference
 
+### Cloudflare Turnstile (optional)
+
+Adds a bot check in front of fetching and downloading. It is free and needs no visible CAPTCHA for most visitors.
+
+1. In the Cloudflare dashboard open **Turnstile** and add a widget for your domain. Choose **Managed** mode.
+2. Copy the **Site key** and **Secret key**.
+3. In the backend `.env`:
+
+   ```
+   TURNSTILE_ENABLED=true
+   TURNSTILE_SITE_KEY=<site key>
+   TURNSTILE_SECRET_KEY=<secret key>
+   ```
+
+4. `pm2 restart <name> --update-env`. The frontend reads the site key from the backend (`GET /api/v1/config`), so it needs
+   no setting of its own. To turn the check off, set `TURNSTILE_ENABLED=false` and restart.
+
+To test locally without a Cloudflare account use Cloudflare's dummy keys (they only work on localhost): site key
+`1x00000000000000000000AA` and secret `1x0000000000000000000000000000000AA` always pass; `2x00000000000000000000AB` and
+`2x0000000000000000000000000000000AA` always fail.
+
+If a visitor sees "security check" errors: check the hostname is added to the widget in Cloudflare, that the secret is
+correct, and that the server can reach `challenges.cloudflare.com` (outbound HTTPS). The check fails closed by design.
+
 ### Server sizing
 
 | Tier | vCPU | RAM | Disk | Notes |

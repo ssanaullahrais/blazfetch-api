@@ -16,6 +16,8 @@ export const ErrorCode = {
   SERVER_BUSY: 'SERVER_BUSY',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   JOB_NOT_FOUND: 'JOB_NOT_FOUND',
+  TURNSTILE_REQUIRED: 'TURNSTILE_REQUIRED',
+  TURNSTILE_FAILED: 'TURNSTILE_FAILED',
   NOT_FOUND: 'NOT_FOUND',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
@@ -41,6 +43,9 @@ const STATUS_BY_CODE: Record<ErrorCodeType, number> = {
   SERVER_BUSY: 503,
   VALIDATION_ERROR: 400,
   JOB_NOT_FOUND: 404,
+  // Cloudflare Turnstile: no valid check yet (solve the widget and call POST /turnstile/verify), or the check was rejected.
+  TURNSTILE_REQUIRED: 403,
+  TURNSTILE_FAILED: 403,
   NOT_FOUND: 404,
   INTERNAL_ERROR: 500,
 };

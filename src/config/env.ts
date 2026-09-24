@@ -48,6 +48,15 @@ const envSchema = z.object({
   // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
   // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).
   STREAM_MODE_ENABLED: boolFromString(true),
+
+  // Cloudflare Turnstile (bot check). Off by default. When on, fetch/stream/download need a passed check.
+  TURNSTILE_ENABLED: boolFromString(false),
+  TURNSTILE_SITE_KEY: z.string().optional().default(''),
+  TURNSTILE_SECRET_KEY: z.string().optional().default(''),
+  // How long a passed check keeps working before the visitor is asked again (seconds).
+  TURNSTILE_SESSION_SECONDS: z.coerce.number().default(1800),
+  // Optional: secret used to sign the pass cookie. Defaults to one derived from TURNSTILE_SECRET_KEY.
+  TURNSTILE_COOKIE_SECRET: z.string().optional().default(''),
   // Delivery mode for GET /api/v1/stream when the request has no ?mode=: "stream" pipes straight through,
   // "prepare" builds the file on the server first, "auto" tries stream and falls back to prepare.
   DEFAULT_DOWNLOAD_MODE: z.enum(['stream', 'prepare', 'auto']).default('stream'),

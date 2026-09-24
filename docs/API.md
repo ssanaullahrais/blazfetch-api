@@ -120,6 +120,8 @@ Every error response has this shape:
 | `FILE_TOO_LARGE` | 413 | Exceeds `MAX_DOWNLOAD_SIZE_BYTES` |
 | `SERVER_BUSY` | 503 | Concurrency limit reached |
 | `VALIDATION_ERROR` | 400 | Request body failed schema validation |
+| `TURNSTILE_REQUIRED` | 403 | Turnstile is on and this visitor has no valid pass. Solve the widget, call `POST /turnstile/verify`, retry |
+| `TURNSTILE_FAILED` | 403 | Cloudflare rejected the token (or could not be reached) |
 | `JOB_NOT_FOUND` | 404 | Job id doesn't exist or isn't ready yet |
 
 > [!NOTE]
@@ -1659,6 +1661,34 @@ stored URLs were stale, the kind (video/playlist), whether it came from a user o
 duration and error code. Every download records the delivery mode (`stream` or `prepare`), time to first
 byte, whether `auto` mode fell back, format, quality, bytes, duration and error code, all tied to the
 media, the platform and the (guest) user.
+
+---
+
+## Cloudflare Turnstile (optional bot check)
+
+Turnstile is Cloudflare's free, privacy-friendly CAPTCHA replacement. It is **off by default**. When
+`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /stream` and `POST /download` need a passed check;
+everything else (`/media`, `/platforms`, `/config`, health) stays open so stored pages can still be read and indexed.
+
+How it works:
+
+1. `GET /api/v1/config` returns `{ "turnstile": { "enabled": true, "siteKey": "...", "sessionSeconds": 1800 } }`. The
+   site key is public; the secret key never leaves the server.
+2. The frontend renders the Cloudflare widget with that site key and gets a one-time token.
+3. `POST /api/v1/turnstile/verify` with `{ "token": "..." }`. The server validates it with Cloudflare
+   (`POST https://challenges.cloudflare.com/turnstile/v0/siteverify`; tokens are single use and expire after 5 minutes) and
+   answers with a signed **pass cookie** (`blazfetch_turnstile`, HttpOnly, bound to the visitor's guest cookie) valid for
+   `TURNSTILE_SESSION_SECONDS` (default 30 minutes).
+4. Protected endpoints check that cookie. A cookie is used rather than a header so plain browser navigations such as
+   `GET /stream` also work. Without a valid pass they answer `403 TURNSTILE_REQUIRED`; the client should run the widget
+   again and retry.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /config` | Public settings: whether Turnstile is on, and the site key |
+| `POST /turnstile/verify` | Swap a solved widget token for the pass cookie. `403 TURNSTILE_FAILED` when Cloudflare rejects the token or cannot be reached (it fails closed) |
+
+Send `credentials: 'include'` so the cookies travel. Set up: [docs/REQUIREMENTS.md](REQUIREMENTS.md#cloudflare-turnstile-optional).
 
 ---
 

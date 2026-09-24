@@ -52,6 +52,7 @@ remember each link's details, such as title and formats, so repeat requests are 
   a weekly check that notices deleted videos, and usage statistics.
 - **Works when a platform blocks it.** If YouTube blocks the server's IP, a fallback provider answers instead.
 - **Your choice of database:** SQLite (default, nothing to install), PostgreSQL, MySQL/MariaDB or MongoDB.
+- **Optional bot protection:** Cloudflare Turnstile can be switched on from `.env` (off by default).
 - **Clean by design:** no media is kept on disk, temporary files are always removed, and cancelling a download
   stops every process it started.
 
@@ -209,6 +210,7 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | `DEFAULT_DOWNLOAD_MODE` | `stream` | Default for `GET /stream` when a request has no `?mode=` |
 | `STREAM_MODE_ENABLED` | `true` | Turn `GET /stream` off entirely |
 | `REVALIDATE_AFTER_SECONDS` | `604800` (7 days) | How often each stored item is re-checked |
+| `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | `false` | Optional [Cloudflare Turnstile](docs/API.md#cloudflare-turnstile-optional-bot-check) bot check in front of fetch, stream and download |
 | `YOUTUBE_FALLBACK_ENABLED` | `true` | Use a fallback provider when YouTube blocks the server |
 | `MAX_CONCURRENT_DOWNLOADS_GLOBAL` / `_PER_GUEST` | `10` / `1` | Concurrency limits |
 | `RATE_LIMIT_MAX_GUEST` / `RATE_LIMIT_MAX_DOWNLOAD` | `30` / `10` per minute | Rate limits |
