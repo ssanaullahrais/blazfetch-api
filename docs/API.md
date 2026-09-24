@@ -25,7 +25,8 @@ real video/audio file was downloaded and ffprobe-validated (correct streams, val
 | Snapchat | ✅ Confirmed | Uses yt-dlp's generic HTML5-embed extractor |
 | Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
 | Pinterest | ✅ Confirmed (pins + boards) | Public `PinResource`/`BoardResource` API, no auth needed — see below |
-| Loom, Newgrounds, Tumblr | ⚠️ Wired, untested | No real test URL exercised yet; Newgrounds correctly blocks age-restricted content |
+| Loom | ✅ Confirmed | Video and audio, including HLS streams |
+| Newgrounds, Tumblr | ⚠️ Wired, untested | Newgrounds returned 403 (bot protection) from the test machine |
 
 
 Authentication is not yet implemented in this scaffold — every endpoint currently runs as a

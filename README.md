@@ -25,7 +25,8 @@ straight through to whoever asked, and deletes any temporary files afterward.
 | Snapchat | ✅ Confirmed | |
 | Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
 | Pinterest | ✅ Confirmed (pins + boards) | Public API, no auth needed — see below |
-| Loom, Newgrounds, Tumblr | ⚠️ Wired, untested | Newgrounds correctly blocks age-restricted content |
+| Loom | ✅ Confirmed | Video and audio, including HLS streams |
+| Newgrounds, Tumblr | ⚠️ Wired, untested | Newgrounds returned 403 (bot protection) from the test machine |
 
 
 ## Install
