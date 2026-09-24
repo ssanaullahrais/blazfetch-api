@@ -1,9 +1,10 @@
 # Blazfetch Backend
 
-A server that takes a link from a social platform (YouTube, TikTok, Instagram, etc.) and lets you
-download the video, audio, or photos in it. It doesn't keep a copy of anyone's media on its own
-server. It fetches the file, checks that it actually works, sends it straight through to whoever
-asked, and deletes any temporary files afterward.
+A server that takes a link from a social platform (YouTube, TikTok, Instagram, X/Twitter,
+Facebook, Reddit, Vimeo, Dailymotion, Bluesky, Streamable, Rutube, SoundCloud, Snapchat, Twitch,
+or Pinterest) and lets you download the video, audio, or photos in it. It doesn't keep a copy of
+anyone's media on its own server. It fetches the file, checks that it actually works, sends it
+straight through to whoever asked, and deletes any temporary files afterward.
 
 ## Platform status
 
