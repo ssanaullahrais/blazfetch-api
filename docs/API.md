@@ -3,6 +3,31 @@
 Base URL: `{APP_URL}/api/v1` (e.g. `http://localhost:4000/api/v1`). All request/response bodies
 are JSON unless noted. An OpenAPI 3.0 definition is available at [openapi.yaml](openapi.yaml).
 
+## Platform status
+
+Verified with real downloads against live URLs, not just metadata calls. "Confirmed" means a
+real video/audio file was downloaded and ffprobe-validated (correct streams, valid duration).
+
+| Platform | Status | Notes |
+|---|---|---|
+| YouTube | ✅ Confirmed | Video, playlists (flat listing), best-quality auto-select |
+| TikTok | ✅ Confirmed | yt-dlp primary, `@tobyg74/tiktok-api-dl` fallback |
+| Instagram | ✅ Confirmed (single post/reel/carousel) | Profile listing needs a session — see below |
+| X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com` |
+| Facebook | ✅ Confirmed | Reels |
+| Reddit | ✅ Confirmed | Including separate video+audio DASH streams |
+| Vimeo | ✅ Confirmed | Auto-retries via the embed/player URL when the watch page requires login |
+| Dailymotion | ✅ Confirmed | Some clips have no audio track at the source — not a bug |
+| Bluesky | ✅ Confirmed | |
+| Streamable | ✅ Confirmed | |
+| Rutube | ✅ Confirmed | |
+| SoundCloud | ✅ Confirmed (single track) | Profile/browse pages (e.g. `/discover`) rejected with a clear error instead of hanging |
+| Snapchat | ✅ Confirmed | Uses yt-dlp's generic HTML5-embed extractor |
+| Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
+| Pinterest | ✅ Confirmed (pins + boards) | Public `PinResource`/`BoardResource` API, no auth needed — see below |
+| Loom, Newgrounds, Tumblr | ⚠️ Wired, untested | No real test URL exercised yet; Newgrounds correctly blocks age-restricted content |
+| Instagram (profile listing) | ⚠️ Requires your own session | See "Instagram profile listing" below |
+
 Authentication is not yet implemented in this scaffold — every endpoint currently runs as a
 guest, tracked by a `blazfetch_guest_id` cookie the server sets automatically. `req.userId` is
 wired through the whole stack (jobs, stats, rate limiting) so adding real auth later only means
@@ -61,6 +86,8 @@ Resolve metadata, thumbnails, and video/image formats for a supported URL.
 |---|---|---|---|
 | `url` | string | yes | Any URL from a supported platform domain |
 | `forceRefresh` | boolean | no | Bypass the metadata cache and re-extract |
+| `rangeStart` | integer | no | 1-based, inclusive. Collection URLs only (Pinterest boards); ignored otherwise |
+| `rangeEnd` | integer | no | 1-based, inclusive. Collection URLs only (Pinterest boards); ignored otherwise |
 
 ### Response `200`
 
@@ -121,6 +148,48 @@ time.
 
 Fetch full formats for one entry by calling `POST /fetch` again with that entry's `url`.
 
+### Pinterest board example
+
+`POST { "url": "https://www.pinterest.com/<username>/<board-slug>/" }` → every pin in the board
+as a carousel of mixed image/video items, resolved via Pinterest's own public `PinResource`/
+`BoardResource` API (no authentication required):
+
+```json
+{
+  "success": true,
+  "platform": "pinterest",
+  "mediaType": "carousel",
+  "isCarousel": true,
+  "itemCount": 56,
+  "title": "Board name",
+  "items": [
+    { "id": "581316264442190336", "type": "video", "thumbnail": "https://...", "durationSeconds": 58.7,
+      "formats": [{ "formatId": "board-581316264442190336-mp4", "ext": "mp4", "kind": "video", "width": 720, "height": 1280, "compatible": true }] },
+    { "id": "581316264448862762", "type": "image", "thumbnail": "https://...", "source": "https://i.pinimg.com/originals/..." }
+  ],
+  "formats": [],
+  "audioFormats": [],
+  "metadata": { "totalPinCount": 59, "rangeStart": 1, "rangeEnd": 56, "truncated": false, "maxItemsPerRequest": 200 },
+  "extractor": "pinterest-board-api",
+  "fallbackUsed": "pinterest-board-api"
+}
+```
+
+Image items are downloaded directly from `items[].source` (already the highest-resolution
+`orig` variant Pinterest has for that pin — verified against Pinterest's own metadata, not a
+grid thumbnail). Video items are downloaded via `POST /download` using their `formats[].formatId`.
+
+**Ranged requests** — for a large board, request a slice instead of the whole thing:
+
+```json
+{ "url": "https://www.pinterest.com/<username>/<board-slug>/", "rangeStart": 50, "rangeEnd": 100 }
+```
+
+`rangeStart`/`rangeEnd` are 1-based and inclusive. Pinterest's pagination is cursor-based, not
+offset-based, so requesting items 950-1000 of a huge board takes as long as requesting 1-1000 —
+pages are still walked sequentially from the start. Ranged requests always bypass the metadata
+cache. A single individual pin URL (`/pin/<id>`) ignores range params entirely.
+
 ### Instagram carousel example
 
 ```json
@@ -140,13 +209,74 @@ Fetch full formats for one entry by calling `POST /fetch` again with that entry'
 }
 ```
 
-### Failed request example
+### Instagram profile example
+
+`POST { "url": "https://www.instagram.com/<username>/" }` — lists a profile's posts. **Requires
+an authenticated session you configure yourself** (`INSTAGRAM_INSTALOADER_SESSION_PATH` via
+Instaloader, or `INSTAGRAM_COOKIES_PATH` via yt-dlp — see the main [README](../README.md#instagram-profile-listing-optional)).
+Instagram blocks this anonymously even for public accounts; the backend never bypasses that.
+
+```json
+{
+  "success": true,
+  "platform": "instagram",
+  "mediaType": "playlist",
+  "isPlaylist": true,
+  "itemCount": 50,
+  "title": "Full Name",
+  "thumbnail": "https://...",
+  "playlist": {
+    "title": "Full Name",
+    "itemCount": 50,
+    "items": [
+      { "videoId": "ABC123xyz", "title": "caption text...", "thumbnail": "https://...", "url": "https://www.instagram.com/p/ABC123xyz/" }
+    ]
+  },
+  "formats": [],
+  "audioFormats": [],
+  "metadata": { "followerCount": 12345, "postCount": 890 },
+  "extractor": "instaloader"
+}
+```
+
+Without a configured session:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "LOGIN_REQUIRED",
+    "message": "Listing an Instagram profile requires an authenticated session (Instagram blocks this anonymously). Set INSTAGRAM_INSTALOADER_SESSION_PATH + INSTAGRAM_INSTALOADER_SESSION_USERNAME (preferred, via Instaloader), or INSTAGRAM_COOKIES_PATH, to a session from an account authorized to view this profile."
+  },
+  "requestId": "b3f1..."
+}
+```
+
+Fetch full details for one post by calling `POST /fetch` again with that item's `url`.
+
+### Failed request examples
 
 ```json
 {
   "success": false,
   "error": { "code": "UNSUPPORTED_PLATFORM", "message": "This platform is currently not supported." },
   "requestId": "b3f1..."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": { "code": "MEDIA_NOT_FOUND", "message": "Media could not be found at the given URL." },
+  "requestId": "c4a2..."
+}
+```
+
+```json
+{
+  "success": false,
+  "error": { "code": "AGE_RESTRICTED", "message": "This media is age-restricted." },
+  "requestId": "d5b3..."
 }
 ```
 
@@ -260,21 +390,72 @@ Cancels the job (terminating any in-flight yt-dlp/ffmpeg process) and removes it
 ```
 
 `status` is one of: `queued`, `preparing`, `ready`, `streaming`, `completed`, `failed`,
-`cancelled`, `expired`.
+`cancelled`, `expired`. Poll this endpoint (e.g. every 1-2s) to drive a progress bar; once
+`status` is `ready` or `completed`, call `GET /downloads/:id` to get the actual file.
+
+Failed job example:
+
+```json
+{
+  "success": true,
+  "job": {
+    "id": "a3b6...",
+    "status": "failed",
+    "progress": 34,
+    "platform": "vimeo",
+    "errorCode": "LOGIN_REQUIRED",
+    "errorMessage": "The web client only works when logged-in.",
+    "updatedAt": "2026-01-01T00:00:07.000Z"
+  }
+}
+```
+
+Unknown/expired job id:
+
+```json
+{
+  "success": false,
+  "error": { "code": "JOB_NOT_FOUND", "message": "Job a3b6... was not found." },
+  "requestId": "e6c4..."
+}
+```
 
 ## `DELETE /api/v1/jobs/:id`
 
 Cancels a queued or in-progress job.
 
+```json
+{ "success": true, "job": { "id": "a3b6...", "status": "cancelled", "...": "..." } }
+```
+
 ---
 
 ## `GET /api/v1/platforms`
+
+Returns all 18 configured platforms (see "Platform status" above for which are verified working).
 
 ```json
 {
   "success": true,
   "platforms": [
-    { "id": "youtube", "label": "YouTube", "domains": ["youtube.com", "youtu.be", "youtube-nocookie.com"] }
+    { "id": "youtube", "label": "YouTube", "domains": ["youtube.com", "youtu.be", "youtube-nocookie.com"] },
+    { "id": "tiktok", "label": "TikTok", "domains": ["tiktok.com"] },
+    { "id": "instagram", "label": "Instagram", "domains": ["instagram.com", "instagr.am"] },
+    { "id": "twitter", "label": "X / Twitter", "domains": ["x.com", "twitter.com", "t.co"] },
+    { "id": "facebook", "label": "Facebook", "domains": ["facebook.com", "fb.watch", "fb.me"] },
+    { "id": "vimeo", "label": "Vimeo", "domains": ["vimeo.com"] },
+    { "id": "reddit", "label": "Reddit", "domains": ["reddit.com", "redd.it"] },
+    { "id": "soundcloud", "label": "SoundCloud", "domains": ["soundcloud.com", "snd.sc"] },
+    { "id": "pinterest", "label": "Pinterest", "domains": ["pinterest.com", "pin.it", "..."] },
+    { "id": "snapchat", "label": "Snapchat", "domains": ["snapchat.com"] },
+    { "id": "dailymotion", "label": "Dailymotion", "domains": ["dailymotion.com", "dai.ly"] },
+    { "id": "bluesky", "label": "Bluesky", "domains": ["bsky.app"] },
+    { "id": "loom", "label": "Loom", "domains": ["loom.com"] },
+    { "id": "newgrounds", "label": "Newgrounds", "domains": ["newgrounds.com"] },
+    { "id": "rutube", "label": "Rutube", "domains": ["rutube.ru"] },
+    { "id": "streamable", "label": "Streamable", "domains": ["streamable.com"] },
+    { "id": "twitch", "label": "Twitch", "domains": ["twitch.tv"] },
+    { "id": "tumblr", "label": "Tumblr", "domains": ["tumblr.com"] }
   ]
 }
 ```
@@ -298,4 +479,41 @@ Cancels a queued or in-progress job.
 ```
 
 Returns `503` with `success: false` if any dependency check fails — suitable as a load balancer
-or orchestrator readiness probe.
+or orchestrator readiness probe:
+
+```json
+{
+  "success": false,
+  "status": "not_ready",
+  "checks": {
+    "database": true,
+    "ytdlp": true,
+    "ytdlpVersion": "2026.08.19",
+    "ffmpeg": false,
+    "ffmpegVersion": null,
+    "instaloader": false,
+    "instaloaderVersion": null
+  }
+}
+```
+
+`instaloader` is informational only (optional dependency, only needed for Instagram profile
+listing) and never affects the overall `ready`/`not_ready` status.
+
+---
+
+## Quick reference for frontend integration
+
+Typical flow for "user pastes a URL, picks a quality, downloads":
+
+1. `POST /fetch` with the URL → get `formats[]`/`audioFormats[]` (or `items[]` for a carousel/
+   playlist/board — recurse into each item's own `url` if you need per-item formats).
+2. Let the user pick a `formatId`, or skip this and just use `"best"`.
+3. `POST /download` with `{ url, formatId, kind }` → get a `job.id` back immediately (`202`).
+4. Poll `GET /jobs/:id` every 1-2s until `status` is `ready` or `completed` (or `failed` —
+   show `errorCode`/`errorMessage`).
+5. Navigate to (or `fetch()`) `GET /downloads/:id` to get the actual file — the browser can
+   treat this as a normal download link since it sets `Content-Disposition: attachment`.
+
+For a live progress bar while downloading, `job.progress` (0-100) and `job.downloadedBytes`/
+`totalBytes` from the `/jobs/:id` poll response are the numbers to drive it with.
