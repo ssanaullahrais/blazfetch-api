@@ -287,6 +287,8 @@ space for them (a few GB free per concurrent download).
 
 ### Troubleshooting
 
+Problems seen on real deployments are listed here with their fixes. After any update, run `git pull --ff-only && npm ci && npm run build && npm run migrate && pm2 restart <name> --update-env && pm2 save`, then check `/health/ready`.
+
 ```bash
 npm run diagnostics                      # database, yt-dlp, ffmpeg and ffprobe status in one command
 curl localhost:4000/health/ready         # the app's own readiness check (HTTP 503 if something is missing)
@@ -304,4 +306,12 @@ sudo journalctl -u nginx -n 100
 | YouTube fails with "Sign in to confirm you're not a bot" | YouTube temporarily blocked the server's IP. The fallback provider takes over automatically (check `fallbackUsed` in responses); the block usually clears in minutes to hours. Fewer repeated requests and the media store help. |
 | Downloaded video is black or cannot be shared on a phone (WhatsApp, gallery) | Update to the latest version and set `DEFAULT_DOWNLOAD_MODE=auto`: older versions streamed VP9/AV1, WebM and fragmented MP4 as-is, which phones cannot play. |
 | An Instagram link shows only a thumbnail or fails, but works locally | yt-dlp is blocked from the server's IP. Check with `yt-dlp -J "<link>"` on the server; add `INSTAGRAM_COOKIES_PATH` if it asks for a login. After fixing, use the app's Refresh button once on that link to replace the stored result. |
+| A YouTube download stops after a few minutes with `PROCESS_TIMEOUT` ("ffmpeg process timed out") | The chosen format needed a slow re-encode (VP9/AV1 4K/1440p) on a small CPU. Current versions pick 1080p H.264 for "best", which needs no re-encode. For manually chosen 4K/AV1 formats, raise `FFMPEG_TIMEOUT_MS` (default 180000) or use a bigger server. |
+| Message "The server is busy or you already have a download running" | Each visitor may run 1 download at a time (`MAX_CONCURRENT_DOWNLOADS_PER_GUEST`) and the server 10 (`MAX_CONCURRENT_DOWNLOADS_GLOBAL`). It clears when the running download ends. Raise the limits only if the server has CPU to spare. |
+| A carousel shows photos as videos, duplicates, or an old wrong result stays after you deploy a fix | Results are stored in the database and reused. After updating, open the page and click **Refresh** once (or `POST /fetch` with `"forceRefresh": true`) to replace the stored result. |
+| "Backup source" badge on Instagram | The main extractor (yt-dlp) is blocked from the server's IP and the backup provider answered. Fixes: `INSTAGRAM_COOKIES_PATH` with a `cookies.txt` from a throwaway logged-in account, or a residential proxy. Never use a personal account. |
+| A platform (for example Rutube) fails only from the server with a 504 or 403 | The site blocks or times out datacenter IPs. Try later or from another network; nothing to fix in the app. |
+| New settings in `.env` do not take effect | Restart with `pm2 restart <name> --update-env`, then `pm2 save`. Check the process name with `pm2 status` (this guide uses `blazfetch-backend`; yours may differ). |
+| The status button is red but the site works | `/health/ready` must be reachable through Nginx (`location /health`). Check `curl https://your-domain/health/ready`. |
+| Old localhost origin still in `CORS_ALLOWED_ORIGINS` | Remove `localhost` entries in production, and if the app and `/api` share a domain CORS is not used at all. |
 | Downloads cut off partway | Nginx `proxy_read_timeout` too low, or `proxy_buffering` left on. |
