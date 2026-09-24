@@ -338,6 +338,7 @@ sudo journalctl -u nginx -n 100
 | New settings in `.env` do not take effect | Restart with `pm2 restart <name> --update-env`, then `pm2 save`. Check the process name with `pm2 status` (this guide uses `blazfetch-backend`; yours may differ). |
 | The status button is red but the site works | `/health/ready` must be reachable through Nginx (`location /health`). Check `curl https://your-domain/health/ready`. |
 | Old localhost origin still in `CORS_ALLOWED_ORIGINS` | Remove `localhost` entries in production, and if the app and `/api` share a domain CORS is not used at all. |
+| Visitors see "security check" errors | Turnstile is on. Check the domain is in the widget's hostname list in Cloudflare, `TURNSTILE_SECRET_KEY` is right, and the server can reach `challenges.cloudflare.com`. A page opened before you changed keys holds an old token: reload it. To switch the check off: `TURNSTILE_ENABLED=false`, then `pm2 restart <name> --update-env`. |
 | Downloads cut off partway | Nginx `proxy_read_timeout` too low, or `proxy_buffering` left on. |
 
 ## License

@@ -1688,7 +1688,7 @@ How it works:
 | `GET /config` | Public settings: whether Turnstile is on, and the site key |
 | `POST /turnstile/verify` | Swap a solved widget token for the pass cookie. `403 TURNSTILE_FAILED` when Cloudflare rejects the token or cannot be reached (it fails closed) |
 
-Send `credentials: 'include'` so the cookies travel. Set up: [docs/REQUIREMENTS.md](REQUIREMENTS.md#cloudflare-turnstile-optional).
+A client should call `/turnstile/verify` lazily, when the visitor first does something protected, rather than on page load. Send `credentials: 'include'` so the cookies travel. Set up: [docs/REQUIREMENTS.md](REQUIREMENTS.md#cloudflare-turnstile-optional).
 
 ---
 
