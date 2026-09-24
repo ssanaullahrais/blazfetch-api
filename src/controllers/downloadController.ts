@@ -6,6 +6,9 @@ import { startDownloadJob, runDownloadJob } from '../services/downloadService';
 import { getJob, cancelJob, updateJobStatus, updateJobProgress } from '../core/jobs/jobManager';
 import { cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { assertUrlIsSafeToFetch } from '../utils/url';
+import { assertOwnership } from '../core/jobs/ownership';
+import { safeFetch } from '../utils/safeFetch';
+import { attachmentHeader } from '../utils/contentDisposition';
 import { BlazfetchError } from '../constants/errors';
 
 export const downloadBodySchema = z.object({
@@ -38,6 +41,7 @@ export async function postDownload(req: Request, res: Response): Promise<void> {
 
 export async function getDownloadStream(req: Request, res: Response): Promise<void> {
   const job = await getJob(req.params.id);
+  assertOwnership(req, job);
 
   if (job.status === 'completed' && job.tempPath) {
     if (!fs.existsSync(job.tempPath)) {
@@ -62,6 +66,7 @@ export async function getDownloadStream(req: Request, res: Response): Promise<vo
 
 export async function deleteDownload(req: Request, res: Response): Promise<void> {
   const job = await getJob(req.params.id);
+  assertOwnership(req, job);
   await cancelJob(job.id);
   await cleanupJobTempDir(job.id);
   res.json({ success: true, job: await getJob(job.id) });
@@ -72,7 +77,7 @@ async function streamLocalFile(filePath: string, filename: string, mimeType: str
   const stat = await fs.promises.stat(filePath);
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Content-Length', String(stat.size));
-  res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/"/g, '')}"`);
+  res.setHeader('Content-Disposition', attachmentHeader(filename));
   const stream = fs.createReadStream(filePath);
   return new Promise<boolean>((resolve, reject) => {
     stream.pipe(res);
@@ -92,7 +97,7 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
   await assertUrlIsSafeToFetch(sourceUrl);
   await updateJobStatus(job.id, 'streaming');
 
-  const upstream = await fetch(sourceUrl);
+  const upstream = await safeFetch(sourceUrl);
   if (!upstream.ok || !upstream.body) {
     await updateJobStatus(job.id, 'failed', { error_code: 'DOWNLOAD_FAILED', error_message: `Upstream responded with ${upstream.status}` });
     throw new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
@@ -101,7 +106,7 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
   const totalBytes = Number(upstream.headers.get('content-length')) || undefined;
   res.setHeader('Content-Type', job.mimeType ?? upstream.headers.get('content-type') ?? 'application/octet-stream');
   if (totalBytes) res.setHeader('Content-Length', String(totalBytes));
-  res.setHeader('Content-Disposition', `attachment; filename="${(job.filename ?? 'download').replace(/"/g, '')}"`);
+  res.setHeader('Content-Disposition', attachmentHeader(job.filename ?? 'download'));
 
   let downloaded = 0;
   let clientGone = false;

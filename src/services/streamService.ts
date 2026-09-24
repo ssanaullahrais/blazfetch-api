@@ -1,5 +1,6 @@
 import { Readable, Transform } from 'node:stream';
 import { env } from '../config/env';
+import { safeFetch } from '../utils/safeFetch';
 import { BlazfetchError } from '../constants/errors';
 import { logger } from '../lib/logger';
 import mime from '../lib/mime';
@@ -241,7 +242,7 @@ export function buildFilename(requested: string | undefined, media: BlazfetchRes
 /** Streams a plain HTTP(S) file through untouched. A source that ends early errors instead of finishing quietly. */
 export async function openProxy(url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
   await assertUrlIsSafeToFetch(url);
-  const upstream = await fetch(url, { signal, headers: { 'accept-encoding': 'identity' } });
+  const upstream = await safeFetch(url, { signal, headers: { 'accept-encoding': 'identity' } });
   if (!upstream.ok || !upstream.body) {
     logger.warn({ requestId, status: upstream.status }, 'stream proxy upstream failed');
     throw new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
