@@ -198,8 +198,12 @@ transcode work continues in the background. Poll `GET /jobs/:id` or open
 }
 ```
 
-`formatId` must be a value previously returned by `/fetch` or `/fetch/audio` — never a raw yt-dlp
-format string or shell argument.
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | string | yes | Any URL from a supported platform domain |
+| `formatId` | string | no (default `"best"`) | A `formatId` previously returned by `/fetch` or `/fetch/audio` — never a raw yt-dlp format string or shell argument. Omit it (or pass `"best"`) to skip picking a format entirely: the backend automatically selects the highest resolution for video, or the highest-bitrate audio (converting to MP3 via ffmpeg if the source has no standalone audio track) |
+| `kind` | `"video"` \| `"audio"` | yes | |
+| `quality` | string | no | Informational only; doesn't affect selection |
 
 ### Response `202`
 

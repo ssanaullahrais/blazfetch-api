@@ -10,7 +10,8 @@ import { BlazfetchError } from '../constants/errors';
 
 export const downloadBodySchema = z.object({
   url: z.string().min(1),
-  formatId: z.string().min(1),
+  // Omit (or pass "best") to get the highest-quality video / highest-bitrate audio automatically.
+  formatId: z.string().min(1).optional().default('best'),
   kind: z.enum(['video', 'audio']),
   quality: z.string().optional(),
 });

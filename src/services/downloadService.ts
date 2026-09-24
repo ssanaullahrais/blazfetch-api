@@ -8,9 +8,11 @@ import { createJob, getJob, getJobSignal, updateJobProgress, updateJobStatus, cl
 import { jobTempDir, cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { runFfmpeg, extractAudioArgs, transcodeToCompatibleMp4Args } from '../core/ffmpeg/ffmpegRunner';
 import { isBrowserCompatibleMp4, validateMediaFile } from '../core/ffmpeg/ffprobe';
+import { pickBestAudioFormat, pickBestVideoFormat } from '../core/adapters/formatSelection';
 import { logger } from '../lib/logger';
 import { recordDownloadStat } from './statsService';
 import { fetchMedia } from './fetchService';
+import { fetchAudio } from './audioService';
 import { JobRecord, RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchError } from '../constants/errors';
 
@@ -22,13 +24,37 @@ export interface StartDownloadParams {
   guestId?: string | null;
 }
 
+const BEST_SENTINEL = 'best';
+
+/** `formatId: "best"` (or omitted) resolves to the highest-quality option automatically —
+ *  highest resolution for video, highest bitrate for audio/MP3 — so callers don't need to
+ *  enumerate formats first just to get the default top-quality download. */
+async function resolveFormat(url: string, requestId: string, format: RequestedFormat): Promise<RequestedFormat> {
+  if (format.formatId && format.formatId.toLowerCase() !== BEST_SENTINEL) {
+    return format;
+  }
+
+  if (format.kind === 'video') {
+    const media = await fetchMedia({ url, requestId });
+    const best = pickBestVideoFormat(media.formats);
+    if (!best) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'No video formats are available for this media.');
+    return { ...format, formatId: best.formatId, quality: best.quality };
+  }
+
+  const audio = await fetchAudio({ url, requestId });
+  const best = pickBestAudioFormat(audio.audioFormats);
+  if (!best) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'No audio formats are available for this media.');
+  return { ...format, formatId: best.formatId, quality: best.quality };
+}
+
 export async function startDownloadJob(params: StartDownloadParams): Promise<JobRecord> {
   const normalizedUrl = validateAndNormalizeUrl(params.url);
+  const resolvedFormat = await resolveFormat(params.url, params.requestId, params.format);
   const job = await createJob({
     platform: normalizedUrl.platform,
     mediaId: null,
     canonicalUrl: normalizedUrl.canonicalUrl,
-    requestedFormat: params.format,
+    requestedFormat: resolvedFormat,
     userId: params.userId,
     guestId: params.guestId,
   });

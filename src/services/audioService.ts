@@ -1,4 +1,5 @@
 import { fetchMedia, FetchMediaParams } from './fetchService';
+import { pickBestVideoFormat } from '../core/adapters/formatSelection';
 import { BlazfetchAudioFormat, BlazfetchResponse } from '../types/blazfetch';
 
 /** POST /api/v1/fetch/audio response: same metadata, but scoped to audio options only. */
@@ -20,7 +21,7 @@ export async function fetchAudio(params: FetchMediaParams): Promise<AudioFetchRe
   const requiresConversion = audioFormats.length === 0 && media.formats.length > 0;
 
   if (requiresConversion) {
-    const bestVideo = media.formats.find((f) => f.kind === 'video') ?? media.formats[0];
+    const bestVideo = pickBestVideoFormat(media.formats) ?? media.formats[0];
     audioFormats.push({
       formatId: `mp3-from-${bestVideo.formatId}`,
       ext: 'mp3',
