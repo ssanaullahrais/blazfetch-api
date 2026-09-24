@@ -1,0 +1,91 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.facebook.com/reel/1097374499488415"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "facebook",
+    "mediaType": "video",
+    "mediaId": "1097374499488415",
+    "canonicalUrl": "https://m.facebook.com/watch/?v=1097374499488415&_rdr",
+    "title": "232K views · 76K reactions | تفريغ البيانات من ورقة لبرنامج الاكسيل بكل سهولة. Extract Data from Paper Using Your Camera in Excel! #learnontiktok #excel #exceltips #exceltricks #data | Hussein Adel",
+    "description": "تفريغ البيانات من ورقة لبرنامج الاكسيل بكل سهولة.\nExtract Data from Paper Using Your Camera in Excel!\n\n #learnontiktok #excel #exceltips ...",
+    "author": {
+      "name": "Hussein Adel"
+    },
+    "thumbnail": "https://scontent.fisb1-2.fna.fbcdn.net/v/t51.82787-10/801284054_18625495702055500_67742985960207...",
+    "durationSeconds": 58.235,
+    "uploadDate": "20260908",
+    "formats": [
+      {
+        "formatId": "sd",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": null,
+        "bitrate": null,
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "url": "https://video.fisb17-1.fna.fbcdn.net/o1/v/t2/f2/m367/AQMkPq3e_vXQxe0KzT3rIZXj_hZENa1hbGiHtSBSx9S...",
+        "requiresMerge": false,
+        "compatible": false
+      },
+      {
+        "formatId": "1465289862165722v",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "DASH video",
+        "width": 1080,
+        "height": 1920,
+        "fps": null,
+        "bitrate": 659.654,
+        "codec": "av01.0.08M.08.0.111.01.01.01.0",
+        "filesizeApprox": false,
+        "url": "https://video.fisb1-2.fna.fbcdn.net/o1/v/t2/f2/m367/AQOge4tMa-JFby81FQNULOAQVfETdb9QvaG8xyEvuFqA...",
+        "requiresMerge": true,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "1465249215503120a",
+        "ext": "m4a",
+        "bitrate": 56.698,
+        "codec": "mp4a.40.5",
+        "quality": "DASH audio",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://video.fisb1-2.fna.fbcdn.net/o1/v/t2/f2/m78/AQM9UaGP7t5i_qsKutF1KGgSAZQ81corg7yBwx5SaNGl5..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/facebook/1097374499488415",
+      "sourceUrl": "https://www.facebook.com/reel/1097374499488415",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:44.647Z",
+      "lastFetchedAt": "2026-09-24T19:09:44.647Z",
+      "validatedAt": "2026-09-24T19:09:44.647Z",
+      "nextCheckAt": "2026-10-01T19:09:44.647Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

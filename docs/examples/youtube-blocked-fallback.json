@@ -1,0 +1,65 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.youtube.com/watch?v=Cwkej79U3ek"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "youtube",
+    "mediaType": "video",
+    "mediaId": "Cwkej79U3ek",
+    "canonicalUrl": "https://www.youtube.com/watch?v=Cwkej79U3ek",
+    "title": "Vanessa Carlton - A Thousand Miles",
+    "thumbnail": "https://i.ytimg.com/vi/Cwkej79U3ek/hqdefault.jpg",
+    "author": {
+      "name": "VanessaCarltonVEVO"
+    },
+    "formats": [
+      {
+        "formatId": "btch-mp4",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "best available",
+        "url": "https://c.ymcdn.org/api/v2/download/c5f30166974e83561468bf089a29c4eb/Cwkej79U3ek?_=QohKIyk7RleG2...",
+        "compatible": true
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "btch-m4a",
+        "ext": "m4a",
+        "isConverted": false,
+        "quality": "aac",
+        "url": "https://c.ymcdn.org/api/v2/download/c5f30166974e83561468bf089a29c4eb/Cwkej79U3ek?_=rXKspGtVZqJ5s..."
+      }
+    ],
+    "metadata": {},
+    "extractor": "btch-downloader",
+    "fallbackUsed": "btch-downloader",
+    "stored": {
+      "path": "/youtube/Cwkej79U3ek",
+      "sourceUrl": "https://www.youtube.com/watch?v=Cwkej79U3ek",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:08.284Z",
+      "lastFetchedAt": "2026-09-24T19:09:08.284Z",
+      "validatedAt": "2026-09-24T19:09:08.284Z",
+      "nextCheckAt": "2026-10-01T19:09:08.283Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

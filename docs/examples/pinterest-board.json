@@ -1,0 +1,69 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.pinterest.com/pinterest/official-news/",
+      "rangeStart": 1,
+      "rangeEnd": 20
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "pinterest",
+    "mediaType": "carousel",
+    "mediaId": "424605139806979476",
+    "canonicalUrl": "https://www.pinterest.com/pinterest/official-news",
+    "title": "Official news",
+    "thumbnail": "https://i.pinimg.com/upload/424605139806979476_board_thumbnail_2023-09-07-16-01-40_997_60.jpg",
+    "isCarousel": true,
+    "itemCount": 51,
+    "items": [
+      {
+        "id": "424605071112831904",
+        "type": "image",
+        "thumbnail": "https://i.pinimg.com/originals/32/68/65/3268658fe7973644e6e6e5be15266517.jpg",
+        "source": "https://i.pinimg.com/originals/32/68/65/3268658fe7973644e6e6e5be15266517.jpg"
+      },
+      {
+        "id": "424605071093691246",
+        "type": "image",
+        "thumbnail": "https://i.pinimg.com/originals/ae/cb/6f/aecb6f2fa70649bc9625e061b1f53ed2.jpg",
+        "source": "https://i.pinimg.com/originals/ae/cb/6f/aecb6f2fa70649bc9625e061b1f53ed2.jpg"
+      }
+    ],
+    "formats": [],
+    "audioFormats": [],
+    "metadata": {
+      "truncated": true,
+      "maxItemsPerRequest": 200,
+      "totalPinCount": 51,
+      "rangeStart": 1,
+      "rangeEnd": 51
+    },
+    "extractor": "pinterest-board-api",
+    "fallbackUsed": "pinterest-board-api",
+    "stored": {
+      "path": "/pinterest/424605139806979476",
+      "sourceUrl": "https://www.pinterest.com/pinterest/official-news/",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:11:04.171Z",
+      "lastFetchedAt": "2026-09-24T19:11:04.171Z",
+      "validatedAt": "2026-09-24T19:11:04.171Z",
+      "nextCheckAt": "2026-10-01T19:11:04.171Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

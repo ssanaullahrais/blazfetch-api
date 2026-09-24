@@ -1,0 +1,65 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://soundcloud.com/nasa/houston-we-have-a-podcast-4"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "soundcloud",
+    "mediaType": "video",
+    "mediaId": "2403099432",
+    "canonicalUrl": "https://soundcloud.com/nasa/houston-we-have-a-podcast-4",
+    "title": "Houston We Have a Podcast: Cosmic Perspectives",
+    "description": "On episode 437, NASA astronaut Chris Williams and astrophysicist Neil deGrasse Tyson explore human spaceflight, astrophysics, and the won...",
+    "author": {
+      "name": "NASA",
+      "url": "https://soundcloud.com/nasa"
+    },
+    "thumbnail": "https://i1.sndcdn.com/artworks-LTfuEDzJrFK1p4Qo-PEsQhA-original.jpg",
+    "durationSeconds": 3211.642,
+    "uploadDate": "20260918",
+    "formats": [],
+    "audioFormats": [
+      {
+        "formatId": "hls_mp3_1_0",
+        "ext": "mp3",
+        "bitrate": 128,
+        "codec": "mp3",
+        "quality": null,
+        "filesizeBytes": 51386272,
+        "filesizeApprox": true,
+        "isConverted": false,
+        "url": "https://cf-hls-media.sndcdn.com/playlist/RYIhjySuLlIK.128.mp3/playlist.m3u8?Policy=eyJTdGF0ZW1lb..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/soundcloud/2403099432",
+      "sourceUrl": "https://soundcloud.com/nasa/houston-we-have-a-podcast-4",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:34.530Z",
+      "lastFetchedAt": "2026-09-24T19:10:34.530Z",
+      "validatedAt": "2026-09-24T19:10:34.530Z",
+      "nextCheckAt": "2026-10-01T19:10:34.530Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

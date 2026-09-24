@@ -1,0 +1,95 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.tiktok.com/@scout2015/video/6718335390845095173"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "tiktok",
+    "mediaType": "video",
+    "mediaId": "6718335390845095173",
+    "canonicalUrl": "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+    "title": "Scramble up ur name & I’ll try to guess it😍❤️ #foryoupage #petsoftikt...",
+    "description": "Scramble up ur name & I’ll try to guess it😍❤️ #foryoupage #petsoftiktok #aesthetic",
+    "author": {
+      "name": "scout2015",
+      "url": "https://www.tiktok.com/@scout2015"
+    },
+    "thumbnail": "https://p16-common-sign.tiktokcdn.com/tos-maliva-p-0068/8ac0190d8ad54535bf823ed5f3202b6b~tplv-ti...",
+    "durationSeconds": 10,
+    "uploadDate": "20190727",
+    "formats": [
+      {
+        "formatId": "h264_540p_992286-0",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "576x1024",
+        "width": 576,
+        "height": 1024,
+        "bitrate": 992,
+        "codec": "h264",
+        "filesizeBytes": 1307586,
+        "filesizeApprox": false,
+        "url": "https://v16-webapp-prime.tiktok.com/video/tos/alisg/tos-alisg-ve-37c799-sg/b061a7d5c4c74a028371c...",
+        "requiresMerge": false,
+        "compatible": true
+      },
+      {
+        "formatId": "bytevc1_720p_1504834-1",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "720x1280",
+        "width": 720,
+        "height": 1280,
+        "bitrate": 1504,
+        "codec": "h265",
+        "filesizeBytes": 2004627,
+        "filesizeApprox": false,
+        "url": "https://v19-webapp-prime.tiktok.com/video/tos/alisg/tos-alisg-ve-37c799-sg/c9f7a85bfdd7452aaffab...",
+        "requiresMerge": false,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "audio",
+        "ext": "mp3",
+        "bitrate": null,
+        "codec": "mp3",
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://v58.tiktokcdn.com/video/tos/useast2a/tos-useast2a-v-27dcd7/fdec9588d6684e7d97da29739b9d0..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/tiktok/6718335390845095173",
+      "sourceUrl": "https://www.tiktok.com/@scout2015/video/6718335390845095173",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:09:19.639Z",
+      "lastFetchedAt": "2026-09-24T19:09:19.639Z",
+      "validatedAt": "2026-09-24T19:09:19.639Z",
+      "nextCheckAt": "2026-10-01T19:09:19.639Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

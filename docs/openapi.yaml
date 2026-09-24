@@ -1,0 +1,399 @@
+openapi: 3.0.3
+info:
+  title: Blazfetch Backend API
+  version: 0.1.0
+  description: >
+    Resolves media metadata/formats and orchestrates downloads from supported social platforms
+    (YouTube, TikTok, Instagram, X/Twitter, Facebook, Reddit, Vimeo, Dailymotion, Bluesky, Streamable,
+    Rutube, SoundCloud, Snapchat, Twitch, Pinterest, Loom, Newgrounds). Everything fetched is stored
+    (metadata only) with a stable path and re-checked weekly. See docs/API.md for the narrative
+    documentation and a real response for every platform, and docs/examples/ for them as JSON files.
+servers:
+  - url: /api/v1
+paths:
+  /fetch:
+    post:
+      summary: Resolve metadata and video/image formats for a URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchRequest'
+      responses:
+        '200':
+          description: Normalized media metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlazfetchResponse'
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '5XX':
+          $ref: '#/components/responses/Error'
+  /fetch/audio:
+    post:
+      summary: Resolve audio/MP3 options for a URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchRequest'
+      responses:
+        '200':
+          description: Audio format options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioFetchResponse'
+        '4XX':
+          $ref: '#/components/responses/Error'
+  /download:
+    post:
+      summary: Start a download job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadRequest'
+      responses:
+        '202':
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  job: { $ref: '#/components/schemas/Job' }
+  /stream:
+    get:
+      summary: Download in one request (direct stream, prepare, or auto)
+      description: >
+        Plain GET so a browser can start it by navigating to the URL. Failures before the first byte
+        return the normal JSON error envelope; after the first byte the connection is aborted.
+        Video-only formats are merged into fragmented MP4 without transcoding. Disabled when
+        STREAM_MODE_ENABLED=false (the route then returns 404).
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string }
+        - name: formatId
+          in: query
+          schema: { type: string, default: best }
+          description: A formatId from /fetch or /fetch/audio, or "best".
+        - name: kind
+          in: query
+          schema: { type: string, enum: [video, audio], default: video }
+        - name: filename
+          in: query
+          schema: { type: string, maxLength: 200 }
+        - name: token
+          in: query
+          description: >
+            8 to 64 characters chosen by the page. When bytes start flowing the response sets the cookie
+            blazfetch_dl_<token>=1 (60 seconds) so a navigation-started download can detect that it began.
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }
+        - name: mode
+          in: query
+          description: >
+            stream pipes straight through (default, no temp file). prepare builds the file on the server
+            first (H.264/AAC guaranteed) then sends it. auto tries stream and, if that fails before the
+            first byte, prepares in the same request. Default comes from DEFAULT_DOWNLOAD_MODE.
+          schema: { type: string, enum: [stream, prepare, auto] }
+      responses:
+        '200':
+          description: Media bytes (chunked in stream mode unless the exact size is known; Content-Length in prepare mode)
+          headers:
+            X-Blazfetch-Mode:
+              schema: { type: string, enum: [stream, prepare] }
+              description: Which delivery mode actually served the file.
+            Content-Disposition:
+              schema: { type: string }
+              description: attachment; filename="..."
+          content:
+            video/mp4: {}
+            audio/mp4: {}
+            audio/mpeg: {}
+            application/octet-stream: {}
+        '4XX':
+          $ref: '#/components/responses/Error'
+        '5XX':
+          $ref: '#/components/responses/Error'
+  /media/{platform}/{id}:
+    get:
+      summary: Serve stored media by its stable path (also /media/{platform}/{id}/playlist/{listId} and /media/{platform}/playlist/{listId})
+      description: >
+        Answers from the permanent media store; fetches and stores never-seen media when its link can be
+        rebuilt from the id. Stored media is re-checked weekly, and media found gone answers 410 with a tombstone.
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: cacheOnly
+          in: query
+          description: Never contact the source; not stored means 404.
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: The stored response, with a `stored` block (path, freshness, statistics)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlazfetchResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '410':
+          description: Known to have existed but re-checks found it gone (error.details.tombstone)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /downloads/{id}:
+    get:
+      summary: Stream the resolved media for a ready/completed job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Media file stream
+          content:
+            application/octet-stream: {}
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      summary: Cancel a job and clean up its temp files
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job cancelled
+  /jobs/{id}:
+    get:
+      summary: Poll job status/progress
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  job: { $ref: '#/components/schemas/Job' }
+    delete:
+      summary: Cancel a job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Job cancelled
+  /platforms:
+    get:
+      summary: List supported platforms and domains
+      responses:
+        '200':
+          description: Platform list
+components:
+  parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Error:
+      description: Normalized error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    FetchRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        forceRefresh: { type: boolean, description: Skip the stored copy and extract again now. }
+        rangeStart: { type: integer, minimum: 1, description: Collection URLs (Pinterest boards) only. }
+        rangeEnd: { type: integer, minimum: 1, description: Collection URLs (Pinterest boards) only. }
+    DownloadRequest:
+      type: object
+      required: [url, formatId, kind]
+      properties:
+        url: { type: string }
+        formatId: { type: string, default: best, description: A formatId from /fetch, or "best". }
+        kind: { type: string, enum: [video, audio] }
+        quality: { type: string }
+    BlazfetchFormat:
+      type: object
+      properties:
+        formatId: { type: string }
+        ext: { type: string }
+        kind: { type: string, enum: [video, audio, video_only, audio_only] }
+        quality: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        fps: { type: number }
+        bitrate: { type: number }
+        codec: { type: string }
+        filesizeBytes: { type: integer }
+        filesizeApprox: { type: boolean }
+        url: { type: string }
+        requiresMerge: { type: boolean }
+        compatible: { type: boolean }
+    BlazfetchResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        platform:
+          type: string
+          enum: [youtube, tiktok, instagram, twitter, facebook, vimeo, reddit, soundcloud, pinterest, snapchat, dailymotion, bluesky, loom, newgrounds, rutube, streamable, twitch, tumblr]
+        mediaType: { type: string, enum: [video, audio, image, carousel, playlist] }
+        mediaId: { type: string, description: The platform's own id; also the last part of stored.path. }
+        canonicalUrl: { type: string }
+        title: { type: string }
+        description: { type: string }
+        author:
+          type: object
+          properties:
+            name: { type: string }
+            url: { type: string }
+        thumbnail: { type: string }
+        durationSeconds: { type: number, nullable: true }
+        uploadDate: { type: string, description: 'YYYYMMDD' }
+        formats:
+          type: array
+          items: { $ref: '#/components/schemas/BlazfetchFormat' }
+        audioFormats:
+          type: array
+          items: { $ref: '#/components/schemas/BlazfetchAudioFormat' }
+        items:
+          type: array
+          description: For carousels and Pinterest boards, one entry per photo or video.
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              type: { type: string, enum: [image, video] }
+              thumbnail: { type: string }
+              source: { type: string }
+              durationSeconds: { type: number }
+              formats:
+                type: array
+                items: { $ref: '#/components/schemas/BlazfetchFormat' }
+        playlist:
+          type: object
+          description: For playlists.
+          properties:
+            title: { type: string }
+            channel: { type: string }
+            itemCount: { type: integer }
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  videoId: { type: string }
+                  title: { type: string }
+                  thumbnail: { type: string }
+                  durationSeconds: { type: number }
+                  url: { type: string }
+        isPlaylist: { type: boolean }
+        isCarousel: { type: boolean }
+        itemCount: { type: integer }
+        metadata:
+          type: object
+        extractor: { type: string, description: yt-dlp, or the name of a fallback provider. }
+        fallbackUsed: { type: string, description: Set when a fallback provider produced the answer. }
+        stored: { $ref: '#/components/schemas/StoredInfo' }
+    BlazfetchAudioFormat:
+      type: object
+      properties:
+        formatId: { type: string }
+        ext: { type: string }
+        bitrate: { type: number, nullable: true }
+        codec: { type: string }
+        quality: { type: string, nullable: true }
+        filesizeBytes: { type: integer }
+        filesizeApprox: { type: boolean }
+        isConverted: { type: boolean, description: True when the audio must be produced with ffmpeg. }
+        url: { type: string }
+    StoredInfo:
+      type: object
+      description: What we know about a stored item, added to fetch and media responses.
+      properties:
+        path: { type: string, example: /youtube/Cwkej79U3ek }
+        playlistPath: { type: string, example: /youtube/Cwkej79U3ek/playlist/RDCwkej79U3ek }
+        sourceUrl: { type: string }
+        status: { type: string, enum: [available, unavailable] }
+        cached: { type: boolean, description: True when answered from the database without extracting. }
+        urlsStale: { type: boolean, description: The direct media URLs are past their trust window and refresh in the background. }
+        validationFailed: { type: boolean, description: A live check failed without proving the media gone, so the last answer is served. }
+        firstFetchedAt: { type: string, format: date-time }
+        lastFetchedAt: { type: string, format: date-time }
+        validatedAt: { type: string, format: date-time, nullable: true }
+        nextCheckAt: { type: string, format: date-time, nullable: true }
+        stats:
+          type: object
+          properties:
+            fetchCount: { type: integer }
+            hitCount: { type: integer }
+            viewCount: { type: integer }
+            downloadCount: { type: integer }
+            streamCount: { type: integer }
+            prepareCount: { type: integer }
+            bytesServed: { type: integer }
+            lastAccessedAt: { type: string, format: date-time, nullable: true }
+            lastDownloadedAt: { type: string, format: date-time, nullable: true }
+    AudioFetchResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        platform: { type: string }
+        mediaId: { type: string }
+        canonicalUrl: { type: string }
+        audioFormats:
+          type: array
+          items:
+            type: object
+        requiresConversion: { type: boolean }
+    Job:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, preparing, ready, streaming, completed, failed, cancelled, expired] }
+        platform: { type: string }
+        canonicalUrl: { type: string }
+        progress: { type: integer }
+        downloadedBytes: { type: integer }
+        totalBytes: { type: integer, nullable: true }
+        filename: { type: string, nullable: true }
+        mimeType: { type: string, nullable: true }
+        errorCode: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [UNSUPPORTED_PLATFORM, INVALID_URL, MEDIA_NOT_FOUND, MEDIA_UNAVAILABLE, PRIVATE_MEDIA, LOGIN_REQUIRED, AGE_RESTRICTED, GEO_RESTRICTED, EXTRACTOR_FAILED, PLATFORM_RATE_LIMITED, DOWNLOAD_FAILED, FORMAT_UNAVAILABLE, PROCESS_TIMEOUT, FILE_TOO_LARGE, SERVER_BUSY, VALIDATION_ERROR, JOB_NOT_FOUND, NOT_FOUND, INTERNAL_ERROR]
+            message: { type: string }
+            details:
+              type: object
+              description: Only for MEDIA_UNAVAILABLE. details.tombstone says what the media was (title, thumbnail, reason, unavailableSince, lastSeenAvailable, path, sourceUrl).
+        requestId: { type: string }

@@ -1,0 +1,90 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "loom",
+    "mediaType": "video",
+    "mediaId": "9245fa69349d4dfa8a8ade8b728ce1f6",
+    "canonicalUrl": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6",
+    "title": "How to Upload a Downloadable Product on AFOMA Marketplace",
+    "description": "In this video, I walk you through the process of uploading a Downloadable product on our AFOMA Marketplace. Downloadable products are dig...",
+    "author": {
+      "name": "AFOMA Marketplace"
+    },
+    "durationSeconds": 386,
+    "uploadDate": "20250316",
+    "formats": [
+      {
+        "formatId": "hls-raw-1500",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "1260x720",
+        "width": 1260,
+        "height": 720,
+        "fps": null,
+        "bitrate": 1500,
+        "filesizeApprox": false,
+        "url": "https://luna.loom.com/id/9245fa69349d4dfa8a8ade8b728ce1f6/rev/83c6758ef75a3f8c57d8e1a5ce037c0fa5...",
+        "requiresMerge": true,
+        "compatible": false
+      },
+      {
+        "formatId": "hls-raw-3200",
+        "ext": "mp4",
+        "kind": "video_only",
+        "quality": "1890x1080",
+        "width": 1890,
+        "height": 1080,
+        "fps": null,
+        "bitrate": 3200,
+        "filesizeApprox": false,
+        "url": "https://luna.loom.com/id/9245fa69349d4dfa8a8ade8b728ce1f6/rev/83c6758ef75a3f8c57d8e1a5ce037c0fa5...",
+        "requiresMerge": true,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [
+      {
+        "formatId": "hls-raw-audio-audio",
+        "ext": "mp4",
+        "bitrate": null,
+        "quality": "audio",
+        "filesizeApprox": false,
+        "isConverted": false,
+        "url": "https://luna.loom.com/id/9245fa69349d4dfa8a8ade8b728ce1f6/rev/83c6758ef75a3f8c57d8e1a5ce037c0fa5..."
+      }
+    ],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/loom/9245fa69349d4dfa8a8ade8b728ce1f6",
+      "sourceUrl": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:11:10.798Z",
+      "lastFetchedAt": "2026-09-24T19:11:10.798Z",
+      "validatedAt": "2026-09-24T19:11:10.798Z",
+      "nextCheckAt": "2026-10-01T19:11:10.798Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

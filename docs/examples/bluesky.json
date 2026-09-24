@@ -1,0 +1,83 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://bsky.app/profile/bsky.app/post/3l3vgf77uco2g"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "bluesky",
+    "mediaType": "video",
+    "mediaId": "3l3vgf77uco2g",
+    "canonicalUrl": "https://bsky.app/profile/bsky.app/post/3l3vgf77uco2g",
+    "title": "Bluesky now has video! Update your app to version 1.91 or refresh on ...",
+    "description": "Bluesky now has video! Update your app to version 1.91 or refresh on desktop!\n\nWe’ve begun gradually rolling out the ability to post vide...",
+    "author": {
+      "name": "Bluesky",
+      "url": "https://bsky.app/profile/bsky.app"
+    },
+    "thumbnail": "https://video.bsky.app/watch/did%3Aplc%3Az72i7hdynmk6r22z27h6tvur/bafkreih7qpo7ef7hhtm7ehi7paiml...",
+    "durationSeconds": null,
+    "uploadDate": "20240911",
+    "formats": [
+      {
+        "formatId": "hls-655",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "640x360",
+        "width": 640,
+        "height": 360,
+        "fps": null,
+        "bitrate": 655.6,
+        "codec": "avc1.64001e",
+        "filesizeApprox": false,
+        "url": "https://video.bsky.app/watch/did%3Aplc%3Az72i7hdynmk6r22z27h6tvur/bafkreih7qpo7ef7hhtm7ehi7paiml...",
+        "requiresMerge": false,
+        "compatible": true
+      },
+      {
+        "formatId": "blob",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "1920x1080",
+        "width": 1920,
+        "height": 1080,
+        "bitrate": null,
+        "filesizeBytes": 6688967,
+        "filesizeApprox": false,
+        "url": "https://puffball.us-east.host.bsky.network/xrpc/com.atproto.sync.getBlob?did=did%3Aplc%3Az72i7hd...",
+        "requiresMerge": false,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/bluesky/3l3vgf77uco2g",
+      "sourceUrl": "https://bsky.app/profile/bsky.app/post/3l3vgf77uco2g",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:13.791Z",
+      "lastFetchedAt": "2026-09-24T19:10:13.791Z",
+      "validatedAt": "2026-09-24T19:10:13.791Z",
+      "nextCheckAt": "2026-10-01T19:10:13.791Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

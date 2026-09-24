@@ -1,0 +1,65 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ"
+    }
+  },
+  "response": {
+    "success": true,
+    "platform": "snapchat",
+    "mediaType": "video",
+    "mediaId": "W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ-1",
+    "canonicalUrl": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPw...",
+    "title": "3.1 ہزار لائیکس، 1.0 ہزار تبصرے، اور 3.0 ہزار شیئرز | introducing reals  | Team Snapchat | 1 اپریل، 2026 کو پوسٹ کردہ | Spotlight (1)",
+    "description": "A man in a black t-shirt speaks directly to the camera in front of a wooden bookshelf, announcing a significant change for Snapchat. He e...",
+    "author": {},
+    "thumbnail": "https://cf-st.sc-cdn.net/d/rNe7IEIM72elKXhSclqCu.256.IRZXSOY?mo=GkYaCTIBBEgCUC5gAVCgAVoQRGZMYXJn...",
+    "durationSeconds": null,
+    "formats": [
+      {
+        "formatId": "0",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": null,
+        "width": null,
+        "height": null,
+        "bitrate": null,
+        "codec": null,
+        "filesizeBytes": null,
+        "filesizeApprox": false,
+        "url": "https://cf-st.sc-cdn.net/d/rNe7IEIM72elKXhSclqCu.27.IRZXSOY?mo=GmAaCTIBBEgCUC5gAVCiAVoQU3BvdGxpZ...",
+        "requiresMerge": false,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "stored": {
+      "path": "/snapchat/W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ-1",
+      "sourceUrl": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPw...",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-24T19:10:45.954Z",
+      "lastFetchedAt": "2026-09-24T19:10:45.954Z",
+      "validatedAt": "2026-09-24T19:10:45.954Z",
+      "nextCheckAt": "2026-10-01T19:10:45.954Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

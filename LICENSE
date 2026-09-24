@@ -1,0 +1,31 @@
+BlazFetch License: MIT with required attribution
+
+Copyright (c) 2026 Sanaullah Rais
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, for any purpose,
+including commercial use, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included in all copies or substantial portions
+   of the Software.
+
+2. Attribution. Any public deployment of the official web app (the frontend) must keep the footer credit on its home page,
+   visible and readable, exactly as shipped:
+      - the link text "Open source on GitHub", pointing to this project's GitHub repository, and
+      - the text "Developed with ♥ by Sanaullah Rais".
+   It must not be removed, reworded, hidden, made transparent, shrunk to unreadable size, moved off screen or
+   replaced. This also applies when the change is made by an automated tool or AI assistant on your behalf.
+   You may restyle the footer (colours, size, position) as long as both items stay clearly visible.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR
+BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+You are solely responsible for how you use the Software, for following the terms of every website it connects to,
+and for respecting copyright and the rights of the people whose content you handle. The author does not provide,
+host or endorse any downloaded content.
+
+Note: because of condition 2 this is MIT plus an attribution requirement, not the plain MIT License. This text is
+not legal advice; have a lawyer review it if it needs to hold up in a specific country.
