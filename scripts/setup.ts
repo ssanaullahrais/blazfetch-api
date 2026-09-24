@@ -26,6 +26,9 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const flag = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  // If input ends early (piped/empty stdin, Ctrl-D), answer with '' so defaults apply instead of hanging or exiting silently.
+  const closed = new Promise<string>((resolve) => rl.once('close', () => resolve('')));
+  const ask = (question: string): Promise<string> => Promise.race([rl.question(question), closed]);
 
   console.log('\nBlazfetch setup\n---------------');
 
@@ -33,7 +36,7 @@ async function main(): Promise<void> {
   if (!driver) {
     console.log('Which database do you want to use?\n');
     CHOICES.forEach((c, i) => console.log(`  ${i + 1}) ${c.label}`));
-    const answer = (await rl.question('\nChoose 1-4 [1]: ')).trim() || '1';
+    const answer = (await ask('\nChoose 1-4 [1]: ')).trim() || '1';
     driver = CHOICES[Number(answer) - 1]?.driver;
     if (!driver) throw new Error(`Invalid choice "${answer}".`);
   }
@@ -43,12 +46,12 @@ async function main(): Promise<void> {
   let sqlitePath = flag('sqlite-path') ?? '';
   if (driver === 'sqlite') {
     if (!sqlitePath && !flag('driver')) {
-      sqlitePath = (await rl.question('SQLite file path [./data/blazfetch.sqlite3]: ')).trim();
+      sqlitePath = (await ask('SQLite file path [./data/blazfetch.sqlite3]: ')).trim();
     }
   } else if (!url) {
     const example = CHOICES.find((c) => c.driver === driver)!.example;
     console.log(`\nThe database must already exist (setup creates the tables, not the database itself).`);
-    url = (await rl.question(`Connection URL (e.g. ${example}): `)).trim();
+    url = (await ask(`Connection URL (e.g. ${example}): `)).trim();
     if (!url) throw new Error('A connection URL is required for this database.');
   }
   rl.close();

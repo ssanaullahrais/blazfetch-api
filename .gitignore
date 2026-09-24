@@ -10,3 +10,4 @@ temp/
 coverage/
 *.tsbuildinfo
 examples/
+data/
