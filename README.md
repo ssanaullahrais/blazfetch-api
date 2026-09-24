@@ -33,6 +33,16 @@ actually works, sends it straight through to whoever asked, and deletes any temp
 remember each link's details, such as title and formats, so repeat requests are instant. See
 [Stored media](#stored-media).)
 
+## Demo
+
+<div align="center">
+
+<a href="docs/media/demo.mp4"><img src="docs/media/demo.gif" alt="BlazFetch demo: paste a link, pick a quality, download" width="760" /></a>
+
+<sub>Click the animation to open the full video ([demo.mp4](docs/media/demo.mp4)).</sub>
+
+</div>
+
 ## Highlights
 
 - **One API for 17 confirmed platforms** (plus Tumblr, wired but not yet verified): title, thumbnail and every quality option, then download.
