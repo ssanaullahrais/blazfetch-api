@@ -15,4 +15,8 @@ describe('classifyYtdlpFailure', () => {
   it('does not treat words like "generate" or "average" as special cases', () => {
     expect(classifyYtdlpFailure('ERROR: could not generate average').code).toBe('EXTRACTOR_FAILED');
   });
+
+  it('reports DRM-protected media clearly', () => {
+    expect(classifyYtdlpFailure('ERROR: This format is DRM protected').code).toBe('FORMAT_UNAVAILABLE');
+  });
 });

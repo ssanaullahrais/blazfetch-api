@@ -96,6 +96,9 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   if (lower.includes('private video') || lower.includes('this video is private')) {
     return new BlazfetchError('PRIVATE_MEDIA', 'This media is private.');
   }
+  if (lower.includes('drm protected') || lower.includes('drm-protected')) {
+    return new BlazfetchError('FORMAT_UNAVAILABLE', 'This media is DRM-protected and cannot be downloaded.');
+  }
   if (lower.includes('login required') || lower.includes('sign in')) {
     return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.');
   }

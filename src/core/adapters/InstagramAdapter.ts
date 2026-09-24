@@ -110,10 +110,12 @@ export class InstagramAdapter implements PlatformAdapter {
   }
 
   private normalizeFallbackItems(
-    items: { url: string; type: 'image' | 'video'; thumbnail?: string }[],
+    rawItems: { url: string; type: 'image' | 'video'; thumbnail?: string }[],
     canonicalUrl: string,
     fallbackUsed: string,
   ): BlazfetchResponse {
+    // Fallback providers return junk (empty URLs) for unavailable posts; never report those as media.
+    const items = rawItems.filter((item) => /^https?:\/\//i.test(item.url ?? ''));
     if (items.length === 0) {
       throw new BlazfetchError('MEDIA_NOT_FOUND', 'No media could be extracted for this Instagram URL.');
     }
