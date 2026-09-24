@@ -26,7 +26,8 @@ real video/audio file was downloaded and ffprobe-validated (correct streams, val
 | Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
 | Pinterest | ✅ Confirmed (pins + boards) | Public `PinResource`/`BoardResource` API, no auth needed — see below |
 | Loom | ✅ Confirmed | Video and audio, including HLS streams |
-| Newgrounds, Tumblr | ⚠️ Wired, untested | Newgrounds returned 403 (bot protection) from the test machine |
+| Newgrounds | ✅ Confirmed | Public movies with a video; ones with no video return a clear `MEDIA_NOT_FOUND` |
+| Tumblr | ⚠️ Wired, untested | |
 
 
 Authentication is not yet implemented in this scaffold — every endpoint currently runs as a

@@ -50,11 +50,11 @@ app behaves identically on each.
 | Database | Status | Best for | Do this first | Connection URL |
 |---|---|---|---|---|
 | **SQLite** (default) | ✅ Confirmed | one server, zero setup | nothing | none needed |
-| **PostgreSQL** | ⚠️ Wired, untested | production, if you already run it | install + create DB (below) | `postgres://blazfetch:change-me@localhost:5432/blazfetch` |
-| **MySQL / MariaDB** | ⚠️ Wired, untested | if you already run it | install + create DB (below) | `mysql://blazfetch:change-me@localhost:3306/blazfetch` |
-| **MongoDB** | ⚠️ Storage layer tested | if you already run it | install (below) | `mongodb://localhost:27017/blazfetch` |
+| **PostgreSQL** | ✅ Confirmed | production, if you already run it | install + create DB (below) | `postgres://blazfetch:change-me@localhost:5432/blazfetch` |
+| **MySQL / MariaDB** | ✅ Confirmed | if you already run it | install + create DB (below) | `mysql://blazfetch:change-me@localhost:3306/blazfetch` |
+| **MongoDB** | ✅ Confirmed | if you already run it | install (below) | `mongodb://localhost:27017/blazfetch` |
 
-Confirmed = tested end to end from a fresh clone. For a production VPS, SQLite is the verified choice today.
+Confirmed = tested end to end from a fresh clone (setup, server start, fetch, download, and data written to the database). All four work on a production VPS.
 
 Skip the rest of this step if you choose SQLite. Otherwise follow only your database's section:
 
@@ -63,7 +63,7 @@ Skip the rest of this step if you choose SQLite. Otherwise follow only your data
 ```bash
 sudo apt-get install -y postgresql postgresql-contrib
 sudo -u postgres psql -c "CREATE ROLE blazfetch WITH LOGIN PASSWORD 'change-me';"
-sudo -u postgres psql -c "CREATE DATABASE blazfetch OWNER blazfetch;"
+sudo -u postgres psql -c "CREATE DATABASE blazfetch OWNER blazfetch ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
 For a managed/remote PostgreSQL that requires SSL, also set `DATABASE_SSL=true` in `.env`.

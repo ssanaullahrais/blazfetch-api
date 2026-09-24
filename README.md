@@ -16,17 +16,18 @@ straight through to whoever asked, and deletes any temporary files afterward.
 | X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com` |
 | Facebook | ✅ Confirmed | Reels |
 | Reddit | ✅ Confirmed | Including separate video+audio DASH streams |
-| Vimeo | ✅ Confirmed | Auto-retries via embed URL when watch page requires login |
+| Vimeo | ✅ Confirmed | Auto-retries via embed URL when watch page requires login. DRM-protected videos return a clear error |
 | Dailymotion | ✅ Confirmed | Some clips have no audio at the source — not a bug |
 | Bluesky | ✅ Confirmed | |
 | Streamable | ✅ Confirmed | |
 | Rutube | ✅ Confirmed | |
-| SoundCloud | ✅ Confirmed (single track) | Profile/browse pages rejected with a clear error |
+| SoundCloud | ✅ Confirmed (single track) | Profile/browse pages rejected with a clear error. DRM-protected (Go+) tracks can't be downloaded |
 | Snapchat | ✅ Confirmed | |
 | Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
 | Pinterest | ✅ Confirmed (pins + boards) | Public API, no auth needed — see below |
 | Loom | ✅ Confirmed | Video and audio, including HLS streams |
-| Newgrounds, Tumblr | ⚠️ Wired, untested | Newgrounds returned 403 (bot protection) from the test machine |
+| Newgrounds | ✅ Confirmed | Public movies with a video; ones with no video return a clear `MEDIA_NOT_FOUND` |
+| Tumblr | ⚠️ Wired, untested | |
 
 
 ## Install
@@ -63,15 +64,15 @@ just press Enter and you're running. Pick another if you already have a server:
 | Database | Status | You need | Connection URL example |
 |---|---|---|---|
 | SQLite (default) | ✅ Confirmed | nothing | none (the file is created automatically) |
-| PostgreSQL 14+ | ⚠️ Wired, untested | an empty database created first | `postgres://user:password@localhost:5432/blazfetch` |
-| MySQL 8+ / MariaDB | ⚠️ Wired, untested | an empty database created first | `mysql://user:password@localhost:3306/blazfetch` |
-| MongoDB 6+ | ⚠️ Storage layer tested | a running server | `mongodb://localhost:27017/blazfetch` |
+| PostgreSQL 14+ | ✅ Confirmed | an empty database created first | `postgres://user:password@localhost:5432/blazfetch` |
+| MySQL 8+ / MariaDB | ✅ Confirmed | an empty database created first | `mysql://user:password@localhost:3306/blazfetch` |
+| MongoDB 6+ | ✅ Confirmed | a running server | `mongodb://localhost:27017/blazfetch` |
 
-Confirmed = tested end to end from a fresh clone (setup, server start, fetch, download). Storage
-layer tested = jobs, cache and stats verified against a real server, full API run pending.
+Confirmed = tested end to end from a fresh clone: setup, server start, fetch, download, and rows
+written to the jobs, cache and stats storage.
 
-Setup creates the tables, not the database itself. For PostgreSQL run `createdb blazfetch` first,
-for MySQL `CREATE DATABASE blazfetch;`. All four store the same data (metadata cache, jobs, stats,
+Setup creates the tables, not the database itself. For PostgreSQL run `createdb -E UTF8 blazfetch` first,
+for MySQL `CREATE DATABASE blazfetch CHARACTER SET utf8mb4;`. All four store the same data (metadata cache, jobs, stats,
 never the downloaded media) and the app behaves identically on each.
 
 Prefer to configure by hand? Copy `.env.example` to `.env`, set `DATABASE_DRIVER` (`sqlite`,
