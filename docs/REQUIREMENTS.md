@@ -54,10 +54,9 @@ app behaves identically on each.
 | **MySQL / MariaDB** | if you already run it | install + create DB (below) | `mysql://blazfetch:change-me@localhost:3306/blazfetch` |
 | **MongoDB** | if you already run it | install (below) | `mongodb://localhost:27017/blazfetch` |
 
-Skip the rest of this step if you choose SQLite.
+Skip the rest of this step if you choose SQLite. Otherwise follow only your database's section:
 
-<details>
-<summary><b>PostgreSQL</b></summary>
+#### PostgreSQL
 
 ```bash
 sudo apt-get install -y postgresql postgresql-contrib
@@ -66,10 +65,8 @@ sudo -u postgres psql -c "CREATE DATABASE blazfetch OWNER blazfetch;"
 ```
 
 For a managed/remote PostgreSQL that requires SSL, also set `DATABASE_SSL=true` in `.env`.
-</details>
 
-<details>
-<summary><b>MySQL / MariaDB</b></summary>
+#### MySQL / MariaDB
 
 ```bash
 sudo apt-get install -y mariadb-server
@@ -78,15 +75,11 @@ sudo mysql -e "CREATE USER 'blazfetch'@'localhost' IDENTIFIED BY 'change-me';"
 sudo mysql -e "GRANT ALL ON blazfetch.* TO 'blazfetch'@'localhost'; FLUSH PRIVILEGES;"
 ```
 
-</details>
-
-<details>
-<summary><b>MongoDB</b></summary>
+#### MongoDB
 
 MongoDB is not in Ubuntu's default repositories. Install it by following the
 [official guide](https://www.mongodb.com/docs/manual/administration/install-on-linux/). The database
 and collections are created automatically on first use, so there is nothing else to create.
-</details>
 
 Replace `change-me` with a real password. Special characters in a password must be URL-encoded
 inside the connection URL.
