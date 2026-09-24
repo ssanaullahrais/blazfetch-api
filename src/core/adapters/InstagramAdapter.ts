@@ -17,9 +17,9 @@ interface YtdlpPlaylistInfo extends YtdlpRawInfo {
   entries?: YtdlpRawInfo[];
 }
 
-function guessExtFromUrl(url: string): string {
-  const match = url.match(/\.(jpg|jpeg|png|webp|mp4|mov)(?:\?|$)/i);
-  return match ? match[1].toLowerCase() : 'jpg';
+/** Providers hand out extensionless tokenised links (e.g. rapidcdn `/v2?token=`) for videos, so only a real image extension means an image. */
+function looksLikeImage(url: string): boolean {
+  return /\.(jpg|jpeg|png|webp)(?:\?|$)/i.test(url);
 }
 
 /** Resolves the operator-supplied cookies file, only if configured and actually present on disk. */
@@ -64,7 +64,7 @@ export class InstagramAdapter implements PlatformAdapter {
     try {
       const items = await fetchInstagramViaBtchDownloader(targetUrl);
       return this.normalizeFallbackItems(
-        items.map((i) => ({ url: i.url, type: guessExtFromUrl(i.url) === 'mp4' ? 'video' as const : 'image' as const, thumbnail: i.thumbnail })),
+        items.map((i) => ({ url: i.url, type: looksLikeImage(i.url) ? 'image' as const : 'video' as const, thumbnail: i.thumbnail })),
         targetUrl,
         'btch-downloader',
       );
