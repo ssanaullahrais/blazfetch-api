@@ -114,7 +114,15 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
 
   if (format.kind === 'video') {
     const chosen = media.formats.find((f) => f.formatId === format.formatId);
-    if (!chosen) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'The requested format is not available for this media.');
+    if (!chosen) {
+      // A video inside a carousel/board has its own direct link: pass that through (mixed photo+video posts).
+      const fromItem = media.items?.flatMap((i) => i.formats ?? []).find((f) => f.formatId === format.formatId);
+      if (fromItem?.url) {
+        if (!isPhoneSafeVideo(fromItem)) throw notPhoneSafe();
+        return { type: 'proxy', url: fromItem.url, contentType: contentTypeFor(fromItem.ext, 'video'), ext: fromItem.ext };
+      }
+      throw new BlazfetchError('FORMAT_UNAVAILABLE', 'The requested format is not available for this media.');
+    }
 
     if (!isYtdlp) {
       if (!chosen.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });

@@ -70,6 +70,20 @@ describe('planStream', () => {
   });
 });
 
+describe('planStream: carousel items', () => {
+  it('streams a video that lives inside a mixed photo + video carousel from its own link', () => {
+    const carousel = media({
+      extractor: 'fallback',
+      formats: [],
+      items: [
+        { id: '0', type: 'image', source: 'https://cdn.example/a.jpg' },
+        { id: '1', type: 'video', formats: [{ formatId: 'btch-downloader-1', ext: 'mp4', kind: 'video', url: 'https://cdn.example/v.mp4' }] },
+      ],
+    } as never);
+    expect(planStream(carousel, { formatId: 'btch-downloader-1', kind: 'video' })).toMatchObject({ type: 'proxy', url: 'https://cdn.example/v.mp4', ext: 'mp4' });
+  });
+});
+
 describe('planStream fast path', () => {
   const withUrls = media({
     formats: [
