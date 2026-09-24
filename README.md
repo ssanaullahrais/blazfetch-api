@@ -12,7 +12,7 @@ Paste a link, get every quality option, download it. Nothing is stored except th
 ![Platforms](https://img.shields.io/badge/platforms-17%20confirmed-2EA44F)
 ![Tests](https://img.shields.io/badge/tests-137%20passing-2EA44F)
 
-[Frontend repository](https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend) ·
+[Frontend repository](https://github.com/ssanaullahrais/blazfetch-web) ·
 [API reference](docs/API.md) ·
 [VPS deployment](docs/REQUIREMENTS.md) ·
 [OpenAPI](docs/openapi.yaml)
@@ -23,7 +23,7 @@ Paste a link, get every quality option, download it. Nothing is stored except th
 
 > [!TIP]
 > **Want the web app?** The ready-made frontend for this API is
-> **[ssanaullahrais/blazfetch-social-downloader-frontend](https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend)**:
+> **[ssanaullahrais/blazfetch-web](https://github.com/ssanaullahrais/blazfetch-web)**:
 > start this backend, then run the frontend on top of it.
 
 It takes a link from YouTube, TikTok, Instagram, X/Twitter, Facebook, Reddit, Vimeo, Dailymotion, Bluesky,
@@ -171,7 +171,7 @@ GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpe
 
 ### Building a frontend
 
-The official one already exists: [blazfetch-social-downloader-frontend](https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend). To build your own:
+The official one already exists: [blazfetch-web](https://github.com/ssanaullahrais/blazfetch-web). To build your own:
 
 - Send `credentials: 'include'` on every request: the server identifies visitors with a guest cookie
   (rate limits and concurrency use it).
@@ -251,5 +251,5 @@ npm run typecheck
 ---
 
 <div align="center">
-Frontend: <a href="https://github.com/ssanaullahrais/blazfetch-social-downloader-frontend">blazfetch-social-downloader-frontend</a>
+Frontend: <a href="https://github.com/ssanaullahrais/blazfetch-web">blazfetch-web</a>
 </div>

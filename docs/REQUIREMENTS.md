@@ -89,7 +89,7 @@ inside the connection URL.
 ### 3. Get the code
 
 ```bash
-git clone https://github.com/ssanaullahrais/blazfetch-social-downloader.git blazfetch-backend
+git clone https://github.com/ssanaullahrais/blazfetch-api.git blazfetch-backend
 cd blazfetch-backend
 npm ci
 ```
