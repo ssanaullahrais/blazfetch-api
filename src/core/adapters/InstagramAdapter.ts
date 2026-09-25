@@ -158,10 +158,17 @@ export class InstagramAdapter implements PlatformAdapter {
     }
 
     const isCarousel = items.length > 1;
+    // Providers answering for a whole profile put the SAME picture on every entry. Showing it on each row is misleading,
+    // so when every entry shares one thumbnail an image uses itself and a video shows none (the page keeps the cover).
+    const sharedThumbnail = items.length > 1 && items.every((item) => item.thumbnail && item.thumbnail === items[0].thumbnail);
+    const thumbnailFor = (item: { url: string; type: 'image' | 'video'; thumbnail?: string }): string | undefined => {
+      if (!sharedThumbnail) return item.thumbnail;
+      return item.type === 'image' ? item.url : undefined;
+    };
     const blazfetchItems: BlazfetchItem[] = items.map((item, idx) => ({
       id: String(idx),
       type: item.type,
-      thumbnail: item.thumbnail,
+      thumbnail: thumbnailFor(item),
       source: item.url,
       formats:
         item.type === 'video'
