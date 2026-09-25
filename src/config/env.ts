@@ -40,6 +40,15 @@ const envSchema = z.object({
   PROXY_STREAM_TIMEOUT_MS: z.coerce.number().default(600000),
 
   MAX_CONCURRENT_DOWNLOADS_GLOBAL: z.coerce.number().default(10),
+  // H.264 conversions (ffmpeg) are what can exhaust a small server's CPU and memory: at most this many run at once,
+  // the rest wait their turn. 0 = half the CPU cores (at least 1).
+  MAX_CONCURRENT_CONVERSIONS: z.coerce.number().int().min(0).default(0),
+  // CPU threads per conversion. 0 = the cores divided between the conversions allowed at once.
+  FFMPEG_THREADS: z.coerce.number().int().min(0).default(0),
+  // yt-dlp/ffmpeg run at this lower priority (nice, 0-19) so the API keeps answering while they work. 0 = off.
+  MEDIA_PROCESS_NICE: z.coerce.number().int().min(0).max(19).default(10),
+  // A download that has to be prepared on disk is refused while TEMP_DIR has less free space than this.
+  MIN_FREE_DISK_MB: z.coerce.number().int().min(0).default(1024),
   MAX_CONCURRENT_DOWNLOADS_PER_USER: z.coerce.number().default(2),
   MAX_CONCURRENT_DOWNLOADS_PER_GUEST: z.coerce.number().default(1),
   // Guests sharing one IP address (one /64 for IPv6), e.g. an office or a mobile carrier, share this many downloads.

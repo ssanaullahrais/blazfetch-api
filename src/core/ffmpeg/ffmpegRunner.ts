@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { lowerPriority } from '../processPriority';
 import { env } from '../../config/env';
 import { BlazfetchError } from '../../constants/errors';
 import { logger } from '../../lib/logger';
@@ -23,8 +24,12 @@ export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
   const { args, timeoutMs = env.FFMPEG_TIMEOUT_MS, signal, progress } = options;
   const fullArgs = progress ? ['-progress', 'pipe:1', '-nostats', ...args] : args;
 
+  // Cancelled while it waited for a conversion slot: never start the process.
+  if (signal?.aborted) return Promise.reject(new BlazfetchError('DOWNLOAD_FAILED', 'Request was cancelled.'));
+
   return new Promise((resolve, reject) => {
     const child = spawn(env.FFMPEG_PATH, fullArgs, { shell: false, windowsHide: true, stdio: ['ignore', progress ? 'pipe' : 'ignore', 'pipe'] });
+    lowerPriority(child);
 
     if (progress && child.stdout) {
       let buffered = '';
@@ -116,11 +121,12 @@ export function mergeVideoAudioArgs(
 }
 
 /** Re-encodes an arbitrary video into a browser-safe H.264/AAC MP4 without re-selecting sources. */
-export function transcodeToCompatibleMp4Args(inputPath: string, outputPath: string, options: { fast?: boolean } = {}): string[] {
+export function transcodeToCompatibleMp4Args(inputPath: string, outputPath: string, options: { fast?: boolean; threads?: number } = {}): string[] {
   return [
     '-y',
     '-fflags', '+genpts',
     '-i', inputPath,
+    ...(options.threads ? ['-threads', String(options.threads)] : []),
     '-c:v', 'libx264',
     // fast: about three times quicker, for a somewhat larger file at the same quality.
     '-preset', options.fast ? 'ultrafast' : 'veryfast',
@@ -134,6 +140,6 @@ export function transcodeToCompatibleMp4Args(inputPath: string, outputPath: stri
   ];
 }
 
-export function extractAudioArgs(inputPath: string, outputPath: string, bitrateKbps = 192): string[] {
-  return ['-y', '-fflags', '+genpts', '-i', inputPath, '-vn', '-b:a', `${bitrateKbps}k`, '-acodec', 'libmp3lame', outputPath];
+export function extractAudioArgs(inputPath: string, outputPath: string, bitrateKbps = 192, threads?: number): string[] {
+  return ['-y', '-fflags', '+genpts', '-i', inputPath, ...(threads ? ['-threads', String(threads)] : []), '-vn', '-b:a', `${bitrateKbps}k`, '-acodec', 'libmp3lame', outputPath];
 }

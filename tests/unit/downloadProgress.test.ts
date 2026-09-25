@@ -76,3 +76,19 @@ describe('parseByteRange', () => {
     expect(parseByteRange('bytes=50-10', 100)).toBe('unsatisfiable');
   });
 });
+
+describe('conversion limits', () => {
+  it('passes the per-conversion thread count to ffmpeg', async () => {
+    const { transcodeToCompatibleMp4Args, extractAudioArgs } = await import('../../src/core/ffmpeg/ffmpegRunner');
+    expect(transcodeToCompatibleMp4Args('in.webm', 'out.mp4', { threads: 2 }).join(' ')).toContain('-threads 2');
+    expect(transcodeToCompatibleMp4Args('in.webm', 'out.mp4').join(' ')).not.toContain('-threads');
+    expect(extractAudioArgs('in.mp4', 'out.mp3', 192, 3).join(' ')).toContain('-threads 3');
+  });
+
+  it('never starts ffmpeg for a job cancelled while it waited for a slot', async () => {
+    const { runFfmpeg } = await import('../../src/core/ffmpeg/ffmpegRunner');
+    const abort = new AbortController();
+    abort.abort();
+    await expect(runFfmpeg({ args: ['-version'], signal: abort.signal })).rejects.toThrow(/cancelled/);
+  });
+});

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { lowerPriority } from '../processPriority';
 import { env } from '../../config/env';
 import { BlazfetchError } from '../../constants/errors';
 
@@ -24,6 +25,7 @@ function runFfprobeJson(filePath: string): Promise<FfprobeOutput> {
   return new Promise((resolve, reject) => {
     const args = ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath];
     const child = spawn(env.FFPROBE_PATH, args, { shell: false, windowsHide: true });
+    lowerPriority(child);
 
     let stdout = '';
     const timer = setTimeout(() => {
