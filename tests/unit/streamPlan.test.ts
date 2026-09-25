@@ -70,6 +70,34 @@ describe('planStream', () => {
   });
 });
 
+describe('planStream in stream mode (Fastest: no phone-safe rule)', () => {
+  const fastest = { phoneSafeOnly: false };
+
+  it('live-merges a video-only format with audio instead of refusing it', () => {
+    expect(planStream(media(), { formatId: '137', kind: 'video' }, fastest)).toMatchObject({ type: 'ffmpeg', mode: 'merge', ext: 'mp4', selector: '137+bestaudio[acodec^=mp4a]/137+bestaudio/best' });
+  });
+
+  it('remuxes HLS to MP4 on the fly', () => {
+    expect(planStream(media(), { formatId: 'hls-720', kind: 'video' }, fastest)).toMatchObject({ type: 'ffmpeg', mode: 'remux', ext: 'mp4' });
+  });
+
+  it('passes WebM / VP9 through as they are, with their own extension', () => {
+    const codecs = media({
+      formats: [
+        { formatId: 'webm', ext: 'webm', kind: 'video', codec: 'vp9' },
+        { formatId: 'vp9', ext: 'mp4', kind: 'video', codec: 'vp09.00.40.08' },
+      ],
+    });
+    expect(planStream(codecs, { formatId: 'webm', kind: 'video' }, fastest)).toMatchObject({ type: 'ytdlp', ext: 'webm', contentType: 'video/webm' });
+    expect(planStream(codecs, { formatId: 'vp9', kind: 'video' }, fastest)).toMatchObject({ type: 'ytdlp', ext: 'mp4' });
+  });
+
+  it('proxies a fallback provider link even when it is not phone-safe', () => {
+    const plan = planStream(media({ extractor: 'btch-downloader', formats: [{ formatId: 'x', ext: 'webm', kind: 'video', url: 'https://cdn.example/a.webm' }] }), { formatId: 'x', kind: 'video' }, fastest);
+    expect(plan).toMatchObject({ type: 'proxy', url: 'https://cdn.example/a.webm', ext: 'webm' });
+  });
+});
+
 describe('planStream: carousel items', () => {
   it('streams a video that lives inside a mixed photo + video carousel from its own link', () => {
     const carousel = media({

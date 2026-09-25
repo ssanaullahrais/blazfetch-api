@@ -20,10 +20,12 @@ export const downloadBodySchema = z.object({
   formatId: z.string().min(1).optional().default('best'),
   kind: z.enum(['video', 'audio']),
   quality: z.string().optional(),
+  // File name without extension for the finished file; the title is used when omitted.
+  filename: z.string().max(200).optional(),
 });
 
 export async function postDownload(req: Request, res: Response): Promise<void> {
-  const { url, formatId, kind, quality } = req.body as z.infer<typeof downloadBodySchema>;
+  const { url, formatId, kind, quality, filename } = req.body as z.infer<typeof downloadBodySchema>;
 
   const job = await startDownloadJob({
     url,
@@ -35,7 +37,7 @@ export async function postDownload(req: Request, res: Response): Promise<void> {
 
   // The HTTP response returns immediately with the job handle; the actual resolve/download
   // work continues in the background so the client can poll or stream once it's ready.
-  runDownloadJob(job, req.requestId, { networkKey: networkKey(req) }).catch((err) => {
+  runDownloadJob(job, req.requestId, { networkKey: networkKey(req), filename }).catch((err) => {
     logger.warn({ jobId: job.id, err: (err as Error).message }, 'download job failed');
   });
 
@@ -53,9 +55,9 @@ export async function getDownloadStream(req: Request, res: Response): Promise<vo
       throw new BlazfetchError('JOB_NOT_FOUND', 'This download has expired. Start a new one with POST /api/v1/download.');
     }
     const countBytes = trackDelivery(job, res);
-    const finished = await streamLocalFile(job.tempPath, job.filename ?? 'download', job.mimeType ?? 'application/octet-stream', res, countBytes);
-    // Only delete once the whole file reached the client; if the client dropped mid-transfer the
-    // file stays so a retry still works, and the periodic sweep removes it later.
+    const finished = await streamLocalFile(job.tempPath, job.filename ?? 'download', job.mimeType ?? 'application/octet-stream', req.headers.range, res, countBytes);
+    // Only delete once the end of the file reached the client; if the client dropped mid-transfer the
+    // file stays so a retry (or a resume with Range) still works, and the periodic sweep removes it later.
     if (finished) await cleanupJobTempDir(job.id);
     return;
   }
@@ -84,6 +86,8 @@ function trackDelivery(job: JobRecord, res: Response): (size: number) => void {
   const record = (finished: boolean): void => {
     if (recorded) return;
     recorded = true;
+    // A ranged request for an earlier part of the file (a probe, or one piece of a resume) is not a delivery.
+    if (res.locals.partialBeforeEnd) return;
     const expected = Number(res.getHeader('Content-Length')) || undefined;
     const success = finished && res.statusCode < 400 && bytes > 0 && (expected === undefined || bytes === expected);
     void recordDownloadStat({
@@ -99,12 +103,61 @@ function trackDelivery(job: JobRecord, res: Response): (size: number) => void {
   return (size) => { bytes += size; };
 }
 
-async function streamLocalFile(filePath: string, filename: string, mimeType: string, res: Response, countBytes: (size: number) => void): Promise<boolean> {
+/**
+ * One `bytes=` range from a Range header, or null to send the whole file. Multiple ranges are not supported and get
+ * the whole file, which the HTTP spec allows. Returns 'unsatisfiable' when the range lies outside the file.
+ */
+export function parseByteRange(header: string | undefined, size: number): { start: number; end: number } | 'unsatisfiable' | null {
+  const match = header?.trim().match(/^bytes=(\d*)-(\d*)$/);
+  if (!match || (!match[1] && !match[2])) return null;
+  let start: number;
+  let end: number;
+  if (!match[1]) {
+    // "bytes=-500": the last 500 bytes.
+    start = Math.max(0, size - Number(match[2]));
+    end = size - 1;
+  } else {
+    start = Number(match[1]);
+    end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+  }
+  if (start >= size || start > end) return 'unsatisfiable';
+  return { start, end };
+}
+
+/**
+ * Sends the prepared file. Range requests are honoured, so a download that dropped halfway (common on phones) can be
+ * resumed instead of failing for good. Resolves true once the end of the file has been delivered.
+ */
+async function streamLocalFile(
+  filePath: string,
+  filename: string,
+  mimeType: string,
+  rangeHeader: string | undefined,
+  res: Response,
+  countBytes: (size: number) => void,
+): Promise<boolean> {
   const stat = await fs.promises.stat(filePath);
   res.setHeader('Content-Type', mimeType);
-  res.setHeader('Content-Length', String(stat.size));
+  res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Content-Disposition', attachmentHeader(filename));
-  const stream = fs.createReadStream(filePath);
+  res.setHeader('Cache-Control', 'no-store');
+
+  const range = parseByteRange(rangeHeader, stat.size);
+  if (range === 'unsatisfiable') {
+    res.status(416).setHeader('Content-Range', `bytes */${stat.size}`);
+    res.end();
+    return false;
+  }
+  const start = range?.start ?? 0;
+  const end = range?.end ?? stat.size - 1;
+  if (range) {
+    res.locals.partialBeforeEnd = end !== stat.size - 1;
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+  }
+  res.setHeader('Content-Length', String(end - start + 1));
+
+  const stream = fs.createReadStream(filePath, { start, end });
   stream.on('data', (chunk) => countBytes(chunk.length));
   return new Promise<boolean>((resolve, reject) => {
     stream.pipe(res);
@@ -114,7 +167,7 @@ async function streamLocalFile(filePath: string, filename: string, mimeType: str
     });
     res.on('close', () => {
       stream.destroy();
-      resolve(res.writableFinished);
+      resolve(res.writableFinished && end === stat.size - 1);
     });
   });
 }
@@ -153,7 +206,7 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
       if (clientGone) break;
       countBytes(value.byteLength);
       res.write(value);
-      void updateJobProgress(job.id, downloaded, totalBytes, totalBytes ? (downloaded / totalBytes) * 100 : undefined);
+      updateJobProgress(job.id, downloaded, totalBytes, totalBytes ? (downloaded / totalBytes) * 100 : undefined).catch(() => undefined);
     }
     if (clientGone) {
       await updateJobStatus(job.id, 'cancelled', { downloaded_bytes: downloaded });

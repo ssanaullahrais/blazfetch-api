@@ -1289,7 +1289,8 @@ transcode work continues in the background. Poll `GET /jobs/:id` or open
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
   "formatId": "137",
   "kind": "video",
-  "quality": "1080p"
+  "quality": "1080p",
+  "filename": "My video"
 }
 ```
 
@@ -1299,6 +1300,7 @@ transcode work continues in the background. Poll `GET /jobs/:id` or open
 | `formatId` | string | no (default `"best"`) | A `formatId` previously returned by `/fetch` or `/fetch/audio` — never a raw yt-dlp format string or shell argument. Omit it (or pass `"best"`) to skip picking a format entirely: the backend automatically selects the highest resolution for video, or the highest-bitrate audio (converting to MP3 via ffmpeg if the source has no standalone audio track) |
 | `kind` | `"video"` \| `"audio"` | yes | |
 | `quality` | string | no | Informational only; doesn't affect selection |
+| `filename` | string | no | Name for the finished file, without extension (max 200 characters). Defaults to the media title |
 
 ### Response `202`
 
@@ -1324,7 +1326,15 @@ transcode work continues in the background. Poll `GET /jobs/:id` or open
 
 Streams the resolved media once the job is `ready` (proxying from the source URL) or `completed`
 (a local temp file produced by yt-dlp/ffmpeg). Responds with the file body directly —
-`Content-Type`, `Content-Length` (when known), and `Content-Disposition: attachment`.
+`Content-Type`, `Content-Length` (when known), and `Content-Disposition: attachment` with the
+media title (or the `filename` given to `POST /download`) as the name.
+
+A finished local file also answers `Range` requests (`Accept-Ranges: bytes`, `206 Partial Content`),
+so a download that dropped halfway can be resumed. The file is deleted once its last byte has been
+sent.
+
+While the job runs, `progress` in `GET /jobs/:id` covers the whole job: the download up to 90, then
+the conversion to H.264/AAC (when the source needs one) up to 99, and 100 when the file is ready.
 
 If the job isn't ready yet, responds `404 JOB_NOT_FOUND` with a message pointing at `GET /jobs/:id`
 for polling.
@@ -1463,7 +1473,7 @@ GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename
 |---|---|---|
 | `stream` (default) | Bytes are piped from the source straight to the response. No file on the server, first byte in 1 to 3 s. Original codecs are kept (no transcode). | Speed |
 | `prepare` | The server builds the file first (download, merge, and a transcode to H.264/AAC when the source is not browser-compatible), then sends it with its exact size, then deletes it. All in this one request, so nothing arrives until it is ready. | Guaranteed H.264/AAC, or sources that cannot stream |
-| `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. | Recommended for the frontend: fast when possible, works when not |
+| `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. Only formats that already play on phones (a plain H.264 MP4) are streamed; live merges, HLS, WebM and VP9/AV1/HEVC are prepared instead. | Recommended for the frontend: fast when possible, works when not |
 
 `auto` falls back only for failures that preparing can get around (the source could not be
 streamed, ffmpeg or extraction failed, a timeout). It does **not** fall back for errors that would

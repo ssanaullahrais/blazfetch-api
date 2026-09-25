@@ -18,6 +18,7 @@ import {
 import { fetchMedia } from './fetchService';
 import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { resolveFormat } from './downloadService';
+import { buildFilename } from '../utils/filename';
 
 export interface OpenStreamParams {
   url: string;
@@ -28,6 +29,9 @@ export interface OpenStreamParams {
   userId?: string | null;
   guestId?: string | null;
   signal: AbortSignal;
+  /** mode=auto: refuse what phones can't play as-is, so the caller prepares a compatible file instead.
+   *  mode=stream ("Fastest") passes the source through as it is (a live merge/remux when needed). */
+  phoneSafeOnly?: boolean;
 }
 
 export interface OpenedStream {
@@ -110,9 +114,18 @@ function contentTypeFor(ext: string, kind: 'video' | 'audio'): string {
   return mime.lookup(`x.${ext}`) ?? (kind === 'audio' ? 'audio/mpeg' : 'video/mp4');
 }
 
+export interface PlanOptions {
+  /** Refuse anything that would not play on phones as-is (mode=auto), instead of streaming it anyway (mode=stream). */
+  phoneSafeOnly?: boolean;
+}
+
 /** Picks how to produce the bytes. Nothing here touches disk or transcodes video. */
-export function planStream(media: BlazfetchResponse, format: RequestedFormat): Plan {
+export function planStream(media: BlazfetchResponse, format: RequestedFormat, options: PlanOptions = {}): Plan {
   const isYtdlp = !media.extractor || media.extractor.startsWith('yt-dlp');
+  const phoneSafeOnly = options.phoneSafeOnly ?? true;
+  const requirePhoneSafe = (f: BlazfetchFormat): void => {
+    if (phoneSafeOnly && !isPhoneSafeVideo(f)) throw notPhoneSafe();
+  };
 
   if (format.kind === 'video') {
     const chosen = media.formats.find((f) => f.formatId === format.formatId);
@@ -120,7 +133,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
       // A video inside a carousel/board has its own direct link: pass that through (mixed photo+video posts).
       const fromItem = media.items?.flatMap((i) => i.formats ?? []).find((f) => f.formatId === format.formatId);
       if (fromItem?.url) {
-        if (!isPhoneSafeVideo(fromItem)) throw notPhoneSafe();
+        requirePhoneSafe(fromItem);
         return { type: 'proxy', url: fromItem.url, contentType: contentTypeFor(fromItem.ext, 'video'), ext: fromItem.ext };
       }
       throw new BlazfetchError('FORMAT_UNAVAILABLE', 'The requested format is not available for this media.');
@@ -128,17 +141,18 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
 
     if (!isYtdlp) {
       if (!chosen.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
-      if (!isPhoneSafeVideo(chosen)) throw notPhoneSafe();
+      requirePhoneSafe(chosen);
       return { type: 'proxy', url: chosen.url, contentType: contentTypeFor(chosen.ext, 'video'), ext: chosen.ext };
     }
-    if (chosen.requiresMerge || isHls(chosen)) throw notPhoneSafe(); // fragmented MP4 from a live merge/remux
-    if (!isPhoneSafeVideo(chosen)) throw notPhoneSafe();
+    // A live merge/remux produces fragmented MP4, which phone galleries show black: auto prepares those instead.
+    if (phoneSafeOnly && (chosen.requiresMerge || isHls(chosen))) throw notPhoneSafe();
     if (chosen.requiresMerge) {
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }
     if (isHls(chosen)) {
       return { type: 'ffmpeg', selector: chosen.formatId, mode: 'remux', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'remux') };
     }
+    requirePhoneSafe(chosen);
     return {
       type: 'ytdlp',
       fast: proxyFastPath(chosen.url),
@@ -226,19 +240,7 @@ export function waitForFirstChunk(stream: Readable): Promise<Buffer> {
   });
 }
 
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .replace(/[\\/:*?"<>|]+/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 150);
-}
-
-export function buildFilename(requested: string | undefined, media: BlazfetchResponse, ext: string): string {
-  const base = sanitizeFilename(requested ?? '') || sanitizeFilename(media.title ?? '') || sanitizeFilename(media.mediaId) || 'download';
-  return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
-}
+export { buildFilename } from '../utils/filename';
 
 /** Streams a plain HTTP(S) file through untouched. A source that ends early errors instead of finishing quietly. */
 export async function openProxy(url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
@@ -306,7 +308,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
     requireFreshUrls: true,
     forceRefresh: retriedWithFreshLinks,
   });
-  const plan = planStream(media, resolved);
+  const plan = planStream(media, resolved, { phoneSafeOnly: params.phoneSafeOnly });
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);
   let lastError: unknown;

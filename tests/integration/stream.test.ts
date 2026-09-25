@@ -199,10 +199,35 @@ describe('GET /api/v1/stream', () => {
     expect(fs.readdirSync(tempDir)).toEqual([]);
   });
 
-  it('refuses to live-merge "best" in stream mode (it would not play on phones)', async () => {
+  it('live-merges "best" (video-only + audio) in stream mode, which is what Fastest asks for', async () => {
+    behaviour = (child, args) => {
+      if (args.includes('--dump-single-json')) {
+        child.stdout.write(JSON.stringify({ requested_formats: [{ url: 'https://cdn.example/v.mp4' }, { url: 'https://cdn.example/a.m4a' }] }));
+      } else {
+        child.stdout.write('merged-bytes');
+      }
+      child.emit('close', 0);
+    };
     const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&mode=stream`);
-    expect(res.statusCode).toBeGreaterThanOrEqual(400);
-    expect(JSON.parse(await body(res))).toMatchObject({ success: false, error: { code: 'DOWNLOAD_FAILED' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('stream');
+    expect(res.headers['content-type']).toContain('video/mp4');
+    expect(await body(res)).toBe('merged-bytes');
+    expect(preparedJobs).toHaveLength(0);
+    await waitFor(() => stats.length === 1);
+    expect(stats[0]).toMatchObject({ success: true, mode: 'stream' });
+    await waitFor(() => activeStreamProcessCount() === 0);
+  });
+
+  it('prepares "best" instead of live-merging it in auto mode (a live merge would not play on phones)', async () => {
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&mode=auto`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(children).toHaveLength(0);
+    await waitFor(() => stats.length === 1);
+    expect(stats[0]).toMatchObject({ success: true, mode: 'prepare' });
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
   });
 
   it('returns a JSON error with the right status when yt-dlp fails before the first byte', async () => {

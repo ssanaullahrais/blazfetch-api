@@ -136,7 +136,7 @@ Settings you may want to review for a public deployment:
 
 | Setting | Why |
 |---|---|
-| `DEFAULT_DOWNLOAD_MODE` | **Use `auto` for a public site.** It streams files that already play on phones (plain H.264 MP4) and prepares a compatible MP4 on the server for the rest (live merges, WebM, VP9/AV1/HEVC, HLS). `stream` never falls back, so those formats return an error. Clients can always choose with `?mode=` |
+| `DEFAULT_DOWNLOAD_MODE` | **Use `auto` for a public site.** It streams files that already play on phones (plain H.264 MP4) and prepares a compatible MP4 on the server for the rest (live merges, WebM, VP9/AV1/HEVC, HLS). `stream` never falls back and sends those formats as they are (fastest, but they may not play on phones). Clients can always choose with `?mode=` |
 | `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional Cloudflare bot check in front of fetch, stream and download. Set up in [Cloudflare Turnstile](#cloudflare-turnstile-optional) below. Off by default |
 | `INSTAGRAM_COOKIES_PATH` | Optional. Instagram often blocks datacenter IPs; a `cookies.txt` from a logged-in browser lets yt-dlp through. Without it the backup provider is used |
 | `YOUTUBE_FALLBACK_ENABLED` | Leave `true`: if YouTube blocks the server's IP, a fallback provider serves the request |
