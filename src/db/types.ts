@@ -110,6 +110,8 @@ export interface StatsTotals {
   fetches: number;
   /** Successful downloads (stream and prepare). */
   downloads: number;
+  /** Successful downloads per platform id (`{ youtube: 10, tiktok: 4 }`); platforms with none are left out. */
+  platforms: Record<string, number>;
   /** Distinct visitors with a live GET /stats/events connection seen within ONLINE_VISITOR_WINDOW_SECONDS.
    * Backed by the database (not an in-memory count), so it stays correct across multiple API instances
    * behind a load balancer, the same as fetches/downloads. */
