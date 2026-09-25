@@ -1471,9 +1471,9 @@ GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename
 
 | Mode | What happens | Best for |
 |---|---|---|
-| `stream` (default) | Bytes are piped from the source straight to the response. No file on the server, first byte in 1 to 3 s. Original codecs are kept (no transcode). A source that cannot be streamed at all is prepared instead (below). | Speed |
+| `stream` (default) | Bytes are piped from the source straight to the response when the format already plays on phones (a single H.264 MP4, a standalone audio track): no file on the server, first byte in 1 to 3 s. Anything else (a merge, HLS, WebM, VP9/AV1/HEVC) is prepared as a normal MP4 instead, like `auto`, using ffmpeg's quickest settings when a conversion cannot be avoided. | Speed, with a file that plays everywhere |
 | `prepare` | The server builds the file first (download, merge, and a transcode to H.264/AAC when the source is not browser-compatible), then sends it with its exact size, then deletes it. All in this one request, so nothing arrives until it is ready. When the chosen format is VP9/AV1/WebM and the source offers the same quality in H.264, that version is downloaded instead, so no re-encode is needed. | Guaranteed H.264/AAC, or sources that cannot stream |
-| `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. Only formats that already play on phones (a plain H.264 MP4) are streamed; live merges, HLS, WebM and VP9/AV1/HEVC are prepared instead. | Recommended for the frontend: fast when possible, works when not |
+| `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. Only formats that already play on phones (a plain H.264 MP4) are streamed; live merges, HLS, WebM and VP9/AV1/HEVC are prepared instead. Conversions use the balanced settings (smaller file than `stream`'s). | Recommended for the frontend: fast when possible, works when not |
 
 `auto` falls back only for failures that preparing can get around (the source could not be
 streamed, ffmpeg or extraction failed, a timeout). It does **not** fall back for errors that would
@@ -1502,17 +1502,15 @@ HTTP status (`success:false`, `error:{code,message}`, `requestId`).
 | Requested format | Pipeline |
 |---|---|
 | Plain single file (most muxed formats, standalone audio) | the file's bytes are passed through untouched (exact size, original container) |
-| Video-only format needing audio (e.g. YouTube 1080p+) | video + best AAC audio are merged by ffmpeg with `-c copy` into **fragmented MP4** (`-movflags frag_keyframe+empty_moov+default_base_moof`), because a normal MP4 cannot be written to a pipe |
-| HLS video | ffmpeg remux (`-c copy`, ADTS AAC converted) to fragmented MP4 |
-| MP3 (no standalone audio track) | `ffmpeg -vn -c:a libmp3lame -f mp3` |
+| Video-only format needing audio (e.g. YouTube 1080p+) | prepared: yt-dlp downloads video + best AAC audio and merges them (`-c copy`) into a normal MP4 on the server, then it is sent with its exact size |
+| HLS video, WebM, VP9/AV1/HEVC | prepared the same way; converted to H.264/AAC only when the source has no H.264 version of that quality |
+| MP3 (no standalone audio track) | `ffmpeg -vn -c:a libmp3lame -f mp3`, streamed |
 
-- **No H.264 transcode in stream mode.** Codecs are copied as-is (for example VP9 or AV1 + AAC in
-  MP4), which is what makes it fast. Modern browsers and players handle this, but if you need
-  guaranteed H.264/AAC output use `POST /download` (prepare mode), which transcodes when needed.
-- **Sources that cannot stream:** some sources cannot be streamed directly (Loom's signed HLS playlists,
-  and Reddit's `v.redd.it`, which refuses ffmpeg). Every mode serves them with prepare mode in the same
-  request (`X-Blazfetch-Mode: prepare`), so the download still arrives. Other failures in `mode=stream`
-  come back as the JSON error without a fallback.
+- **Why nothing is live-merged:** a merge or remux written to a pipe has to be fragmented MP4, which phone
+  galleries show black or refuse to share. So `stream` and `auto` both prepare those as a normal MP4 on the
+  server (a remux takes seconds; the same quality in H.264 is used when the source offers it). Both also fall
+  back to prepare for sources that cannot be streamed (Loom's signed HLS playlists, Reddit's `v.redd.it`,
+  which refuses ffmpeg). Errors that preparing cannot fix (private, removed, login required) come back as JSON.
 - **Full speed from throttling hosts:** plain files are fetched in 10 MB ranged requests (YouTube throttles one
   long request to about playback speed). ffmpeg reads them through a relay on `127.0.0.1` that does the same, so
   live merges and remuxes run at full speed too; HLS playlists are read by ffmpeg directly.

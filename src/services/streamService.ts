@@ -168,8 +168,10 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
   // Audio: a real standalone audio track is piped as-is; anything else becomes MP3 through ffmpeg.
   const audio: BlazfetchAudioFormat | undefined = media.audioFormats.find((f) => f.formatId === format.formatId);
   if (audio && !audio.isConverted) {
-    // An HLS audio track would come out of yt-dlp as MPEG-TS: remux it to a real M4A instead.
+    // An HLS audio track would come out of yt-dlp as MPEG-TS. A live remux gives a fragmented M4A, which phones may
+    // refuse, so the phone-safe modes prepare a normal M4A instead.
     if (isYtdlp && isHls({ formatId: audio.formatId, url: audio.url } as BlazfetchFormat)) {
+      if (phoneSafeOnly) throw notPhoneSafe();
       return {
         type: 'ffmpeg',
         selector: audio.formatId,

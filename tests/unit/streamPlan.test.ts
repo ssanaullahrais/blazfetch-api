@@ -140,8 +140,9 @@ describe('planStream fast path', () => {
 
   it('never passes an HLS/DASH manifest through as if it were the media', () => {
     const hlsAudio = media({ audioFormats: [{ formatId: 'hls_mp3', ext: 'mp3', bitrate: 128, isConverted: false, url: 'https://cdn.example/playlist.m3u8?x=1' }] });
-    // ffmpeg reads the playlist (remuxing to M4A); it is never proxied as if it were the file.
-    expect((planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' }) as { fast?: { kind: string } }).fast?.kind).not.toBe('proxy');
+    // Phone-safe modes prepare it; without that rule ffmpeg reads the playlist. It is never proxied as the file.
+    expect(() => planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' })).toThrowError(/would not play on phones/);
+    expect((planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' }, { phoneSafeOnly: false }) as { fast?: { kind: string } }).fast?.kind).not.toBe('proxy');
   });
 
   it('has no fast path when the cached format has no URL', () => {
@@ -212,9 +213,10 @@ describe('waitForFirstChunk', () => {
 });
 
 describe('planStream: HLS audio', () => {
-  it('remuxes an HLS audio track to M4A with ffmpeg (yt-dlp would pipe it out as MPEG-TS)', () => {
+  it('prepares an HLS audio track in the phone-safe modes, and can remux it to M4A with ffmpeg otherwise', () => {
     const hlsAudio = media({ audioFormats: [{ formatId: 'hls-raw-audio-audio', ext: 'mp4', isConverted: false, url: 'https://cdn.example/audio.m3u8?sig=1' }] });
-    expect(planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' })).toMatchObject({
+    expect(() => planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' })).toThrowError(/would not play on phones/);
+    expect(planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' }, { phoneSafeOnly: false })).toMatchObject({
       type: 'ffmpeg',
       mode: 'audio',
       ext: 'm4a',

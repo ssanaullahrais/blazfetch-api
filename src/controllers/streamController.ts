@@ -38,15 +38,6 @@ export const streamQuerySchema = z.object({
 /** Failures that streaming can cause but preparing the file can still get around. */
 const FALLBACK_CODES = new Set(['DOWNLOAD_FAILED', 'EXTRACTOR_FAILED', 'PROCESS_TIMEOUT']);
 
-/**
- * The source can't be streamed at all (ffmpeg is refused by the host, as v.redd.it does, or can't read a signed
- * playlist, as with Loom). Even mode=stream prepares those, so the download still arrives; any other failure in
- * mode=stream comes back as the error.
- */
-export function isStreamUnsupported(err: unknown): boolean {
-  return err instanceof BlazfetchError && (err.details as { streamUnsupported?: boolean } | undefined)?.streamUnsupported === true;
-}
-
 export function isFallbackEligible(err: unknown): boolean {
   if (!(err instanceof BlazfetchError)) return false;
   if ((err.details as { streamUnsupported?: boolean } | undefined)?.streamUnsupported) return true;
@@ -61,8 +52,9 @@ export function isFallbackEligible(err: unknown): boolean {
  * - prepare: the file is built in TEMP_DIR first (merge/transcode, H.264/AAC guaranteed), then sent
  *   and deleted, all within this one request.
  * - auto: stream first; if that fails before the first byte, prepare in the same request.
- *   Only formats that already play on phones are streamed; the rest are prepared.
- * - stream also prepares, but only a source that cannot be streamed at all (see isStreamUnsupported).
+ * - stream (Fastest in the app): the same, but a conversion that cannot be avoided uses ffmpeg's quickest settings.
+ * Both stream only what already plays on phones (a single H.264 MP4, a standalone audio track); merges, HLS, WebM and
+ * VP9/AV1/HEVC are prepared as a normal MP4, using the same quality in H.264 when the source has it.
  *
  * Before the first byte any failure is a normal JSON error. After it, the only way to signal a
  * problem is to abort the connection (so auto can only fall back before bytes are sent).
@@ -187,7 +179,9 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       userId: req.userId,
       guestId: req.guestId,
       signal: abort.signal,
-      phoneSafeOnly: mode === 'auto',
+      // Every mode only streams what already plays on phones as it is: a live merge or remux makes a fragmented MP4
+      // that phone galleries show black or refuse to open, so those are prepared as a normal MP4 instead.
+      phoneSafeOnly: true,
     });
     killSource = opened.kill;
     platformForStat = opened.platform;
@@ -243,7 +237,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: networkKey(req) });
+      // Fastest (mode=stream) converts with ffmpeg's quickest settings when a conversion cannot be avoided.
+      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: networkKey(req), fastConvert: mode === 'stream' });
     } finally {
       prepareFinished = true;
     }
@@ -316,8 +311,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
         await runStream();
         return;
       } catch (err) {
-        const canFallBack = mode === 'stream' ? isStreamUnsupported(err) : isFallbackEligible(err);
-        if (clientClosed || res.headersSent || !canFallBack) throw err;
+        if (clientClosed || res.headersSent || !isFallbackEligible(err)) throw err;
         logger.warn(
           { requestId: req.requestId, code: (err as BlazfetchError).code, err: (err as Error).message },
           'direct stream failed before the first byte, falling back to prepare mode',

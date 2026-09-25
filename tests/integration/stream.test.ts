@@ -82,6 +82,7 @@ vi.mock('../../src/services/fetchService', () => ({
 /** Test hook: what the fake prepare pipeline (POST /download's job runner) does. */
 let prepareBehaviour: (jobId: string) => Promise<void> = async () => undefined;
 const preparedJobs: string[] = [];
+const prepareOptions: Record<string, unknown>[] = [];
 const cancelledJobs: string[] = [];
 
 vi.mock('../../src/services/downloadService', async () => {
@@ -89,8 +90,9 @@ vi.mock('../../src/services/downloadService', async () => {
   return {
     ...actual,
     startDownloadJob: vi.fn(async (params: { url: string }) => ({ id: `job-${preparedJobs.length + 1}`, platform: 'youtube', canonicalUrl: params.url })),
-    runDownloadJob: vi.fn(async (job: { id: string }) => {
+    runDownloadJob: vi.fn(async (job: { id: string }, _requestId: string, options: Record<string, unknown> = {}) => {
       preparedJobs.push(job.id);
+      prepareOptions.push(options);
       await prepareBehaviour(job.id);
       const dir = path.join(tempDir, job.id);
       fs.mkdirSync(dir, { recursive: true });
@@ -133,6 +135,7 @@ afterAll(async () => {
 beforeEach(() => {
   children.length = 0;
   stats.length = 0;
+  prepareOptions.length = 0;
   behaviour = () => undefined;
   prepareBehaviour = async () => undefined;
   preparedJobs.length = 0;
@@ -199,24 +202,16 @@ describe('GET /api/v1/stream', () => {
     expect(fs.readdirSync(tempDir)).toEqual([]);
   });
 
-  it('live-merges "best" (video-only + audio) in stream mode, which is what Fastest asks for', async () => {
-    behaviour = (child, args) => {
-      if (args.includes('--dump-single-json')) {
-        child.stdout.write(JSON.stringify({ requested_formats: [{ url: 'https://cdn.example/v.mp4' }, { url: 'https://cdn.example/a.m4a' }] }));
-      } else {
-        child.stdout.write('merged-bytes');
-      }
-      child.emit('close', 0);
-    };
+  it('prepares "best" in stream mode too, with fast conversion: a live merge would not play on phones', async () => {
     const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&mode=stream`);
     expect(res.statusCode).toBe(200);
-    expect(res.headers['x-blazfetch-mode']).toBe('stream');
-    expect(res.headers['content-type']).toContain('video/mp4');
-    expect(await body(res)).toBe('merged-bytes');
-    expect(preparedJobs).toHaveLength(0);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(children).toHaveLength(0); // nothing was live-merged
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: true });
     await waitFor(() => stats.length === 1);
-    expect(stats[0]).toMatchObject({ success: true, mode: 'stream' });
-    await waitFor(() => activeStreamProcessCount() === 0);
+    expect(stats[0]).toMatchObject({ success: true, mode: 'prepare' });
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
   });
 
   it('prepares "best" instead of live-merging it in auto mode (a live merge would not play on phones)', async () => {
@@ -478,12 +473,27 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     await waitFor(() => fs.readdirSync(tempDir).length === 0);
   });
 
-  it('mode=stream does not fall back for other failures: the error comes back as JSON', async () => {
+  it('mode=stream falls back to prepare like auto when streaming fails before the first byte', async () => {
     behaviour = failingStream;
     const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=stream`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: true, fellBack: true });
+    await waitFor(() => stats.length === 1);
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
+  });
+
+  it('mode=stream does not fall back for errors prepare cannot fix (private video)', async () => {
+    behaviour = (child) => {
+      child.stderr.write('ERROR: This video is private video');
+      setTimeout(() => child.emit('close', 1), 10);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=stream`);
     expect(res.statusCode).toBeGreaterThanOrEqual(400);
-    expect(JSON.parse(await body(res)).error.code).toBe('EXTRACTOR_FAILED');
+    expect(JSON.parse(await body(res)).error.code).toBe('PRIVATE_MEDIA');
     expect(preparedJobs).toHaveLength(0);
+    await waitFor(() => stats.length === 1);
   });
 
   it('mode=auto does not fall back for errors prepare cannot fix (private video)', async () => {

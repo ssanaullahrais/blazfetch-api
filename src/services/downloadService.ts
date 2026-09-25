@@ -88,6 +88,8 @@ export interface RunDownloadOptions {
   networkKey?: string;
   /** Name for the saved file, without extension (the page's own naming); the title is used otherwise. */
   filename?: string;
+  /** Convert with ffmpeg's quickest settings (Fastest): a larger file, much sooner. */
+  fastConvert?: boolean;
 }
 
 /**
@@ -215,7 +217,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
       },
     );
 
-    result = await ensureValidAndCompatible(job, result, signal);
+    result = await ensureValidAndCompatible(job, result, signal, options.fastConvert);
     result = { ...result, filename: displayName(result, metadata, options.filename, job.requestedFormat.kind) };
     await finalizeSuccess(job, result, startedAt, ctx);
     return { ...result, job: await refreshJob(job.id) };
@@ -308,7 +310,7 @@ async function runAudioExtraction(
  * only has a directUrl (proxied straight from the source CDN, never touching local disk) is
  * intentionally left unprobed — we're not downloading it ourselves to inspect it.
  */
-async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, signal: AbortSignal): Promise<DownloadResult> {
+async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, signal: AbortSignal, fastConvert = false): Promise<DownloadResult> {
   if (!result.filePath) return result;
 
   const kind = job.requestedFormat.kind;
@@ -327,7 +329,7 @@ async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, 
   const compatiblePath = path.join(dir, `${job.id}-compatible.mp4`);
   reportProgress(job.id, result.bytes, undefined, DOWNLOAD_SHARE);
   await runFfmpeg({
-    args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath),
+    args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath, { fast: fastConvert }),
     signal,
     timeoutMs: convertTimeoutMs(validation.durationSeconds),
     progress: validation.durationSeconds
