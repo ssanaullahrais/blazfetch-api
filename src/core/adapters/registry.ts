@@ -8,9 +8,9 @@ import { TikTokAdapter } from './TikTokAdapter';
 import { InstagramAdapter } from './InstagramAdapter';
 import { VimeoAdapter } from './VimeoAdapter';
 import { PinterestAdapter } from './PinterestAdapter';
+import { TwitterAdapter } from './TwitterAdapter';
 
 const GENERIC_PLATFORMS: PlatformId[] = [
-  'twitter',
   'facebook',
   'reddit',
   'soundcloud',
@@ -31,6 +31,7 @@ const adapters: PlatformAdapter[] = [
   new InstagramAdapter(),
   new VimeoAdapter(),
   new PinterestAdapter(),
+  new TwitterAdapter(),
   ...GENERIC_PLATFORMS.map((platform) => new GenericYtDlpAdapter(platform)),
 ];
 
