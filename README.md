@@ -89,7 +89,7 @@ Each platform was tested with real downloads. Its actual API response is in [doc
 | YouTube | ✅ Confirmed | Video, playlists, best-quality auto-select. If YouTube temporarily blocks the server's IP ("confirm you're not a bot"), a fallback provider serves the request automatically |
 | TikTok | ✅ Confirmed | yt-dlp primary, `@tobyg74/tiktok-api-dl` fallback |
 | Instagram | ✅ Confirmed | Posts and reels (profile listing is not supported) |
-| X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com` |
+| X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com`. Posts whose media X hides from yt-dlp ("No video could be found in this tweet", often sensitive posts) are served by a fallback provider (FixTweet), like TikTok's |
 | Facebook | ✅ Confirmed | Reels and public videos. Posts that need a login return an error |
 | Reddit | ✅ Confirmed | Including separate video+audio DASH streams |
 | Vimeo | ✅ Confirmed | Auto-retries via embed URL when watch page requires login. DRM-protected videos return a clear error |
