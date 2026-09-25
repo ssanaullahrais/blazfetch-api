@@ -1,5 +1,6 @@
 import { env } from '../config/env';
-import { validateAndNormalizeUrl, NormalizedUrlResult } from '../utils/url';
+import { NormalizedUrlResult } from '../utils/url';
+import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { getAdapter } from '../core/adapters/registry';
 import { PlatformAdapter } from '../core/adapters/types';
 import { globalFetchSemaphore } from '../core/jobs/concurrencyLimiter';
@@ -119,7 +120,7 @@ async function findStored(normalized: NormalizedUrlResult): Promise<StoredMedia 
 }
 
 export async function fetchMedia(params: FetchMediaParams): Promise<BlazfetchResponse> {
-  const normalized = validateAndNormalizeUrl(params.url);
+  const normalized = await normalizeAndResolveUrl(params.url);
   const adapter = getAdapter(normalized);
   const isRanged = !!(params.range?.start || params.range?.end);
 
@@ -331,7 +332,7 @@ export async function revalidateStored(record: StoredMedia, requestId: string): 
   }
 
   try {
-    const normalized = validateAndNormalizeUrl(record.canonicalUrl);
+    const normalized = await normalizeAndResolveUrl(record.canonicalUrl);
     await extractLive(normalized, getAdapter(normalized), { url: record.canonicalUrl, requestId }, record, 'revalidation');
     return 'available';
   } catch (err) {

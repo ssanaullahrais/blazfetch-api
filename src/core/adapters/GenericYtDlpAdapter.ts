@@ -5,11 +5,18 @@ import { PlatformId } from '../../constants/platforms';
 import { BlazfetchError } from '../../constants/errors';
 import { NormalizedUrlResult } from '../../utils/url';
 import { assertUrlIsSafeToFetch } from '../../utils/url';
+import { isOpenShortLink } from '../../utils/shortLinks';
 import { classifyYtdlpFailure, runYtdlp } from '../ytdlp/ytdlpRunner';
 import { downloadWithYtdlp } from '../ytdlp/ytdlpDownload';
 import { normalizeYtdlpInfo, YtdlpRawInfo } from './ytdlpNormalize';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
 import { BlazfetchResponse } from '../../types/blazfetch';
+
+/** yt-dlp follows redirects without the SSRF checks, so an unresolved open short link (t.co) must never reach it. */
+async function assertSafeTarget(targetUrl: string): Promise<void> {
+  if (isOpenShortLink(targetUrl)) throw new BlazfetchError('INVALID_URL', 'This short link could not be resolved.');
+  await assertUrlIsSafeToFetch(targetUrl);
+}
 
 /**
  * Default adapter for every platform that yt-dlp supports natively with no platform-specific
@@ -25,7 +32,7 @@ export class GenericYtDlpAdapter implements PlatformAdapter {
 
   async fetchMetadata(ctx: AdapterFetchContext): Promise<BlazfetchResponse> {
     const targetUrl = ctx.normalizedUrl.canonicalUrl;
-    await assertUrlIsSafeToFetch(targetUrl);
+    await assertSafeTarget(targetUrl);
 
     const { stdout, stderr, exitCode } = await runYtdlp({
       args: ['-J', '--no-warnings', '--no-playlist', targetUrl],
@@ -47,7 +54,7 @@ export class GenericYtDlpAdapter implements PlatformAdapter {
 
   async download(ctx: AdapterFetchContext, target: DownloadTarget): Promise<DownloadResult> {
     const targetUrl = ctx.normalizedUrl.canonicalUrl;
-    await assertUrlIsSafeToFetch(targetUrl);
+    await assertSafeTarget(targetUrl);
 
     const filePath = await downloadWithYtdlp({
       url: targetUrl,

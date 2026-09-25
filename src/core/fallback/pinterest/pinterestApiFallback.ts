@@ -1,5 +1,6 @@
 import { BlazfetchError } from '../../../constants/errors';
 import { assertUrlIsSafeToFetch } from '../../../utils/url';
+import { safeFetchFollow } from '../../../utils/safeFetch';
 import { env } from '../../../config/env';
 
 /**
@@ -290,12 +291,13 @@ export async function fetchPinterestBoard(username: string, slug: string, maxIte
 
 /** Resolves a pin.it short link to its canonical pinterest.com/pin/<id> URL via HTTP redirect. */
 export async function resolvePinItRedirect(pinItUrl: string): Promise<string> {
-  await assertUrlIsSafeToFetch(pinItUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), env.REDIRECT_RESOLVE_TIMEOUT_MS);
   try {
-    const res = await fetch(pinItUrl, { redirect: 'follow', signal: controller.signal });
-    return res.url || pinItUrl;
+    // Every hop is checked against the SSRF rules (a plain redirect: 'follow' would not check them).
+    const { response, url } = await safeFetchFollow(pinItUrl, { signal: controller.signal });
+    await response.body?.cancel().catch(() => undefined);
+    return url.toString();
   } finally {
     clearTimeout(timer);
   }
