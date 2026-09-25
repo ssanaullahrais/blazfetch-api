@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Tests run on the built-in defaults: a server's own .env (Turnstile on, TRUST_PROXY, production mode) must not
+// change what they check. Each test sets whatever it needs itself.
+if (!process.env.VITEST) dotenv.config();
 
 const boolFromString = (defaultValue: boolean) =>
   z
