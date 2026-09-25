@@ -52,6 +52,14 @@
     "pino-pretty": "^13.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.5"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@tobyg74/tiktok-api-dl": {
+      "uuid": "^11.1.1"
+    },
+    "tsup": {
+      "esbuild": "^0.28.1"
+    }
   }
 }

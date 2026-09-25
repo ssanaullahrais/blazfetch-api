@@ -40,6 +40,9 @@ const envSchema = z.object({
   MAX_CONCURRENT_DOWNLOADS_GLOBAL: z.coerce.number().default(10),
   MAX_CONCURRENT_DOWNLOADS_PER_USER: z.coerce.number().default(2),
   MAX_CONCURRENT_DOWNLOADS_PER_GUEST: z.coerce.number().default(1),
+  // Guests sharing one IP address (one /64 for IPv6), e.g. an office or a mobile carrier, share this many downloads.
+  // Only applies when the real visitor IP is known (TRUST_PROXY set correctly behind a proxy).
+  MAX_CONCURRENT_DOWNLOADS_PER_IP: z.coerce.number().default(5),
   MAX_CONCURRENT_FETCHES_GLOBAL: z.coerce.number().default(20),
 
   MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
@@ -91,6 +94,8 @@ const envSchema = z.object({
   RATE_LIMIT_MAX_GUEST: z.coerce.number().default(30),
   RATE_LIMIT_MAX_USER: z.coerce.number().default(120),
   RATE_LIMIT_MAX_DOWNLOAD: z.coerce.number().default(10),
+  // Per-IP ceiling = this many times the per-visitor limit (bounds a client that keeps dropping its guest cookie).
+  RATE_LIMIT_IP_MULTIPLIER: z.coerce.number().int().min(1).default(10),
 
   INSTAGRAM_FALLBACK_MAX_RETRIES: z.coerce.number().default(3),
   INSTAGRAM_FALLBACK_RETRY_DELAY_MS: z.coerce.number().default(1000),

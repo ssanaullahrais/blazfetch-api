@@ -1,9 +1,10 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { validateAndNormalizeUrl } from '../utils/url';
+import { assertUrlIsSafeToFetch, validateAndNormalizeUrl } from '../utils/url';
+import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { getAdapter } from '../core/adapters/registry';
 import { DownloadResult } from '../core/adapters/types';
-import { globalDownloadSemaphore, acquireUserDownloadSlot } from '../core/jobs/concurrencyLimiter';
+import { globalDownloadSemaphore, acquireVisitorDownloadSlots } from '../core/jobs/concurrencyLimiter';
 import { createJob, getJob, getJobSignal, updateJobProgress, updateJobStatus, clearJobController } from '../core/jobs/jobManager';
 import { jobTempDir, cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { runFfmpeg, extractAudioArgs, transcodeToCompatibleMp4Args } from '../core/ffmpeg/ffmpegRunner';
@@ -49,7 +50,7 @@ export async function resolveFormat(url: string, requestId: string, format: Requ
 }
 
 export async function startDownloadJob(params: StartDownloadParams): Promise<JobRecord> {
-  const normalizedUrl = validateAndNormalizeUrl(params.url);
+  const normalizedUrl = await normalizeAndResolveUrl(params.url);
   const resolvedFormat = await resolveFormat(params.url, params.requestId, params.format);
   const job = await createJob({
     platform: normalizedUrl.platform,
@@ -78,15 +79,16 @@ export interface RunDownloadOptions {
   fellBack?: boolean;
   /** GET /stream records the entire response outcome itself, including preparation failures. */
   recordFailure?: boolean;
+  /** The requester's network (see networkKey), for the per-IP download limit on guests. */
+  networkKey?: string;
 }
 
 export async function runDownloadJob(job: JobRecord, requestId: string, options: RunDownloadOptions = {}): Promise<RunDownloadResult> {
-  const normalizedUrl = validateAndNormalizeUrl(job.canonicalUrl);
+  const normalizedUrl = await normalizeAndResolveUrl(job.canonicalUrl);
   const adapter = getAdapter(normalizedUrl);
   const signal = getJobSignal(job.id);
 
-  const userKey = job.userId ?? job.guestId ?? 'anonymous';
-  const releaseUserSlot = acquireUserDownloadSlot(userKey, !job.userId);
+  const releaseUserSlot = acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey });
   const releaseGlobalSlot = await globalDownloadSemaphore.acquire();
 
   const startedAt = Date.now();
@@ -100,14 +102,17 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
     if (job.requestedFormat.kind === 'audio') {
       const metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
-      const hasStandaloneAudio = metadata.audioFormats.some((f) => f.formatId === job.requestedFormat.formatId);
-      if (!hasStandaloneAudio) {
+      const standaloneAudio = metadata.audioFormats.find((f) => f.formatId === job.requestedFormat.formatId);
+      // The media URL comes from the source page and yt-dlp fetches it without the SSRF checks.
+      if (standaloneAudio?.url) await assertUrlIsSafeToFetch(standaloneAudio.url);
+      if (!standaloneAudio) {
         return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt, ctx);
       }
     } else {
       const metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
       const format = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
+      if (format?.url) await assertUrlIsSafeToFetch(format.url);
       if (format?.requiresMerge) {
         // Prefer an AAC/mp4a audio track so the merged output is H.264+AAC MP4 without needing
         // to transcode; yt-dlp falls through to the best available audio if none matches.
@@ -229,6 +234,8 @@ interface StatContext {
   mediaKey?: string;
   fellBack?: boolean;
   recordFailure?: boolean;
+  /** The requester's network (see networkKey), for the per-IP download limit on guests. */
+  networkKey?: string;
 }
 
 async function finalizeSuccess(job: JobRecord, result: DownloadResult, startedAt: number, ctx: StatContext): Promise<void> {
