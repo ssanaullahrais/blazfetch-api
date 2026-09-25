@@ -200,7 +200,7 @@ click. Details and setup: [docs/API.md](docs/API.md#cloudflare-turnstile-optiona
 Set `AUDIO_FORCE_MP3=true` in `.env` (restart the server) and every audio download is delivered as an MP3. `/fetch`,
 `/fetch/audio` and `/media/...` then list all audio options as MP3 (the format ids stay the same), and any source that
 is not MP3 already is converted with ffmpeg: piped live in `stream`/`auto` mode with no file on disk, or, in
-`prepare` and `POST /download` mode, saved to a temporary file, converted, sent and deleted. It is off by default.
+`prepare` and `POST /download` mode, saved to a temporary file, converted, sent and deleted. The shipped `.env.example` turns it on (recommended); if the variable is left out it is off.
 
 ### Building a frontend
 

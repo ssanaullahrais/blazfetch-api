@@ -1249,7 +1249,7 @@ response is shown. Expect the same shape as the other yt-dlp video responses.
 
 ## Audio as MP3 (`AUDIO_FORCE_MP3`)
 
-Off by default. Set `AUDIO_FORCE_MP3=true` in `.env` (and restart the server) and every audio download is delivered as
+Recommended, and on in the shipped `.env.example` (if the variable is left out it is off). Set `AUDIO_FORCE_MP3=true` in `.env` (and restart the server) and every audio download is delivered as
 an MP3, whatever the source format:
 
 - **What clients see:** `POST /fetch`, `POST /fetch/audio` and `GET /media/...` list every audio option with
