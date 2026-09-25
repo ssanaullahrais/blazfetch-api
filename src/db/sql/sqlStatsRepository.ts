@@ -55,9 +55,13 @@ export class SqlStatsRepository implements StatsStore {
     const [fetches] = await knex('fetch_stats').where({ success: true }).andWhere((q) => q.where({ source: 'user' }).orWhereNull('source')).count({ n: '*' });
     const [downloads] = await knex('download_stats').where({ success: true }).count({ n: '*' });
     const [online] = await knex('visitor_presence').where('last_seen_at', '>=', windowStart).count({ n: '*' });
+    const perPlatform = await knex('download_stats').where({ success: true }).select('platform').count({ n: '*' }).groupBy('platform');
+    const platforms: Record<string, number> = {};
+    for (const row of perPlatform as unknown as { platform: string; n: number | string }[]) platforms[row.platform] = Number(row.n);
     return {
       fetches: Number((fetches as { n: number | string }).n),
       downloads: Number((downloads as { n: number | string }).n),
+      platforms,
       online: Number((online as { n: number | string }).n),
     };
   }

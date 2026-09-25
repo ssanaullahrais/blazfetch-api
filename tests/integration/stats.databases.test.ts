@@ -92,7 +92,7 @@ for (const target of targets) {
       const before = await statsStore.totals();
       await Promise.all(Array.from({ length: 20 }, () => recordFetchStat({ platform: 'youtube', success: true })));
       for (const success of [true, false, false]) await recordDownloadStat({ platform: 'youtube', kind: 'video', success });
-      expect(await getStatsTotals()).toEqual({ fetches: before.fetches + 20, downloads: before.downloads + 1, online: before.online });
+      expect(await getStatsTotals()).toMatchObject({ fetches: before.fetches + 20, downloads: before.downloads + 1, online: before.online });
     });
 
     it('invalidates a warm total immediately after a committed write and forbids browser caching', async () => {

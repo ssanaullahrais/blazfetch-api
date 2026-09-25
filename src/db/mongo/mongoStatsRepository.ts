@@ -52,12 +52,15 @@ export class MongoStatsRepository implements StatsStore {
   async totals(): Promise<StatsTotals> {
     const db = await getMongoDb();
     const windowStart = new Date(Date.now() - env.ONLINE_VISITOR_WINDOW_SECONDS * 1000);
-    const [fetches, downloads, online] = await Promise.all([
+    const [fetches, downloads, online, perPlatform] = await Promise.all([
       db.collection('fetch_stats').countDocuments({ success: true, source: { $in: ['user', null] } }),
       db.collection('download_stats').countDocuments({ success: true }),
       db.collection('visitor_presence').countDocuments({ lastSeenAt: { $gte: windowStart } }),
+      db.collection('download_stats').aggregate<{ _id: string; n: number }>([{ $match: { success: true } }, { $group: { _id: '$platform', n: { $sum: 1 } } }]).toArray(),
     ]);
-    return { fetches, downloads, online };
+    const platforms: Record<string, number> = {};
+    for (const row of perPlatform) platforms[row._id] = row.n;
+    return { fetches, downloads, platforms, online };
   }
 
   async recordPresence(visitorId: string): Promise<void> {
