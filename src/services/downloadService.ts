@@ -186,7 +186,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
   let releaseUserSlot: () => void;
   try {
     await assertDiskSpace();
-    releaseUserSlot = acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey });
+    releaseUserSlot = acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey, kind: job.requestedFormat.kind });
   } catch (err) {
     await finalizeFailure(job, err, Date.now(), false, { fellBack: options.fellBack, recordFailure: options.recordFailure });
     clearJobController(job.id);

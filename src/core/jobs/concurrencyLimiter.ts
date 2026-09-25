@@ -59,20 +59,24 @@ function acquireKeyedSlot(key: string, limit: number): () => void {
   };
 }
 
-export function acquireUserDownloadSlot(key: string, isGuest: boolean): () => void {
-  return acquireKeyedSlot(`visitor:${key}`, isGuest ? env.MAX_CONCURRENT_DOWNLOADS_PER_GUEST : env.MAX_CONCURRENT_DOWNLOADS_PER_USER);
+/** Video and audio downloads count separately: a visitor's video download does not block their audio one (or the reverse). */
+export type DownloadKind = 'video' | 'audio';
+
+export function acquireUserDownloadSlot(key: string, isGuest: boolean, kind: DownloadKind = 'video'): () => void {
+  return acquireKeyedSlot(`visitor:${key}:${kind}`, isGuest ? env.MAX_CONCURRENT_DOWNLOADS_PER_GUEST : env.MAX_CONCURRENT_DOWNLOADS_PER_USER);
 }
 
 /**
  * The per-guest slot plus, for guests, a per-network slot (see networkKey). The guest id comes from a cookie the
  * client controls, so on its own it would let a client that drops the cookie start unlimited downloads.
  */
-export function acquireVisitorDownloadSlots(visitor: { userId?: string | null; guestId?: string | null; networkKey?: string }): () => void {
-  const releaseVisitor = acquireUserDownloadSlot(visitor.userId ?? visitor.guestId ?? 'anonymous', !visitor.userId);
+export function acquireVisitorDownloadSlots(visitor: { userId?: string | null; guestId?: string | null; networkKey?: string; kind?: DownloadKind }): () => void {
+  const kind = visitor.kind ?? 'video';
+  const releaseVisitor = acquireUserDownloadSlot(visitor.userId ?? visitor.guestId ?? 'anonymous', !visitor.userId, kind);
   if (visitor.userId || !visitor.networkKey) return releaseVisitor;
   let releaseNetwork: () => void;
   try {
-    releaseNetwork = acquireKeyedSlot(`network:${visitor.networkKey}`, env.MAX_CONCURRENT_DOWNLOADS_PER_IP);
+    releaseNetwork = acquireKeyedSlot(`network:${visitor.networkKey}:${kind}`, env.MAX_CONCURRENT_DOWNLOADS_PER_IP);
   } catch (err) {
     releaseVisitor();
     throw err;
