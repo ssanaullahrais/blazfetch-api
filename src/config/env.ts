@@ -62,6 +62,9 @@ const envSchema = z.object({
   // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
   // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).
   STREAM_MODE_ENABLED: boolFromString(true),
+  // Every audio download is delivered as MP3: any source format that is not already MP3 is converted through
+  // ffmpeg (piped live in stream mode, or a temporary file that is deleted after sending in prepare/job mode).
+  AUDIO_FORCE_MP3: boolFromString(false),
 
   // Cloudflare Turnstile (bot check). Off by default. When on, fetch/stream/download need a passed check.
   TURNSTILE_ENABLED: boolFromString(false),

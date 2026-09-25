@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { fetchMedia } from '../services/fetchService';
 import { fetchAudio } from '../services/audioService';
+import { presentAudioFormats, presentMedia } from '../utils/audioMp3';
 import { recordVisitorFetch } from '../services/statsService';
 
 export const fetchBodySchema = z.object({
@@ -25,7 +26,7 @@ export async function postFetch(req: Request, res: Response): Promise<void> {
     guestId: req.guestId,
   });
   await recordVisitorFetch(result, { userId: req.userId, guestId: req.guestId });
-  res.json(result);
+  res.json(presentMedia(result));
 }
 
 export async function postFetchAudio(req: Request, res: Response): Promise<void> {
@@ -39,5 +40,5 @@ export async function postFetchAudio(req: Request, res: Response): Promise<void>
     userId: req.userId,
     guestId: req.guestId,
   });
-  res.json(result);
+  res.json({ ...result, audioFormats: presentAudioFormats(result.audioFormats) });
 }

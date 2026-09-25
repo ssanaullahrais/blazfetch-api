@@ -21,6 +21,7 @@ import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { resolveFormat } from './downloadService';
 import { buildFilename } from '../utils/filename';
 import { isManifestFormat, phoneSafeEquivalent } from '../core/adapters/formatSelection';
+import { needsMp3Conversion } from '../utils/audioMp3';
 
 export interface OpenStreamParams {
   url: string;
@@ -183,6 +184,17 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
 
   // Audio: a real standalone audio track is piped as-is; anything else becomes MP3 through ffmpeg.
   const audio: BlazfetchAudioFormat | undefined = media.audioFormats.find((f) => f.formatId === format.formatId);
+  if (audio && !audio.isConverted && needsMp3Conversion(audio)) {
+    // AUDIO_FORCE_MP3: any track that is not already MP3 is converted live through ffmpeg (no temp file).
+    return {
+      type: 'ffmpeg',
+      selector: audio.formatId,
+      mode: 'mp3',
+      contentType: 'audio/mpeg',
+      ext: 'mp3',
+      fast: audio.url ? { kind: 'ffmpeg', inputs: [{ url: audio.url, headers: {} }], mode: 'mp3' } : undefined,
+    };
+  }
   if (audio && !audio.isConverted) {
     // An HLS audio track would come out of yt-dlp as MPEG-TS. A live remux gives a fragmented M4A, which phones may
     // refuse, so the phone-safe modes prepare a normal M4A instead.
