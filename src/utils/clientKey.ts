@@ -6,19 +6,26 @@ import { logger } from '../lib/logger';
 let warnedAboutProxy = false;
 
 /**
- * Who a limit is counted against. The guest cookie cannot be used: a client that simply drops it gets a fresh guest
- * id on every request, and with it a fresh limit. A signed-in user is counted by account, everyone else by IP
- * address (req.ip honours TRUST_PROXY). An IPv6 client usually owns a whole /64, so it is counted by that prefix.
+ * The visitor's network, for the per-IP ceilings that sit on top of the per-visitor limits. The guest cookie alone
+ * cannot bound anything: a client that drops it gets a fresh guest id, and a fresh limit, on every request.
+ *
+ * Counted by IP address (req.ip honours TRUST_PROXY); an IPv6 client usually owns a whole /64, so by that prefix.
+ * Returns undefined when the address is not the visitor's: a request that came through a proxy while TRUST_PROXY is 0
+ * carries the proxy's address, and counting by it would make every visitor share one ceiling. Callers then skip the
+ * per-IP ceiling and keep only the per-visitor limit, exactly as before it existed.
  */
-export function clientKey(req: Request): string {
-  if (req.userId) return `user:${req.userId}`;
-  if (!warnedAboutProxy && env.TRUST_PROXY === 0 && req.headers['x-forwarded-for']) {
-    warnedAboutProxy = true;
-    logger.warn('Requests arrive through a proxy but TRUST_PROXY is 0: every visitor shares the proxy\'s rate limit. Set TRUST_PROXY=1 behind Nginx.');
+export function networkKey(req: Request): string | undefined {
+  if (env.TRUST_PROXY === 0 && req.headers['x-forwarded-for']) {
+    if (!warnedAboutProxy) {
+      warnedAboutProxy = true;
+      logger.warn('Requests arrive through a proxy but TRUST_PROXY is 0, so per-IP limits are off. Set TRUST_PROXY=1 behind Nginx.');
+    }
+    return undefined;
   }
   const ip = req.ip ?? req.socket?.remoteAddress ?? '';
+  if (!ip) return undefined;
   if (net.isIPv6(ip) && !ip.toLowerCase().startsWith('::ffff:')) return `ip6:${ipv6Prefix64(ip)}`;
-  return `ip:${ip.replace(/^::ffff:/i, '') || 'unknown'}`;
+  return `ip:${ip.replace(/^::ffff:/i, '')}`;
 }
 
 function ipv6Prefix64(ip: string): string {

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ErrorCode } from '../constants/errors';
-import { clientKey } from '../utils/clientKey';
+import { networkKey } from '../utils/clientKey';
 import { getStatsTotals, subscribeStatsTotals } from '../services/statsTotalsService';
 
 /** Public, anonymous totals (no per-visitor data). */
@@ -60,13 +60,14 @@ function startPolling(): void {
 
 /** Push committed totals immediately. Periodic reads also observe writes from other API workers. */
 export function streamStats(req: Request, res: Response): void {
-  const key = clientKey(req);
-  const open = streamsPerClient.get(key) ?? 0;
+  // No per-client cap when the address is the proxy's (see networkKey): every visitor would share it.
+  const key = networkKey(req);
+  const open = key ? streamsPerClient.get(key) ?? 0 : 0;
   if (open >= MAX_STREAMS_PER_CLIENT || subscribers.size >= MAX_STREAMS_TOTAL) {
     res.status(429).json({ success: false, error: { code: ErrorCode.SERVER_BUSY, message: 'Too many live stats connections.' }, requestId: req.requestId });
     return;
   }
-  streamsPerClient.set(key, open + 1);
+  if (key) streamsPerClient.set(key, open + 1);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-store');
@@ -80,9 +81,11 @@ export function streamStats(req: Request, res: Response): void {
   startPolling();
   res.once('close', () => {
     subscribers.delete(res);
-    const left = (streamsPerClient.get(key) ?? 1) - 1;
-    if (left <= 0) streamsPerClient.delete(key);
-    else streamsPerClient.set(key, left);
+    if (key) {
+      const left = (streamsPerClient.get(key) ?? 1) - 1;
+      if (left <= 0) streamsPerClient.delete(key);
+      else streamsPerClient.set(key, left);
+    }
     if (subscribers.size === 0) stopPolling?.();
   });
   if (!latest) void broadcast();

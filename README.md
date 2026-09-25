@@ -224,8 +224,9 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | `REVALIDATE_AFTER_SECONDS` | `604800` (7 days) | How often each stored item is re-checked |
 | `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_SESSION_SECONDS` | `false`, 1800 s | Optional [Cloudflare Turnstile](docs/API.md#cloudflare-turnstile-optional-bot-check) bot check in front of fetch, stream and download |
 | `YOUTUBE_FALLBACK_ENABLED` | `true` | Use a fallback provider when YouTube blocks the server |
-| `MAX_CONCURRENT_DOWNLOADS_GLOBAL` / `_PER_GUEST` / `_PER_IP` | `10` / `1` / `4` | Concurrency limits (guests on one IP share `_PER_IP`) |
-| `RATE_LIMIT_MAX_GUEST` / `RATE_LIMIT_MAX_DOWNLOAD` | `30` / `10` per minute | Rate limits, counted per IP address (set `TRUST_PROXY=1` behind Nginx) |
+| `MAX_CONCURRENT_DOWNLOADS_GLOBAL` / `_PER_GUEST` / `_PER_IP` | `10` / `1` / `5` | Concurrency limits (guests on one IP share `_PER_IP`) |
+| `RATE_LIMIT_MAX_GUEST` / `RATE_LIMIT_MAX_DOWNLOAD` | `30` / `10` per minute | Rate limits per visitor |
+| `RATE_LIMIT_IP_MULTIPLIER` | `10` | Per-IP ceiling, as a multiple of the per-visitor limits (only when `TRUST_PROXY` is set correctly behind a proxy) |
 | `MAX_DOWNLOAD_SIZE_BYTES`, `TEMP_DIR` | 2 GB, `./tmp` | Size cap and temporary folder |
 
 ## Security

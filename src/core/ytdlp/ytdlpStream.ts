@@ -161,7 +161,8 @@ function headerArg(headers: Record<string, string>): string[] {
   return lines ? ['-headers', lines] : [];
 }
 
-const FFMPEG_NETWORK_PROTOCOLS = 'http,https,tls,tcp,crypto';
+// httpproxy: deployments that route outbound traffic through an HTTP proxy (http_proxy env) need it.
+const FFMPEG_NETWORK_PROTOCOLS = 'http,https,tls,tcp,crypto,httpproxy';
 
 export function ffmpegStreamArgs(inputs: ResolvedInput[], mode: FfmpegMode): string[] {
   const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-fflags', '+genpts'];

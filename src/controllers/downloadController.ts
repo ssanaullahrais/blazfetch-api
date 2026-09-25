@@ -11,7 +11,7 @@ import { safeFetch } from '../utils/safeFetch';
 import { attachmentHeader } from '../utils/contentDisposition';
 import { BlazfetchError } from '../constants/errors';
 import { recordDownloadStat } from '../services/statsService';
-import { clientKey } from '../utils/clientKey';
+import { networkKey } from '../utils/clientKey';
 import type { JobRecord } from '../core/jobs/jobTypes';
 
 export const downloadBodySchema = z.object({
@@ -35,7 +35,7 @@ export async function postDownload(req: Request, res: Response): Promise<void> {
 
   // The HTTP response returns immediately with the job handle; the actual resolve/download
   // work continues in the background so the client can poll or stream once it's ready.
-  runDownloadJob(job, req.requestId, { networkKey: clientKey(req) }).catch((err) => {
+  runDownloadJob(job, req.requestId, { networkKey: networkKey(req) }).catch((err) => {
     logger.warn({ jobId: job.id, err: (err as Error).message }, 'download job failed');
   });
 

@@ -13,7 +13,7 @@ import { runDownloadJob, startDownloadJob } from '../services/downloadService';
 import { fetchMedia } from '../services/fetchService';
 import { recordDownloadStat } from '../services/statsService';
 import { mediaKeyForResponse } from '../core/media/mediaPath';
-import { clientKey } from '../utils/clientKey';
+import { networkKey } from '../utils/clientKey';
 import { attachmentHeader } from '../utils/contentDisposition';
 
 export const DOWNLOAD_MODES = ['stream', 'prepare', 'auto'] as const;
@@ -162,7 +162,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
   /** Direct stream: resolves once the response has been handed to the pipe (or the client left). */
   const runStream = async (): Promise<void> => {
-    releaseUser = acquireVisitorDownloadSlots({ userId: req.userId, guestId: req.guestId, networkKey: clientKey(req) }); // throws SERVER_BUSY when over the limit
+    releaseUser = acquireVisitorDownloadSlots({ userId: req.userId, guestId: req.guestId, networkKey: networkKey(req) }); // throws SERVER_BUSY when over the limit
     releaseGlobal = await globalDownloadSemaphore.acquire();
     if (clientClosed) return;
 
@@ -231,7 +231,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: clientKey(req) });
+      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: networkKey(req) });
     } finally {
       prepareFinished = true;
     }

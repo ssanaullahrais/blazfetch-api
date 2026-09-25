@@ -6,10 +6,11 @@ import { assertNotPrivateHost } from '../../src/utils/ssrf';
 import { safeFetch } from '../../src/utils/safeFetch';
 import { assertOwnership } from '../../src/core/jobs/ownership';
 import { clearShortLinkCache, normalizeAndResolveUrl } from '../../src/utils/shortLinks';
-import { clientKey } from '../../src/utils/clientKey';
+import { networkKey } from '../../src/utils/clientKey';
 import { requestId } from '../../src/middleware/requestId';
 import { acquireVisitorDownloadSlots } from '../../src/core/jobs/concurrencyLimiter';
 import { ffmpegStreamArgs } from '../../src/core/ytdlp/ytdlpStream';
+import { env } from '../../src/config/env';
 
 describe('attachmentHeader', () => {
   it('cannot be bent by the file name', () => {
@@ -105,15 +106,35 @@ describe('short links', () => {
     await expect(normalizeAndResolveUrl('https://t.co/stuck')).rejects.toThrow(/could not be resolved/);
   });
 
-  it('leaves a platform short link as it is when it does not redirect', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('<html></html>')) as unknown as typeof fetch;
-    const result = await normalizeAndResolveUrl('https://redd.it/abc');
-    expect(result.canonicalUrl).toBe('https://redd.it/abc');
+  it('follows the meta refresh t.co serves to some clients instead of a redirect', async () => {
+    const page = '<head><noscript><META http-equiv="refresh" content="0;URL=https://x.com/user/status/123?s=20&amp;t=abc"></noscript></head>';
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes('t.co') ? new Response(page) : new Response('tweet')) as unknown as typeof fetch;
+    const result = await normalizeAndResolveUrl('https://t.co/meta');
+    expect(result.platform).toBe('twitter');
+    expect(result.canonicalUrl).toBe('https://x.com/user/status/123');
   });
 
-  it('does not touch the network for ordinary links', async () => {
+  it('does not touch the network for any other link, platform short links included', async () => {
     globalThis.fetch = vi.fn() as unknown as typeof fetch;
-    await normalizeAndResolveUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    for (const url of [
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://youtu.be/dQw4w9WgXcQ',
+      'https://www.tiktok.com/@user/video/7300000000000000000',
+      'https://vm.tiktok.com/ZMabc123/',
+      'https://www.instagram.com/reel/Cabc123/',
+      'https://x.com/user/status/123',
+      'https://www.facebook.com/watch/?v=123',
+      'https://fb.watch/abc123/',
+      'https://www.reddit.com/r/videos/comments/abc/title/',
+      'https://redd.it/abc',
+      'https://pin.it/abc123',
+      'https://soundcloud.com/artist/track',
+      'https://vimeo.com/123456',
+    ]) {
+      const result = await normalizeAndResolveUrl(url);
+      expect(result.originalUrl).toBe(url);
+    }
     expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalled();
   });
 });
@@ -128,23 +149,27 @@ describe('ffmpeg inputs', () => {
   });
 });
 
-describe('limits are not keyed by the guest cookie', () => {
+describe('per-IP ceilings', () => {
   const req = (ip: string, extra: Partial<Request> = {}) => ({ ip, headers: {}, ...extra }) as unknown as Request;
 
   it('counts guests by IP address, whatever guest id they send', () => {
-    expect(clientKey(req('203.0.113.9', { guestId: 'a' }))).toBe(clientKey(req('203.0.113.9', { guestId: 'b' })));
-    expect(clientKey(req('::ffff:203.0.113.9'))).toBe(clientKey(req('203.0.113.9')));
+    expect(networkKey(req('203.0.113.9', { guestId: 'a' }))).toBe(networkKey(req('203.0.113.9', { guestId: 'b' })));
+    expect(networkKey(req('::ffff:203.0.113.9'))).toBe(networkKey(req('203.0.113.9')));
   });
 
   it('counts an IPv6 client by its /64', () => {
-    expect(clientKey(req('2001:db8:1:2::1'))).toBe(clientKey(req('2001:db8:1:2:ffff::9')));
-    expect(clientKey(req('2001:db8:1:2::1'))).not.toBe(clientKey(req('2001:db8:1:3::1')));
+    expect(networkKey(req('2001:db8:1:2::1'))).toBe(networkKey(req('2001:db8:1:2:ffff::9')));
+    expect(networkKey(req('2001:db8:1:2::1'))).not.toBe(networkKey(req('2001:db8:1:3::1')));
+  });
+
+  it('is off when the address is a proxy the app was not told to trust (visitors would share it)', () => {
+    expect(networkKey(req('127.0.0.1', { headers: { 'x-forwarded-for': '198.51.100.1' } } as never))).toBeUndefined();
   });
 
   it('caps downloads per network even when every request brings a new guest id', () => {
     const releases: (() => void)[] = [];
     try {
-      for (let i = 0; i < 4; i += 1) releases.push(acquireVisitorDownloadSlots({ guestId: `g${i}`, networkKey: 'ip:198.51.100.7' }));
+      for (let i = 0; i < env.MAX_CONCURRENT_DOWNLOADS_PER_IP; i += 1) releases.push(acquireVisitorDownloadSlots({ guestId: `g${i}`, networkKey: 'ip:198.51.100.7' }));
       expect(() => acquireVisitorDownloadSlots({ guestId: 'g-new', networkKey: 'ip:198.51.100.7' })).toThrow(/limit/);
       expect(() => acquireVisitorDownloadSlots({ guestId: 'g-other', networkKey: 'ip:198.51.100.8' })()).not.toThrow();
     } finally {
