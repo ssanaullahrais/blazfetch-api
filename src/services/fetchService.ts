@@ -1,3 +1,4 @@
+import { fillMissingSizes } from '../utils/probeSizes';
 import { env } from '../config/env';
 import { NormalizedUrlResult } from '../utils/url';
 import { normalizeAndResolveUrl } from '../utils/shortLinks';
@@ -203,7 +204,10 @@ async function extractLive(
     const release = await globalFetchSemaphore.acquire();
     const startedAt = Date.now();
     try {
-      const result = await adapter.fetchMetadata({ requestId: params.requestId, normalizedUrl: normalized, range: params.range });
+      const result = await fillMissingSizes(
+        await adapter.fetchMetadata({ requestId: params.requestId, normalizedUrl: normalized, range: params.range }),
+        params.requestId,
+      );
 
       if (isRanged) {
         await recordFetchStat({
