@@ -1,16 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { BlazfetchError } from '../constants/errors';
 import { passIsValid, TURNSTILE_COOKIE, turnstileEnabled } from '../services/turnstileService';
-
-function cookieValue(req: Request, name: string): string | undefined {
-  for (const part of (req.headers.cookie ?? '').split(';')) {
-    const [key, ...rest] = part.trim().split('=');
-    if (key === name) {
-      try { return decodeURIComponent(rest.join('=')); } catch { return undefined; }
-    }
-  }
-  return undefined;
-}
+import { cookieValue } from '../utils/cookies';
 
 /**
  * When Cloudflare Turnstile is enabled, lets a request through only if the visitor holds a valid pass (issued by
