@@ -158,6 +158,10 @@ export class InstagramAdapter implements PlatformAdapter {
     }
 
     const isCarousel = items.length > 1;
+    // A profile or stories link: name the result after the account instead of leaving it to a generic label.
+    const account = canonicalUrl.match(/^https?:\/\/(?:www\.)?instagram\.com\/(stories\/)?([A-Za-z0-9._]{1,30})\/?$/i);
+    const reserved = new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore']);
+    const username = account && !reserved.has(account[2].toLowerCase()) ? account[2] : undefined;
     // Providers answering for a whole profile put the SAME picture on every entry. Showing it on each row is misleading,
     // so when every entry shares one thumbnail an image uses itself and a video shows none (the page keeps the cover).
     const sharedThumbnail = items.length > 1 && items.every((item) => item.thumbnail && item.thumbnail === items[0].thumbnail);
@@ -180,8 +184,11 @@ export class InstagramAdapter implements PlatformAdapter {
       success: true,
       platform: 'instagram',
       mediaType: isCarousel ? 'carousel' : items[0].type === 'video' ? 'video' : 'image',
-      mediaId: canonicalUrl.split('/').filter(Boolean).pop() ?? 'unknown',
+      // Stories get their own id: they share the account name with the profile, and the two must not overwrite each other.
+      mediaId: username && account?.[1] ? `stories-${username}` : (canonicalUrl.split('/').filter(Boolean).pop() ?? 'unknown'),
       canonicalUrl,
+      title: username ? `@${username}${account?.[1] ? ' · Stories' : ''}` : undefined,
+      author: username ? { name: `@${username}`, url: `https://www.instagram.com/${username}/` } : undefined,
       thumbnail: items[0].thumbnail ?? (items[0].type === 'image' ? items[0].url : undefined),
       isCarousel,
       itemCount: items.length,

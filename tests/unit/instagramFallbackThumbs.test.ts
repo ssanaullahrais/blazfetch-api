@@ -25,3 +25,24 @@ describe('Instagram fallback items', () => {
     expect(items?.map((i) => i.thumbnail)).toEqual(['https://cdn.example.com/1.jpg', 'https://cdn.example.com/2.jpg']);
   });
 });
+
+describe('Instagram fallback naming', () => {
+  const run = (url: string) =>
+    (new InstagramAdapter() as unknown as { normalizeFallbackItems(r: Raw[], u: string, f: string): { mediaId: string; title?: string; author?: { name?: string } } }).normalizeFallbackItems(
+      [
+        { url: 'https://d.example.com/a.mp4', type: 'video' },
+        { url: 'https://d.example.com/b.jpg', type: 'image' },
+      ],
+      url,
+      'btch-downloader',
+    );
+
+  it('names a profile after the account and keeps stories under a separate id', () => {
+    expect(run('https://www.instagram.com/ajaydevgn')).toMatchObject({ mediaId: 'ajaydevgn', title: '@ajaydevgn', author: { name: '@ajaydevgn' } });
+    expect(run('https://www.instagram.com/stories/ajaydevgn')).toMatchObject({ mediaId: 'stories-ajaydevgn', title: '@ajaydevgn · Stories' });
+  });
+
+  it('leaves a single post without an account title', () => {
+    expect(run('https://www.instagram.com/p/DdtviT1KYcv').title).toBeUndefined();
+  });
+});
