@@ -150,6 +150,9 @@ Setup creates the tables, not the database itself. For PostgreSQL run `createdb 
 for MySQL `CREATE DATABASE blazfetch CHARACTER SET utf8mb4;`. All four store the same data (metadata cache, jobs, stats,
 never the downloaded media) and the app behaves identically on each.
 
+`npm run setup` starts from `.env.example`, so a fresh install gets the recommended settings, including
+`AUDIO_FORCE_MP3=true` (every audio download is delivered as MP3; see [Optional: everything as MP3](#optional-everything-as-mp3)).
+
 Prefer to configure by hand? Copy `.env.example` to `.env`, set `DATABASE_DRIVER` (`sqlite`,
 `postgres`, `mysql` or `mongodb`) and `DATABASE_URL`, then run `npm run migrate`. Setup can also run
 non-interactively: `npm run setup -- --driver=postgres --url=postgres://user:pass@host:5432/blazfetch`.
