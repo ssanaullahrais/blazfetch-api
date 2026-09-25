@@ -22,11 +22,13 @@ const media = {
 describe('AUDIO_FORCE_MP3', () => {
   it('lists every audio option as MP3 and keeps the ids', () => {
     flag.on = true;
-    const shown = presentAudioFormats(media.audioFormats);
+    const shown = presentAudioFormats(media.audioFormats, 100);
     expect(shown.map((f) => [f.formatId, f.ext, f.isConverted])).toEqual([
       ['140', 'mp3', true],
       ['mp3src', 'mp3', false],
     ]);
+    // 100 s at 192 kbps: an approximate size, so the row shows one
+    expect(shown[0]).toMatchObject({ filesizeBytes: 2_400_000, filesizeApprox: true });
   });
 
   it('plans a live ffmpeg MP3 conversion for a non-MP3 track, and passes an MP3 through', () => {

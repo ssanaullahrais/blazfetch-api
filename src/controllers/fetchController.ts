@@ -40,5 +40,5 @@ export async function postFetchAudio(req: Request, res: Response): Promise<void>
     userId: req.userId,
     guestId: req.guestId,
   });
-  res.json({ ...result, audioFormats: presentAudioFormats(result.audioFormats) });
+  res.json({ ...result, audioFormats: presentAudioFormats(result.audioFormats, result.durationSeconds) });
 }
