@@ -79,7 +79,7 @@ export interface RunDownloadOptions {
   fellBack?: boolean;
   /** GET /stream records the entire response outcome itself, including preparation failures. */
   recordFailure?: boolean;
-  /** The requester's network (see clientKey), for the per-IP download limit on guests. */
+  /** The requester's network (see networkKey), for the per-IP download limit on guests. */
   networkKey?: string;
 }
 
@@ -234,7 +234,7 @@ interface StatContext {
   mediaKey?: string;
   fellBack?: boolean;
   recordFailure?: boolean;
-  /** The requester's network (see clientKey), for the per-IP download limit on guests. */
+  /** The requester's network (see networkKey), for the per-IP download limit on guests. */
   networkKey?: string;
 }
 

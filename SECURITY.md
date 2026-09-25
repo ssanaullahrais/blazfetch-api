@@ -28,8 +28,8 @@ leaks, rotate it in its dashboard first.
   real name travels in `filename*`). Helmet sets the standard security headers.
 - **CORS and cookies:** a wildcard `CORS_ALLOWED_ORIGINS` is refused in production; cookies are `HttpOnly`, `SameSite=Lax`
   and `Secure` in production.
-- **Limits:** rate limits per IP address (never per cookie, which a client could simply drop), concurrency limits per
-  visitor and per IP address, a cap on live-stats connections, a maximum download size, timeouts on every external process,
+- **Limits:** rate limits and concurrency limits per visitor, with a looser per-IP ceiling on top (the visitor cookie
+  alone could simply be dropped), a cap on live-stats connections, a maximum download size, timeouts on every external process,
   and a 1 MB request body limit.
 - **No public details:** `/health/ready` returns only pass/fail flags, and raw tool output is never sent to clients.
 - **Optional Cloudflare Turnstile:** a signed, expiring pass cookie bound to the visitor; the secret key never leaves the

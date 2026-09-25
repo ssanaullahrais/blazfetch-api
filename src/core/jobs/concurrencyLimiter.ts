@@ -55,7 +55,7 @@ export function acquireUserDownloadSlot(key: string, isGuest: boolean): () => vo
 }
 
 /**
- * The per-guest slot plus, for guests, a per-network slot (see clientKey). The guest id comes from a cookie the
+ * The per-guest slot plus, for guests, a per-network slot (see networkKey). The guest id comes from a cookie the
  * client controls, so on its own it would let a client that drops the cookie start unlimited downloads.
  */
 export function acquireVisitorDownloadSlots(visitor: { userId?: string | null; guestId?: string | null; networkKey?: string }): () => void {
