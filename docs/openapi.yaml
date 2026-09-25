@@ -234,6 +234,7 @@ components:
         formatId: { type: string, default: best, description: A formatId from /fetch, or "best". }
         kind: { type: string, enum: [video, audio] }
         quality: { type: string }
+        filename: { type: string, maxLength: 200, description: Name for the finished file without extension; defaults to the media title. }
     BlazfetchFormat:
       type: object
       properties:

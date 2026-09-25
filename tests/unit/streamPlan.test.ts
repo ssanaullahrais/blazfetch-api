@@ -70,6 +70,34 @@ describe('planStream', () => {
   });
 });
 
+describe('planStream in stream mode (Fastest: no phone-safe rule)', () => {
+  const fastest = { phoneSafeOnly: false };
+
+  it('live-merges a video-only format with audio instead of refusing it', () => {
+    expect(planStream(media(), { formatId: '137', kind: 'video' }, fastest)).toMatchObject({ type: 'ffmpeg', mode: 'merge', ext: 'mp4', selector: '137+bestaudio[acodec^=mp4a]/137+bestaudio/best' });
+  });
+
+  it('remuxes HLS to MP4 on the fly', () => {
+    expect(planStream(media(), { formatId: 'hls-720', kind: 'video' }, fastest)).toMatchObject({ type: 'ffmpeg', mode: 'remux', ext: 'mp4' });
+  });
+
+  it('passes WebM / VP9 through as they are, with their own extension', () => {
+    const codecs = media({
+      formats: [
+        { formatId: 'webm', ext: 'webm', kind: 'video', codec: 'vp9' },
+        { formatId: 'vp9', ext: 'mp4', kind: 'video', codec: 'vp09.00.40.08' },
+      ],
+    });
+    expect(planStream(codecs, { formatId: 'webm', kind: 'video' }, fastest)).toMatchObject({ type: 'ytdlp', ext: 'webm', contentType: 'video/webm' });
+    expect(planStream(codecs, { formatId: 'vp9', kind: 'video' }, fastest)).toMatchObject({ type: 'ytdlp', ext: 'mp4' });
+  });
+
+  it('proxies a fallback provider link even when it is not phone-safe', () => {
+    const plan = planStream(media({ extractor: 'btch-downloader', formats: [{ formatId: 'x', ext: 'webm', kind: 'video', url: 'https://cdn.example/a.webm' }] }), { formatId: 'x', kind: 'video' }, fastest);
+    expect(plan).toMatchObject({ type: 'proxy', url: 'https://cdn.example/a.webm', ext: 'webm' });
+  });
+});
+
 describe('planStream: carousel items', () => {
   it('streams a video that lives inside a mixed photo + video carousel from its own link', () => {
     const carousel = media({
@@ -112,7 +140,8 @@ describe('planStream fast path', () => {
 
   it('never passes an HLS/DASH manifest through as if it were the media', () => {
     const hlsAudio = media({ audioFormats: [{ formatId: 'hls_mp3', ext: 'mp3', bitrate: 128, isConverted: false, url: 'https://cdn.example/playlist.m3u8?x=1' }] });
-    expect((planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' }) as { fast?: unknown }).fast).toBeUndefined();
+    // ffmpeg reads the playlist (remuxing to M4A); it is never proxied as if it were the file.
+    expect((planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' }) as { fast?: { kind: string } }).fast?.kind).not.toBe('proxy');
   });
 
   it('has no fast path when the cached format has no URL', () => {
@@ -179,5 +208,25 @@ describe('waitForFirstChunk', () => {
     const p = waitForFirstChunk(s);
     s.end();
     await expect(p).rejects.toThrow(/no data/);
+  });
+});
+
+describe('planStream: HLS audio', () => {
+  it('remuxes an HLS audio track to M4A with ffmpeg (yt-dlp would pipe it out as MPEG-TS)', () => {
+    const hlsAudio = media({ audioFormats: [{ formatId: 'hls-raw-audio-audio', ext: 'mp4', isConverted: false, url: 'https://cdn.example/audio.m3u8?sig=1' }] });
+    expect(planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' })).toMatchObject({
+      type: 'ffmpeg',
+      mode: 'audio',
+      ext: 'm4a',
+      contentType: 'audio/mp4',
+      fast: { kind: 'ffmpeg', mode: 'audio', inputs: [{ url: 'https://cdn.example/audio.m3u8?sig=1' }] },
+    });
+  });
+
+  it('maps only the audio track and writes fragmented MP4', () => {
+    const args = ffmpegStreamArgs([{ url: 'https://cdn.example/audio.m3u8', headers: {} }], 'audio');
+    expect(args.join(' ')).toContain('-map 0:a:0 -vn');
+    expect(args.join(' ')).toContain('-bsf:a aac_adtstoasc');
+    expect(args.slice(-3)).toEqual(['-f', 'mp4', 'pipe:1']);
   });
 });

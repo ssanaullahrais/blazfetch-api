@@ -1,6 +1,6 @@
 import { Readable, Transform } from 'node:stream';
 import { env } from '../config/env';
-import { safeFetch } from '../utils/safeFetch';
+import { openRanged } from '../utils/rangedFetch';
 import { BlazfetchError } from '../constants/errors';
 import { logger } from '../lib/logger';
 import mime from '../lib/mime';
@@ -9,15 +9,18 @@ import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchAudioFormat, BlazfetchFormat, BlazfetchResponse } from '../types/blazfetch';
 import {
+  FfmpegMode,
   ResolvedInput,
   StreamSource,
   resolveDirectInputs,
-  spawnFfmpegToStdout,
+  spawnFfmpegRelayed,
   spawnYtdlpToStdout,
 } from '../core/ytdlp/ytdlpStream';
 import { fetchMedia } from './fetchService';
 import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { resolveFormat } from './downloadService';
+import { buildFilename } from '../utils/filename';
+import { isManifestFormat } from '../core/adapters/formatSelection';
 
 export interface OpenStreamParams {
   url: string;
@@ -28,6 +31,9 @@ export interface OpenStreamParams {
   userId?: string | null;
   guestId?: string | null;
   signal: AbortSignal;
+  /** mode=auto: refuse what phones can't play as-is, so the caller prepares a compatible file instead.
+   *  mode=stream ("Fastest") passes the source through as it is (a live merge/remux when needed). */
+  phoneSafeOnly?: boolean;
 }
 
 export interface OpenedStream {
@@ -48,24 +54,24 @@ export interface OpenedStream {
 /** Direct media URLs already known from the (cached) fetch: lets ffmpeg start immediately instead of
  *  waiting for yt-dlp to re-extract the page, which can take several seconds. */
 type FastPath =
-  | { kind: 'ffmpeg'; inputs: ResolvedInput[]; mode: 'merge' | 'remux' | 'mp3' }
+  | { kind: 'ffmpeg'; inputs: ResolvedInput[]; mode: FfmpegMode }
   /** A plain single file: its bytes are passed through untouched (exact size, no ffmpeg). */
   | { kind: 'proxy'; url: string };
 
 type Plan =
   | { type: 'ytdlp'; selector: string; contentType: string; ext: string; contentLength?: number; fast?: FastPath }
-  | { type: 'ffmpeg'; selector: string; mode: 'merge' | 'remux' | 'mp3'; contentType: string; ext: string; fast?: FastPath }
+  | { type: 'ffmpeg'; selector: string; mode: FfmpegMode; contentType: string; ext: string; fast?: FastPath }
   | { type: 'proxy'; url: string; contentType: string; ext: string };
 
 const MERGE_SELECTOR = (id: string): string => `${id}+bestaudio[acodec^=mp4a]/${id}+bestaudio/best`;
 
 function isHls(format: BlazfetchFormat): boolean {
-  return /\.m3u8(\?|$)/i.test(format.url ?? '') || format.formatId.toLowerCase().startsWith('hls');
+  return isManifestFormat(format);
 }
 
 /** A playlist/manifest is not the media itself, so it can never be passed through as-is. */
 function isManifestUrl(url: string): boolean {
-  return /\.(m3u8|mpd)(\?|$)/i.test(url);
+  return isManifestFormat({ formatId: '', url });
 }
 
 function proxyFastPath(url: string | undefined): FastPath | undefined {
@@ -110,9 +116,18 @@ function contentTypeFor(ext: string, kind: 'video' | 'audio'): string {
   return mime.lookup(`x.${ext}`) ?? (kind === 'audio' ? 'audio/mpeg' : 'video/mp4');
 }
 
+export interface PlanOptions {
+  /** Refuse anything that would not play on phones as-is (mode=auto), instead of streaming it anyway (mode=stream). */
+  phoneSafeOnly?: boolean;
+}
+
 /** Picks how to produce the bytes. Nothing here touches disk or transcodes video. */
-export function planStream(media: BlazfetchResponse, format: RequestedFormat): Plan {
+export function planStream(media: BlazfetchResponse, format: RequestedFormat, options: PlanOptions = {}): Plan {
   const isYtdlp = !media.extractor || media.extractor.startsWith('yt-dlp');
+  const phoneSafeOnly = options.phoneSafeOnly ?? true;
+  const requirePhoneSafe = (f: BlazfetchFormat): void => {
+    if (phoneSafeOnly && !isPhoneSafeVideo(f)) throw notPhoneSafe();
+  };
 
   if (format.kind === 'video') {
     const chosen = media.formats.find((f) => f.formatId === format.formatId);
@@ -120,7 +135,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
       // A video inside a carousel/board has its own direct link: pass that through (mixed photo+video posts).
       const fromItem = media.items?.flatMap((i) => i.formats ?? []).find((f) => f.formatId === format.formatId);
       if (fromItem?.url) {
-        if (!isPhoneSafeVideo(fromItem)) throw notPhoneSafe();
+        requirePhoneSafe(fromItem);
         return { type: 'proxy', url: fromItem.url, contentType: contentTypeFor(fromItem.ext, 'video'), ext: fromItem.ext };
       }
       throw new BlazfetchError('FORMAT_UNAVAILABLE', 'The requested format is not available for this media.');
@@ -128,17 +143,18 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
 
     if (!isYtdlp) {
       if (!chosen.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
-      if (!isPhoneSafeVideo(chosen)) throw notPhoneSafe();
+      requirePhoneSafe(chosen);
       return { type: 'proxy', url: chosen.url, contentType: contentTypeFor(chosen.ext, 'video'), ext: chosen.ext };
     }
-    if (chosen.requiresMerge || isHls(chosen)) throw notPhoneSafe(); // fragmented MP4 from a live merge/remux
-    if (!isPhoneSafeVideo(chosen)) throw notPhoneSafe();
+    // A live merge/remux produces fragmented MP4, which phone galleries show black: auto prepares those instead.
+    if (phoneSafeOnly && (chosen.requiresMerge || isHls(chosen))) throw notPhoneSafe();
     if (chosen.requiresMerge) {
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }
     if (isHls(chosen)) {
       return { type: 'ffmpeg', selector: chosen.formatId, mode: 'remux', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'remux') };
     }
+    requirePhoneSafe(chosen);
     return {
       type: 'ytdlp',
       fast: proxyFastPath(chosen.url),
@@ -152,6 +168,17 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat): P
   // Audio: a real standalone audio track is piped as-is; anything else becomes MP3 through ffmpeg.
   const audio: BlazfetchAudioFormat | undefined = media.audioFormats.find((f) => f.formatId === format.formatId);
   if (audio && !audio.isConverted) {
+    // An HLS audio track would come out of yt-dlp as MPEG-TS: remux it to a real M4A instead.
+    if (isYtdlp && isHls({ formatId: audio.formatId, url: audio.url } as BlazfetchFormat)) {
+      return {
+        type: 'ffmpeg',
+        selector: audio.formatId,
+        mode: 'audio',
+        contentType: 'audio/mp4',
+        ext: 'm4a',
+        fast: audio.url ? { kind: 'ffmpeg', inputs: [{ url: audio.url, headers: {} }], mode: 'audio' } : undefined,
+      };
+    }
     if (!isYtdlp) {
       if (!audio.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
       return { type: 'proxy', url: audio.url, contentType: contentTypeFor(audio.ext, 'audio'), ext: audio.ext };
@@ -226,31 +253,24 @@ export function waitForFirstChunk(stream: Readable): Promise<Buffer> {
   });
 }
 
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .replace(/[\\/:*?"<>|]+/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 150);
-}
+export { buildFilename } from '../utils/filename';
 
-export function buildFilename(requested: string | undefined, media: BlazfetchResponse, ext: string): string {
-  const base = sanitizeFilename(requested ?? '') || sanitizeFilename(media.title ?? '') || sanitizeFilename(media.mediaId) || 'download';
-  return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
-}
-
-/** Streams a plain HTTP(S) file through untouched. A source that ends early errors instead of finishing quietly. */
+/**
+ * Streams a plain HTTP(S) file through untouched, in ranged chunks (see openRanged) so hosts that throttle one long
+ * request (YouTube does, to about playback speed) still deliver at full speed. A source that ends early errors
+ * instead of finishing quietly.
+ */
 export async function openProxy(url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
   await assertUrlIsSafeToFetch(url);
-  const upstream = await safeFetch(url, { signal, headers: { 'accept-encoding': 'identity' } });
-  if (!upstream.ok || !upstream.body) {
-    logger.warn({ requestId, status: upstream.status }, 'stream proxy upstream failed');
-    throw new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
+  let source: Awaited<ReturnType<typeof openRanged>>;
+  try {
+    source = await openRanged(url, { signal });
+  } catch (err) {
+    logger.warn({ requestId, err: (err as Error).message }, 'stream proxy upstream failed');
+    throw err instanceof BlazfetchError ? err : new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
   }
-  const stream = Readable.fromWeb(upstream.body as never);
-  const length = Number(upstream.headers.get('content-length'));
-  return { stream, kill: () => stream.destroy(), contentLength: Number.isFinite(length) && length > 0 ? length : undefined };
+  const { stream, totalBytes } = source;
+  return { stream, kill: () => stream.destroy(), contentLength: totalBytes };
 }
 
 /**
@@ -271,7 +291,7 @@ async function openSource(plan: Plan, url: string, signal: AbortSignal, requestI
   if (plan.type === 'ffmpeg') {
     const inputs: ResolvedInput[] = await resolveDirectInputs({ url, formatSelector: plan.selector, signal });
     await assertInputsAreSafe(inputs);
-    return spawnFfmpegToStdout({ inputs, mode: plan.mode, signal });
+    return spawnFfmpegRelayed({ inputs, mode: plan.mode, signal });
   }
 
   return openProxy(plan.url, signal, requestId);
@@ -306,7 +326,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
     requireFreshUrls: true,
     forceRefresh: retriedWithFreshLinks,
   });
-  const plan = planStream(media, resolved);
+  const plan = planStream(media, resolved, { phoneSafeOnly: params.phoneSafeOnly });
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);
   let lastError: unknown;
@@ -323,7 +343,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
         open: async () =>
           fast.kind === 'proxy'
             ? openProxy(fast.url, params.signal, params.requestId)
-            : assertInputsAreSafe(fast.inputs).then(() => spawnFfmpegToStdout({ inputs: fast.inputs, mode: fast.mode, signal: params.signal })),
+            : assertInputsAreSafe(fast.inputs).then(() => spawnFfmpegRelayed({ inputs: fast.inputs, mode: fast.mode, signal: params.signal })),
       });
     }
     openers.push({ fast: false, open: () => openSource(plan, candidate, params.signal, params.requestId) });
