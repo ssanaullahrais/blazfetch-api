@@ -71,7 +71,7 @@ describe('sqlite database driver', () => {
     await db.migrate();
     await db.migrate();
     const versions = (await getKnex()('schema_migrations').select('version').orderBy('version')).map((r: { version: number }) => r.version);
-    expect(versions).toEqual([1, 2, 3]);
+    expect(versions).toEqual([1, 2, 3, 4]);
   });
 
   it('records fetch and download stats', async () => {

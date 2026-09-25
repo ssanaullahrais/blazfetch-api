@@ -1,10 +1,23 @@
 import { Request, Response } from 'express';
 import { ErrorCode } from '../constants/errors';
 import { networkKey } from '../utils/clientKey';
+import { getDb } from '../db';
+import { logger } from '../lib/logger';
 import { getStatsTotals, subscribeStatsTotals } from '../services/statsTotalsService';
 
-/** Public, anonymous totals (no per-visitor data). */
-export async function getStats(_req: Request, res: Response): Promise<void> {
+function visitorId(req: Request): string {
+  return req.userId ?? req.guestId ?? 'anonymous';
+}
+
+/** Best-effort: a visitor still gets their stats even if the presence write fails. */
+function touchPresence(id: string): void {
+  getDb().stats.recordPresence(id).catch((err) => logger.warn({ err: (err as Error).message }, 'failed to record visitor presence'));
+}
+
+/** Public, anonymous totals (no per-visitor data). Also counts as presence: the EventSource fallback
+ * (see watchSiteStats on the frontend) polls this same endpoint when a live connection isn't available. */
+export async function getStats(req: Request, res: Response): Promise<void> {
+  touchPresence(visitorId(req));
   const totals = await getStatsTotals();
   res.setHeader('Cache-Control', 'no-store');
   res.json({ success: true, ...totals });
@@ -18,8 +31,10 @@ const HEARTBEAT_MS = 15_000;
 /**
  * Every open /stats/events connection shares ONE poller, so the database sees one query per tick no matter how many
  * pages are open (one query per connection per tick let anyone load the database just by holding connections open).
+ * Maps each open response to the visitor id it belongs to, so presence can be re-touched on every heartbeat without
+ * a second lookup — this is also what the public "online now" count (see ONLINE_VISITOR_WINDOW_SECONDS) is built on.
  */
-const subscribers = new Set<Response>();
+const subscribers = new Map<Response, string>();
 const streamsPerClient = new Map<string, number>();
 let latest = '';
 let loading = false;
@@ -34,7 +49,7 @@ async function broadcast(): Promise<void> {
     const data = JSON.stringify({ success: true, ...(await getStatsTotals()) });
     if (data !== latest) {
       latest = data;
-      for (const res of subscribers) res.write(`data: ${data}\n\n`);
+      for (const res of subscribers.keys()) res.write(`data: ${data}\n\n`);
     }
   } catch {
     // Keep the connections alive through a temporary database outage and retry on the next tick.
@@ -48,7 +63,14 @@ function startPolling(): void {
   if (stopPolling) return;
   const unsubscribe = subscribeStatsTotals(() => { void broadcast(); });
   const poll = setInterval(() => { void broadcast(); }, POLL_MS);
-  const heartbeat = setInterval(() => { for (const res of subscribers) res.write(': keep-alive\n\n'); }, HEARTBEAT_MS);
+  // The same tick that keeps the connection alive also keeps its visitor "online": as long as a tab stays
+  // open, this refreshes last_seen_at well inside ONLINE_VISITOR_WINDOW_SECONDS every time.
+  const heartbeat = setInterval(() => {
+    for (const [res, id] of subscribers) {
+      res.write(': keep-alive\n\n');
+      touchPresence(id);
+    }
+  }, HEARTBEAT_MS);
   stopPolling = () => {
     unsubscribe();
     clearInterval(poll);
@@ -77,7 +99,8 @@ export function streamStats(req: Request, res: Response): void {
   res.write('retry: 2000\n\n');
   if (latest) res.write(`data: ${latest}\n\n`);
 
-  subscribers.add(res);
+  touchPresence(visitorId(req));
+  subscribers.set(res, visitorId(req));
   startPolling();
   res.once('close', () => {
     subscribers.delete(res);

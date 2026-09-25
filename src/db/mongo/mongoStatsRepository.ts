@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getMongoDb } from './mongoClient';
+import { env } from '../../config/env';
 import { DownloadStatParams, FetchStatParams } from '../../services/statsService';
 import { StatsStore, StatsTotals } from '../types';
 
@@ -50,10 +51,23 @@ export class MongoStatsRepository implements StatsStore {
 
   async totals(): Promise<StatsTotals> {
     const db = await getMongoDb();
-    const [fetches, downloads] = await Promise.all([
+    const windowStart = new Date(Date.now() - env.ONLINE_VISITOR_WINDOW_SECONDS * 1000);
+    const [fetches, downloads, online] = await Promise.all([
       db.collection('fetch_stats').countDocuments({ success: true, source: { $in: ['user', null] } }),
       db.collection('download_stats').countDocuments({ success: true }),
+      db.collection('visitor_presence').countDocuments({ lastSeenAt: { $gte: windowStart } }),
     ]);
-    return { fetches, downloads };
+    return { fetches, downloads, online };
+  }
+
+  async recordPresence(visitorId: string): Promise<void> {
+    const db = await getMongoDb();
+    // Every open tab for the same visitor collapses to one document, same as the SQL upsert.
+    await db.collection('visitor_presence').updateOne({ _id: visitorId } as never, { $set: { lastSeenAt: new Date() } }, { upsert: true });
+  }
+
+  async prunePresence(olderThanMs: number): Promise<void> {
+    const db = await getMongoDb();
+    await db.collection('visitor_presence').deleteMany({ lastSeenAt: { $lt: new Date(Date.now() - olderThanMs) } });
   }
 }

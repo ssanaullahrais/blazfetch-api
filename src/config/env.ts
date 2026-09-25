@@ -70,6 +70,11 @@ const envSchema = z.object({
   TEMP_SWEEP_MAX_AGE_MS: z.coerce.number().default(3600000),
   TEMP_SWEEP_INTERVAL_MS: z.coerce.number().default(600000),
 
+  // A visitor counts as "online" in the public stats while a GET /stats/events connection has touched
+  // presence within this long. The live-stats heartbeat (15s) keeps it fresh for as long as the tab stays
+  // open; this only needs to comfortably outlast a couple of missed heartbeats, not model a real timeout.
+  ONLINE_VISITOR_WINDOW_SECONDS: z.coerce.number().default(60),
+
   // How long the direct media URLs inside a stored response are trusted (they expire at the source).
   // Everything else about a stored item is kept forever; see the REVALIDATE_* settings.
   CACHE_TTL_SECONDS: z.coerce.number().default(3600),
