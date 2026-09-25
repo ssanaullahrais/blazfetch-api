@@ -10,7 +10,7 @@ Paste a link, get every quality option, download it. Nothing is stored except th
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
 ![Databases](https://img.shields.io/badge/DB-SQLite%20%7C%20PostgreSQL%20%7C%20MySQL%20%7C%20MongoDB-4169E1)
 ![Platforms](https://img.shields.io/badge/platforms-17%20confirmed-2EA44F)
-![Tests](https://img.shields.io/badge/tests-137%20passing-2EA44F)
+![Tests](https://img.shields.io/badge/tests-272%20passing-2EA44F)
 
 [Frontend repository](https://github.com/ssanaullahrais/blazfetch-web) ·
 [API reference](docs/API.md) ·
@@ -46,8 +46,12 @@ remember each link's details, such as title and formats, so repeat requests are 
 ## Highlights
 
 - **One API for 17 confirmed platforms** (plus Tumblr, wired but not yet verified): title, thumbnail and every quality option, then download.
-- **Three ways to download** with a single request: direct stream (starts immediately), prepare (a guaranteed
-  H.264/AAC file), or `auto` (stream, and fall back to prepare if the source can't be streamed).
+- **Three ways to download** with a single request, and streaming always comes first (preparing a file puts load on
+  the server): `stream` and `auto` pipe the file straight through (merges and HLS included, preferring an H.264 file
+  so it plays on phones) and fall back to preparing it on the server only if streaming fails before the first byte;
+  `prepare` builds a guaranteed H.264/AAC file first.
+- **Audio as MP3 on request:** `AUDIO_FORCE_MP3=true` delivers every audio download as MP3 (converted live, or through a
+  temporary file that is deleted after sending).
 - **Everything fetched is remembered forever** (metadata only), with stable page paths like `/youtube/Cwkej79U3ek`,
   a weekly check that notices deleted videos, and usage statistics.
 - **Works when a platform blocks it.** If YouTube blocks the server's IP, a fallback provider answers instead.
@@ -168,7 +172,7 @@ GET    /api/v1/downloads/:id             stream the file once the job is ready
 DELETE /api/v1/downloads/:id             cancel + clean up temp files
 DELETE /api/v1/jobs/:id                  cancel a job
 GET    /api/v1/platforms                 list supported platforms + domains
-GET    /api/v1/stats                     public all-time totals: successful fetches and downloads
+GET    /api/v1/stats                     public all-time totals: successful fetches and downloads (total and per platform)
 GET    /api/v1/config                    public settings (is Turnstile on, and its site key)
 POST   /api/v1/turnstile/verify          swap a solved Turnstile token for a pass cookie (only when Turnstile is on)
 GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpeg)

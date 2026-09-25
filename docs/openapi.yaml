@@ -100,9 +100,10 @@ paths:
         - name: mode
           in: query
           description: >
-            stream pipes straight through (default, no temp file). prepare builds the file on the server
-            first (H.264/AAC guaranteed) then sends it. auto tries stream and, if that fails before the
-            first byte, prepares in the same request. Default comes from DEFAULT_DOWNLOAD_MODE.
+            stream pipes straight through (default, no temp file; merges and HLS are piped live too) and, if that
+            fails before the first byte, prepares in the same request. auto does the same with balanced conversion
+            settings on the fallback (recommended). prepare builds the file on the server first (H.264/AAC guaranteed)
+            then sends it. Default comes from DEFAULT_DOWNLOAD_MODE.
           schema: { type: string, enum: [stream, prepare, auto] }
       responses:
         '200':
@@ -203,6 +204,28 @@ paths:
       responses:
         '200':
           description: Platform list
+  /stats:
+    get:
+      summary: Public all-time totals
+      description: >
+        Successful fetches and downloads (total and per platform) plus the visitors currently online.
+        No per-visitor data; never cached by the browser. GET /stats/events sends the same object as server-sent events.
+      responses:
+        '200':
+          description: Totals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  fetches: { type: integer }
+                  downloads: { type: integer }
+                  platforms:
+                    type: object
+                    description: Successful downloads per platform id; platforms without any are left out.
+                    additionalProperties: { type: integer }
+                  online: { type: integer }
 components:
   parameters:
     JobId:
@@ -327,7 +350,7 @@ components:
         quality: { type: string, nullable: true }
         filesizeBytes: { type: integer }
         filesizeApprox: { type: boolean }
-        isConverted: { type: boolean, description: True when the audio must be produced with ffmpeg. }
+        isConverted: { type: boolean, description: "True when the audio is produced with ffmpeg: an MP3 made from a video, or, with AUDIO_FORCE_MP3=true, any non-MP3 track (listed as ext mp3; its size is an estimate)." }
         url: { type: string }
     StoredInfo:
       type: object
