@@ -36,7 +36,7 @@ export const streamQuerySchema = z.object({
 });
 
 /** Failures that streaming can cause but preparing the file can still get around. */
-const FALLBACK_CODES = new Set(['DOWNLOAD_FAILED', 'EXTRACTOR_FAILED', 'PROCESS_TIMEOUT']);
+const FALLBACK_CODES = new Set(['DOWNLOAD_FAILED', 'EXTRACTOR_FAILED', 'PROCESS_TIMEOUT', 'FORMAT_UNAVAILABLE']);
 
 export function isFallbackEligible(err: unknown): boolean {
   if (!(err instanceof BlazfetchError)) return false;
@@ -86,6 +86,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   let releaseGlobal: (() => void) | undefined;
   let prepareJob: JobRecord | undefined;
   let prepareFinished = false;
+  /** The format the prepare step builds: the requested one first, then "best" if that cannot be produced. */
+  let prepareFormatId = formatId;
 
   const releaseSlots = (): void => {
     releaseGlobal?.();
@@ -142,6 +144,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   res.once('finish', () => {
     const complete = res.statusCode < 400 && bytes > 0 && (expectedLength === undefined || bytes === expectedLength);
     recordStat(complete, complete ? undefined : 'DOWNLOAD_FAILED');
+    releaseSlots(); // the client already has the whole response: free the slots now, not on the later 'close'
   });
 
   // Source EOF alone does not prove the HTTP response finished sending to the client.
@@ -179,9 +182,9 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       userId: req.userId,
       guestId: req.guestId,
       signal: abort.signal,
-      // Every mode only streams what already plays on phones as it is: a live merge or remux makes a fragmented MP4
-      // that phone galleries show black or refuse to open, so those are prepared as a normal MP4 instead.
-      phoneSafeOnly: true,
+      // Streaming always comes first (prepare puts load on the server): merges, remuxes and HLS are piped live as
+      // fragmented MP4. Only a failure before the first byte falls back to prepare (auto/stream).
+      phoneSafeOnly: false,
     });
     killSource = opened.kill;
     platformForStat = opened.platform;
@@ -218,11 +221,21 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     opened.stream.pipe(res);
   };
 
+  /** Drops a failed prepare attempt (job and temp files) before trying again. */
+  const cleanupPrepare = async (): Promise<void> => {
+    if (prepareJob) {
+      await cancelJob(prepareJob.id).catch(() => undefined);
+      await cleanupJobTempDir(prepareJob.id).catch(() => undefined);
+    }
+    prepareJob = undefined;
+    prepareFinished = false;
+  };
+
   /** Prepare: build the file with the job pipeline (same as POST /download), send it, delete it. */
   const runPrepare = async (): Promise<void> => {
     const job = await startDownloadJob({
       url,
-      format: { formatId, kind },
+      format: { formatId: prepareFormatId, kind },
       requestId: req.requestId,
       userId: req.userId,
       guestId: req.guestId,
@@ -322,7 +335,16 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       }
     }
 
-    await runPrepare();
+    try {
+      await runPrepare();
+    } catch (err) {
+      // The requested quality could not be produced: deliver the best one instead of failing the download.
+      if (clientClosed || res.headersSent || !isFallbackEligible(err) || prepareFormatId === 'best') throw err;
+      logger.warn({ requestId: req.requestId, formatId, err: (err as Error).message }, 'prepare failed for the requested format, retrying with best');
+      await cleanupPrepare();
+      prepareFormatId = 'best';
+      await runPrepare();
+    }
   } catch (err) {
     const code = err instanceof BlazfetchError ? err.code : 'INTERNAL_ERROR';
     recordStat(false, code);
