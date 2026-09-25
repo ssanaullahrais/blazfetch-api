@@ -2,10 +2,9 @@ import rateLimit from 'express-rate-limit';
 import { Request } from 'express';
 import { env } from '../config/env';
 import { ErrorCode } from '../constants/errors';
+import { clientKey } from '../utils/clientKey';
 
-function keyGenerator(req: Request): string {
-  return req.userId ?? req.guestId ?? req.ip ?? 'anonymous';
-}
+const keyGenerator = (req: Request): string => clientKey(req);
 
 function limitFor(req: Request, userMax: number, guestMax: number): number {
   return req.userId ? userMax : guestMax;

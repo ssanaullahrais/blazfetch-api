@@ -161,9 +161,12 @@ function headerArg(headers: Record<string, string>): string[] {
   return lines ? ['-headers', lines] : [];
 }
 
+const FFMPEG_NETWORK_PROTOCOLS = 'http,https,tls,tcp,crypto';
+
 export function ffmpegStreamArgs(inputs: ResolvedInput[], mode: FfmpegMode): string[] {
   const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-fflags', '+genpts'];
-  for (const input of inputs) args.push(...headerArg(input.headers), '-i', input.url);
+  // Only network protocols: a manifest from the source must not be able to point ffmpeg at file:, concat:, etc.
+  for (const input of inputs) args.push('-protocol_whitelist', FFMPEG_NETWORK_PROTOCOLS, ...headerArg(input.headers), '-i', input.url);
 
   if (mode === 'mp3') {
     args.push('-map', '0:a:0', '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', 'pipe:1');

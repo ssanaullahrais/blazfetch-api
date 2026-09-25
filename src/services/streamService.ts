@@ -4,7 +4,8 @@ import { safeFetch } from '../utils/safeFetch';
 import { BlazfetchError } from '../constants/errors';
 import { logger } from '../lib/logger';
 import mime from '../lib/mime';
-import { validateAndNormalizeUrl, assertUrlIsSafeToFetch } from '../utils/url';
+import { assertUrlIsSafeToFetch } from '../utils/url';
+import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchAudioFormat, BlazfetchFormat, BlazfetchResponse } from '../types/blazfetch';
 import {
@@ -252,13 +253,24 @@ export async function openProxy(url: string, signal: AbortSignal, requestId: str
   return { stream, kill: () => stream.destroy(), contentLength: Number.isFinite(length) && length > 0 ? length : undefined };
 }
 
+/**
+ * Media URLs come out of the extractor, i.e. from the source page, so they are checked like any user-supplied link
+ * before yt-dlp or ffmpeg is allowed to fetch them (neither applies the SSRF rules itself).
+ */
+async function assertInputsAreSafe(inputs: ResolvedInput[]): Promise<void> {
+  for (const input of inputs) await assertUrlIsSafeToFetch(input.url);
+}
+
 async function openSource(plan: Plan, url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
   if (plan.type === 'ytdlp') {
+    // yt-dlp re-extracts and downloads the same format: check where that format's bytes live first.
+    if (plan.fast?.kind === 'proxy') await assertUrlIsSafeToFetch(plan.fast.url);
     return spawnYtdlpToStdout({ url, formatSelector: plan.selector, signal });
   }
 
   if (plan.type === 'ffmpeg') {
     const inputs: ResolvedInput[] = await resolveDirectInputs({ url, formatSelector: plan.selector, signal });
+    await assertInputsAreSafe(inputs);
     return spawnFfmpegToStdout({ inputs, mode: plan.mode, signal });
   }
 
@@ -280,7 +292,7 @@ function sourceUrlCandidates(canonicalUrl: string, platform: string): string[] {
  * the controller can still reply with the normal JSON error envelope.
  */
 export async function openStream(params: OpenStreamParams, retriedWithFreshLinks = false): Promise<OpenedStream> {
-  const normalized = validateAndNormalizeUrl(params.url);
+  const normalized = await normalizeAndResolveUrl(params.url);
   await assertUrlIsSafeToFetch(normalized.canonicalUrl);
 
   const resolved = await resolveFormat(params.url, params.requestId, { formatId: params.formatId, kind: params.kind });
@@ -311,7 +323,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
         open: async () =>
           fast.kind === 'proxy'
             ? openProxy(fast.url, params.signal, params.requestId)
-            : spawnFfmpegToStdout({ inputs: fast.inputs, mode: fast.mode, signal: params.signal }),
+            : assertInputsAreSafe(fast.inputs).then(() => spawnFfmpegToStdout({ inputs: fast.inputs, mode: fast.mode, signal: params.signal })),
       });
     }
     openers.push({ fast: false, open: () => openSource(plan, candidate, params.signal, params.requestId) });

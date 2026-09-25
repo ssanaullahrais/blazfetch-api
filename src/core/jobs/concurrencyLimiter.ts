@@ -32,21 +32,44 @@ class Semaphore {
 export const globalDownloadSemaphore = new Semaphore(env.MAX_CONCURRENT_DOWNLOADS_GLOBAL);
 export const globalFetchSemaphore = new Semaphore(env.MAX_CONCURRENT_FETCHES_GLOBAL);
 
-const perUserDownloadCounts = new Map<string, number>();
+const perKeyDownloadCounts = new Map<string, number>();
 
-export function acquireUserDownloadSlot(key: string, isGuest: boolean): () => void {
-  const limit = isGuest ? env.MAX_CONCURRENT_DOWNLOADS_PER_GUEST : env.MAX_CONCURRENT_DOWNLOADS_PER_USER;
-  const current = perUserDownloadCounts.get(key) ?? 0;
+function acquireKeyedSlot(key: string, limit: number): () => void {
+  const current = perKeyDownloadCounts.get(key) ?? 0;
   if (current >= limit) {
     throw new BlazfetchError('SERVER_BUSY', 'You have reached your concurrent download limit.');
   }
-  perUserDownloadCounts.set(key, current + 1);
+  perKeyDownloadCounts.set(key, current + 1);
   let released = false;
   return () => {
     if (released) return;
     released = true;
-    const value = (perUserDownloadCounts.get(key) ?? 1) - 1;
-    if (value <= 0) perUserDownloadCounts.delete(key);
-    else perUserDownloadCounts.set(key, value);
+    const value = (perKeyDownloadCounts.get(key) ?? 1) - 1;
+    if (value <= 0) perKeyDownloadCounts.delete(key);
+    else perKeyDownloadCounts.set(key, value);
+  };
+}
+
+export function acquireUserDownloadSlot(key: string, isGuest: boolean): () => void {
+  return acquireKeyedSlot(`visitor:${key}`, isGuest ? env.MAX_CONCURRENT_DOWNLOADS_PER_GUEST : env.MAX_CONCURRENT_DOWNLOADS_PER_USER);
+}
+
+/**
+ * The per-guest slot plus, for guests, a per-network slot (see clientKey). The guest id comes from a cookie the
+ * client controls, so on its own it would let a client that drops the cookie start unlimited downloads.
+ */
+export function acquireVisitorDownloadSlots(visitor: { userId?: string | null; guestId?: string | null; networkKey?: string }): () => void {
+  const releaseVisitor = acquireUserDownloadSlot(visitor.userId ?? visitor.guestId ?? 'anonymous', !visitor.userId);
+  if (visitor.userId || !visitor.networkKey) return releaseVisitor;
+  let releaseNetwork: () => void;
+  try {
+    releaseNetwork = acquireKeyedSlot(`network:${visitor.networkKey}`, env.MAX_CONCURRENT_DOWNLOADS_PER_IP);
+  } catch (err) {
+    releaseVisitor();
+    throw err;
+  }
+  return () => {
+    releaseVisitor();
+    releaseNetwork();
   };
 }

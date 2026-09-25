@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { env } from '../config/env';
 import { BlazfetchError } from '../constants/errors';
 import { logger } from '../lib/logger';
-import { acquireUserDownloadSlot, globalDownloadSemaphore } from '../core/jobs/concurrencyLimiter';
+import { acquireVisitorDownloadSlots, globalDownloadSemaphore } from '../core/jobs/concurrencyLimiter';
 import { cancelJob } from '../core/jobs/jobManager';
 import { cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { JobRecord } from '../core/jobs/jobTypes';
@@ -13,6 +13,8 @@ import { runDownloadJob, startDownloadJob } from '../services/downloadService';
 import { fetchMedia } from '../services/fetchService';
 import { recordDownloadStat } from '../services/statsService';
 import { mediaKeyForResponse } from '../core/media/mediaPath';
+import { clientKey } from '../utils/clientKey';
+import { attachmentHeader } from '../utils/contentDisposition';
 
 export const DOWNLOAD_MODES = ['stream', 'prepare', 'auto'] as const;
 
@@ -40,11 +42,6 @@ export function isFallbackEligible(err: unknown): boolean {
   if (!(err instanceof BlazfetchError)) return false;
   if ((err.details as { streamUnsupported?: boolean } | undefined)?.streamUnsupported) return true;
   return FALLBACK_CODES.has(err.code);
-}
-
-function contentDisposition(filename: string): string {
-  const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 /**
@@ -165,8 +162,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
   /** Direct stream: resolves once the response has been handed to the pipe (or the client left). */
   const runStream = async (): Promise<void> => {
-    const userKey = req.userId ?? req.guestId ?? 'anonymous';
-    releaseUser = acquireUserDownloadSlot(userKey, !req.userId); // throws SERVER_BUSY when over the limit
+    releaseUser = acquireVisitorDownloadSlots({ userId: req.userId, guestId: req.guestId, networkKey: clientKey(req) }); // throws SERVER_BUSY when over the limit
     releaseGlobal = await globalDownloadSemaphore.acquire();
     if (clientClosed) return;
 
@@ -190,7 +186,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     res.status(200);
     announceStart();
     res.setHeader('Content-Type', opened.contentType);
-    res.setHeader('Content-Disposition', contentDisposition(opened.filename));
+    res.setHeader('Content-Disposition', attachmentHeader(opened.filename));
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Accel-Buffering', 'no'); // stop nginx buffering the whole response
     res.setHeader('X-Blazfetch-Mode', 'stream');
@@ -235,7 +231,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false });
+      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: clientKey(req) });
     } finally {
       prepareFinished = true;
     }
@@ -254,7 +250,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     res.status(200);
     announceStart();
     res.setHeader('Content-Type', result.mimeType);
-    res.setHeader('Content-Disposition', contentDisposition(name));
+    res.setHeader('Content-Disposition', attachmentHeader(name));
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('X-Blazfetch-Mode', 'prepare');

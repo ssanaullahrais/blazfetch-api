@@ -40,6 +40,8 @@ const envSchema = z.object({
   MAX_CONCURRENT_DOWNLOADS_GLOBAL: z.coerce.number().default(10),
   MAX_CONCURRENT_DOWNLOADS_PER_USER: z.coerce.number().default(2),
   MAX_CONCURRENT_DOWNLOADS_PER_GUEST: z.coerce.number().default(1),
+  // Guests sharing one IP address (one /64 for IPv6), e.g. an office or a mobile carrier, share this many downloads.
+  MAX_CONCURRENT_DOWNLOADS_PER_IP: z.coerce.number().default(4),
   MAX_CONCURRENT_FETCHES_GLOBAL: z.coerce.number().default(20),
 
   MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
