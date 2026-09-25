@@ -4,6 +4,7 @@ import { BlazfetchError } from '../constants/errors';
 import { getDb } from '../db';
 import { parseMediaPath, sourceUrlForKey } from '../core/media/mediaPath';
 import { fetchMedia, isPublicSource } from '../services/fetchService';
+import { presentMedia } from '../utils/audioMp3';
 import { recordVisitorFetch } from '../services/statsService';
 
 const querySchema = z.object({
@@ -55,5 +56,5 @@ export async function getMedia(req: Request, res: Response): Promise<void> {
   const response = await fetchMedia({ url: sourceUrl, requestId: req.requestId, userId: req.userId, guestId: req.guestId, internal: true });
   await recordVisitorFetch(response, { userId: req.userId, guestId: req.guestId });
   void store.recordAccess(parsed.platform, parsed.mediaKey, 'view').catch(() => undefined);
-  res.json(response);
+  res.json(presentMedia(response));
 }

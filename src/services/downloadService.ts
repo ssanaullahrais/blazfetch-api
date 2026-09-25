@@ -19,6 +19,7 @@ import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { fetchAudio } from './audioService';
 import { JobRecord, RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchError } from '../constants/errors';
+import { needsMp3Conversion } from '../utils/audioMp3';
 import { buildFilename } from '../utils/filename';
 import { openRanged } from '../utils/rangedFetch';
 import type { BlazfetchResponse } from '../types/blazfetch';
@@ -209,7 +210,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
       const standaloneAudio = metadata.audioFormats.find((f) => f.formatId === job.requestedFormat.formatId);
       // The media URL comes from the source page and yt-dlp fetches it without the SSRF checks.
       if (standaloneAudio?.url) await assertUrlIsSafeToFetch(standaloneAudio.url);
-      if (!standaloneAudio) {
+      if (!standaloneAudio || needsMp3Conversion(standaloneAudio)) {
         return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt, { ...ctx, metadata, filename: options.filename });
       }
       expectedBytes = sizeOf(standaloneAudio, metadata.durationSeconds);

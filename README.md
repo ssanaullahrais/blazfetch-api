@@ -191,6 +191,13 @@ click. Details and setup: [docs/API.md](docs/API.md#cloudflare-turnstile-optiona
 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md#cloudflare-turnstile-optional). If you build your own frontend, call
 `GET /config`, render the widget, then `POST /turnstile/verify` when the visitor first does something protected.
 
+### Optional: everything as MP3
+
+Set `AUDIO_FORCE_MP3=true` in `.env` (restart the server) and every audio download is delivered as an MP3. `/fetch`,
+`/fetch/audio` and `/media/...` then list all audio options as MP3 (the format ids stay the same), and any source that
+is not MP3 already is converted with ffmpeg: piped live in `stream`/`auto` mode with no file on disk, or, in
+`prepare` and `POST /download` mode, saved to a temporary file, converted, sent and deleted. It is off by default.
+
 ### Building a frontend
 
 The official one already exists: [blazfetch-web](https://github.com/ssanaullahrais/blazfetch-web). To build your own:
