@@ -62,8 +62,8 @@ unless noted. Every example in [Responses by platform](#responses-by-platform) i
 
 | You want | Use |
 |---|---|
-| The fastest start, one request, nothing on the server's disk | `GET /stream?mode=stream` (the default) |
-| It to just work for every source, still one request | **`GET /stream?mode=auto`** (recommended) |
+| The fastest start, one request, nothing on the server's disk | `GET /stream?mode=stream` (the default): streams everything, merges and HLS included |
+| It to just work for every source, still one request | **`GET /stream?mode=auto`** (recommended): streams first, prepares only if streaming fails |
 | A guaranteed H.264/AAC file | `GET /stream?mode=prepare` |
 | A progress bar driven by the server while a long file is prepared | `POST /download`, then poll `GET /jobs/:id` |
 
@@ -1247,6 +1247,25 @@ response is shown. Expect the same shape as the other yt-dlp video responses.
 ---
 
 
+## Audio as MP3 (`AUDIO_FORCE_MP3`)
+
+Off by default. Set `AUDIO_FORCE_MP3=true` in `.env` (and restart the server) and every audio download is delivered as
+an MP3, whatever the source format:
+
+- **What clients see:** `POST /fetch`, `POST /fetch/audio` and `GET /media/...` list every audio option with
+  `ext: "mp3"`, `codec: "mp3"` and `isConverted: true`. The `formatId`s do not change, so a download request still
+  names the real source track. `filesizeBytes` is an estimate (duration at 192 kbps) with `filesizeApprox: true`,
+  because the MP3 is re-encoded.
+- **Already MP3:** a source that is MP3 already is passed through untouched.
+- **`GET /stream` (`stream`, `auto`):** the track is converted live through ffmpeg (`libmp3lame`, 192 kbps) and piped
+  to the client, so nothing is written to disk.
+- **`GET /stream?mode=prepare` and `POST /download`:** the source is saved to a temporary file, converted, sent, and
+  both files are deleted afterwards (also when the client cancels).
+- **Filename and type:** `.mp3` and `Content-Type: audio/mpeg`.
+
+The conversion is one lossy step from the best source track: `bestaudio` is selected and then encoded, so the MP3
+is never better than the source (a 128 kbps source stays 128 kbps quality inside a 192 kbps file).
+
 ## `POST /api/v1/fetch/audio`
 
 Same input shape as `/fetch`, scoped to audio/MP3 options only.
@@ -1471,9 +1490,9 @@ GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename
 
 | Mode | What happens | Best for |
 |---|---|---|
-| `stream` (default) | Bytes are piped from the source straight to the response when the format already plays on phones (a single H.264 MP4, a standalone audio track): no file on the server, first byte in 1 to 3 s. Anything else (a merge, HLS, WebM, VP9/AV1/HEVC) is prepared as a normal MP4 instead, like `auto`, using ffmpeg's quickest settings when a conversion cannot be avoided. | Speed, with a file that plays everywhere |
+| `stream` (default) | Bytes are piped from the source straight to the response: a plain file is passed through untouched, and a merge (video + audio) or an HLS remux runs through ffmpeg with `-c copy` and is piped live as fragmented MP4. No file on the server, first byte in 1 to 3 s. A failure **before the first byte** (the source cannot be streamed, ffmpeg or extraction failed, a timeout) falls back to `prepare` in the same request, with ffmpeg's quickest settings when a conversion cannot be avoided. | Speed, and the least load on the server |
 | `prepare` | The server builds the file first (download, merge, and a transcode to H.264/AAC when the source is not browser-compatible), then sends it with its exact size, then deletes it. All in this one request, so nothing arrives until it is ready. When the chosen format is VP9/AV1/WebM and the source offers the same quality in H.264, that version is downloaded instead, so no re-encode is needed. | Guaranteed H.264/AAC, or sources that cannot stream |
-| `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. Only formats that already play on phones (a plain H.264 MP4) are streamed; live merges, HLS, WebM and VP9/AV1/HEVC are prepared instead. Conversions use the balanced settings (smaller file than `stream`'s). | Recommended for the frontend: fast when possible, works when not |
+| `auto` | Same as `stream`: it always tries to stream first (live merges and remuxes included), and if that fails **before the first byte** the server switches to `prepare` **in the same request**, so the client still just gets the file. Conversions on the fallback use the balanced settings (smaller file than `stream`'s). | Recommended for the frontend: fast when possible, works when not |
 
 `auto` falls back only for failures that preparing can get around (the source could not be
 streamed, ffmpeg or extraction failed, a timeout). It does **not** fall back for errors that would
@@ -1502,15 +1521,19 @@ HTTP status (`success:false`, `error:{code,message}`, `requestId`).
 | Requested format | Pipeline |
 |---|---|
 | Plain single file (most muxed formats, standalone audio) | the file's bytes are passed through untouched (exact size, original container) |
-| Video-only format needing audio (e.g. YouTube 1080p+) | prepared: yt-dlp downloads video + best AAC audio and merges them (`-c copy`) into a normal MP4 on the server, then it is sent with its exact size |
-| HLS video, WebM, VP9/AV1/HEVC | prepared the same way; converted to H.264/AAC only when the source has no H.264 version of that quality |
-| MP3 (no standalone audio track) | `ffmpeg -vn -c:a libmp3lame -f mp3`, streamed |
+| Video-only format needing audio (e.g. YouTube 1080p+) | `stream`/`auto`: yt-dlp resolves video + best AAC audio and ffmpeg merges them (`-c copy`), piped live. `prepare` (and the fallback): the same merge written to a temporary MP4, then sent with its exact size |
+| HLS video | `stream`/`auto`: remuxed live with `-c copy`. `prepare`: remuxed to a temporary MP4 |
+| WebM, VP9/AV1/HEVC | the same quality in H.264 is used when the source offers it (a same-height twin, or the source's progressive H.264 MP4 when the pick was "best"); otherwise it is streamed as it is, and `prepare` converts it to H.264/AAC |
+| MP3 (no standalone audio track, or `AUDIO_FORCE_MP3=true`) | `ffmpeg -vn -c:a libmp3lame -b:a 192k -f mp3`, streamed live (see [Audio as MP3](#audio-as-mp3-audio_force_mp3)) |
 
-- **Why nothing is live-merged:** a merge or remux written to a pipe has to be fragmented MP4, which phone
-  galleries show black or refuse to share. So `stream` and `auto` both prepare those as a normal MP4 on the
-  server (a remux takes seconds; the same quality in H.264 is used when the source offers it). Both also fall
-  back to prepare for sources that cannot be streamed (Loom's signed HLS playlists, Reddit's `v.redd.it`,
-  which refuses ffmpeg). Errors that preparing cannot fix (private, removed, login required) come back as JSON.
+- **Stream first, prepare is the fallback:** a merge or remux written to a pipe has to be fragmented MP4. It
+  plays in browsers, VLC and most players, but some phone galleries cannot open it, so a streamed video prefers
+  an H.264 file (the same quality in H.264, or the source's progressive H.264 MP4 when the request was
+  `formatId=best`) over VP9/AV1. Preparing puts load on the server, so it only runs when streaming fails
+  before the first byte (Loom's signed HLS playlists, sources that refuse ffmpeg, an unavailable format). When
+  the requested quality cannot be produced at all, the request is retried once with `best` instead of
+  failing. Errors that preparing cannot fix (private, removed, login required) come back as JSON.
+- **Slots are freed as soon as the response finishes,** so a client can start the next download right away.
 - **Full speed from throttling hosts:** plain files are fetched in 10 MB ranged requests (YouTube throttles one
   long request to about playback speed). ffmpeg reads them through a relay on `127.0.0.1` that does the same, so
   live merges and remuxes run at full speed too; HLS playlists are read by ffmpeg directly.
