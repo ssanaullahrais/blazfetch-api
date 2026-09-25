@@ -116,14 +116,15 @@ export function mergeVideoAudioArgs(
 }
 
 /** Re-encodes an arbitrary video into a browser-safe H.264/AAC MP4 without re-selecting sources. */
-export function transcodeToCompatibleMp4Args(inputPath: string, outputPath: string): string[] {
+export function transcodeToCompatibleMp4Args(inputPath: string, outputPath: string, options: { fast?: boolean } = {}): string[] {
   return [
     '-y',
     '-fflags', '+genpts',
     '-i', inputPath,
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '20',
+    // fast: about three times quicker, for a somewhat larger file at the same quality.
+    '-preset', options.fast ? 'ultrafast' : 'veryfast',
+    '-crf', options.fast ? '23' : '20',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '192k',
