@@ -137,7 +137,7 @@ Settings you may want to review for a public deployment:
 | Setting | Why |
 |---|---|
 | `DEFAULT_DOWNLOAD_MODE` | **Use `auto` for a public site.** Both `stream` and `auto` stream first, live merges and HLS remuxes included (no file on the server, the least load), preferring an H.264 file so it plays on phones. If streaming fails before the first byte the request falls back to preparing a compatible MP4 on the server (`stream` uses ffmpeg's quickest settings). `prepare` always builds the file first. Clients can always choose with `?mode=` |
-| `AUDIO_FORCE_MP3` | `true` delivers every audio download as MP3: sources that are not MP3 are converted with ffmpeg, live in stream/auto mode or through a temporary file that is deleted after sending in prepare/job mode. Off by default. See [Audio as MP3](API.md#audio-as-mp3-audio_force_mp3) |
+| `AUDIO_FORCE_MP3` | `true` delivers every audio download as MP3: sources that are not MP3 are converted with ffmpeg, live in stream/auto mode or through a temporary file that is deleted after sending in prepare/job mode. On in `.env.example` (recommended); off if the variable is left out. See [Audio as MP3](API.md#audio-as-mp3-audio_force_mp3) |
 | `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional Cloudflare bot check in front of fetch, stream and download. Set up in [Cloudflare Turnstile](#cloudflare-turnstile-optional) below. Off by default |
 | `INSTAGRAM_COOKIES_PATH` | Optional. Instagram often blocks datacenter IPs; a `cookies.txt` from a logged-in browser lets yt-dlp through. Without it the backup provider is used |
 | `YOUTUBE_FALLBACK_ENABLED` | Leave `true`: if YouTube blocks the server's IP, a fallback provider serves the request |
