@@ -176,6 +176,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       userId: req.userId,
       guestId: req.guestId,
       signal: abort.signal,
+      phoneSafeOnly: mode === 'auto',
     });
     killSource = opened.kill;
     platformForStat = opened.platform;
