@@ -168,7 +168,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
   /** Direct stream: resolves once the response has been handed to the pipe (or the client left). */
   const runStream = async (): Promise<void> => {
-    releaseUser = acquireVisitorDownloadSlots({ userId: req.userId, guestId: req.guestId, networkKey: networkKey(req) }); // throws SERVER_BUSY when over the limit
+    releaseUser = acquireVisitorDownloadSlots({ userId: req.userId, guestId: req.guestId, networkKey: networkKey(req), kind }); // throws SERVER_BUSY when over the limit
     releaseGlobal = await globalDownloadSemaphore.acquire();
     if (clientClosed) return;
 
