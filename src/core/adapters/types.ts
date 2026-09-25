@@ -16,6 +16,8 @@ export interface DownloadTarget {
   kind: 'video' | 'audio';
   outputDir: string;
   onProgress?: (progress: DownloadProgress) => void;
+  /** Rough size of the finished file when known, so progress can be shown even when the downloader reports none. */
+  expectedBytes?: number;
   signal: AbortSignal;
 }
 

@@ -7,14 +7,37 @@ export interface FfmpegRunOptions {
   args: string[];
   timeoutMs?: number;
   signal?: AbortSignal;
+  /** With the input's duration, reports how far ffmpeg has got (0–100) while it works. */
+  progress?: { durationSeconds: number; onProgress: (percent: number) => void };
+}
+
+/** Reads ffmpeg's `-progress` output: `out_time_us` (or the misnamed `out_time_ms`, also microseconds). */
+export function parseFfmpegProgress(line: string, durationSeconds: number): number | undefined {
+  const match = line.match(/^out_time_(?:us|ms)=(\d+)/);
+  if (!match || durationSeconds <= 0) return undefined;
+  return Math.min(100, (Number(match[1]) / 1e6 / durationSeconds) * 100);
 }
 
 /** Runs ffmpeg with an argument array (no shell interpolation of any input path/URL). */
 export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
-  const { args, timeoutMs = env.FFMPEG_TIMEOUT_MS, signal } = options;
+  const { args, timeoutMs = env.FFMPEG_TIMEOUT_MS, signal, progress } = options;
+  const fullArgs = progress ? ['-progress', 'pipe:1', '-nostats', ...args] : args;
 
   return new Promise((resolve, reject) => {
-    const child = spawn(env.FFMPEG_PATH, args, { shell: false, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    const child = spawn(env.FFMPEG_PATH, fullArgs, { shell: false, windowsHide: true, stdio: ['ignore', progress ? 'pipe' : 'ignore', 'pipe'] });
+
+    if (progress && child.stdout) {
+      let buffered = '';
+      child.stdout.on('data', (chunk: Buffer) => {
+        buffered += chunk.toString('utf-8');
+        const lines = buffered.split('\n');
+        buffered = lines.pop() ?? '';
+        for (const line of lines) {
+          const percent = parseFfmpegProgress(line, progress.durationSeconds);
+          if (percent !== undefined) progress.onProgress(percent);
+        }
+      });
+    }
 
     let stderr = '';
     let settled = false;
@@ -35,7 +58,7 @@ export function runFfmpeg(options: FfmpegRunOptions): Promise<void> {
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
-    child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr?.on('data', (chunk: Buffer) => {
       stderr += chunk.toString('utf-8');
     });
 

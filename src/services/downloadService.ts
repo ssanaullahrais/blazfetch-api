@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { assertUrlIsSafeToFetch, validateAndNormalizeUrl } from '../utils/url';
 import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { getAdapter } from '../core/adapters/registry';
@@ -9,7 +10,8 @@ import { createJob, getJob, getJobSignal, updateJobProgress, updateJobStatus, cl
 import { jobTempDir, cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { runFfmpeg, extractAudioArgs, transcodeToCompatibleMp4Args } from '../core/ffmpeg/ffmpegRunner';
 import { isBrowserCompatibleMp4, validateMediaFile } from '../core/ffmpeg/ffprobe';
-import { pickBestAudioFormat, pickBestVideoFormat } from '../core/adapters/formatSelection';
+import { phoneSafeEquivalent, pickBestAudioFormat, pickBestVideoFormat } from '../core/adapters/formatSelection';
+import { env } from '../config/env';
 import { logger } from '../lib/logger';
 import { recordDownloadStat } from './statsService';
 import { fetchMedia } from './fetchService';
@@ -17,6 +19,9 @@ import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { fetchAudio } from './audioService';
 import { JobRecord, RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchError } from '../constants/errors';
+import { buildFilename } from '../utils/filename';
+import { openRanged } from '../utils/rangedFetch';
+import type { BlazfetchResponse } from '../types/blazfetch';
 
 export interface StartDownloadParams {
   url: string;
@@ -81,6 +86,71 @@ export interface RunDownloadOptions {
   recordFailure?: boolean;
   /** The requester's network (see networkKey), for the per-IP download limit on guests. */
   networkKey?: string;
+  /** Name for the saved file, without extension (the page's own naming); the title is used otherwise. */
+  filename?: string;
+}
+
+/**
+ * How the job's 0–100 progress is shared out: the download itself, then converting to H.264/AAC (or MP3) when the
+ * source needs it. A job that needs no conversion jumps from DOWNLOAD_SHARE to 100 when it is done.
+ */
+const DOWNLOAD_SHARE = 90;
+const AUDIO_DOWNLOAD_SHARE = 50;
+/** Prefix of the MP3 options made from a video format (see audioService). */
+const MP3_FROM_PREFIX = 'mp3-from-';
+
+/**
+ * Converting takes far longer than a remux, so it gets at least the whole download budget rather than ffmpeg's short
+ * one, and more for a long video (a small server can encode slower than real time).
+ */
+function convertTimeoutMs(durationSeconds: number | undefined): number {
+  return Math.max(env.FFMPEG_TIMEOUT_MS, env.DOWNLOAD_TOTAL_TIMEOUT_MS, (durationSeconds ?? 0) * 2000);
+}
+
+/** Progress writes are best effort: one that fails must never turn into an unhandled rejection. */
+function reportProgress(jobId: string, downloadedBytes: number, totalBytes: number | undefined, percent: number | undefined): void {
+  updateJobProgress(jobId, downloadedBytes, totalBytes, percent).catch((err) => {
+    logger.debug({ jobId, err: (err as Error).message }, 'could not store job progress');
+  });
+}
+
+/** A size, or an estimate from the bitrate (kbit/s) and duration, which is all HLS formats come with. */
+function sizeOf(format: { filesizeBytes?: number; bitrate?: number } | undefined, durationSeconds: number | null | undefined): number | undefined {
+  if (format?.filesizeBytes) return format.filesizeBytes;
+  return format?.bitrate && durationSeconds ? Math.round((format.bitrate * 1000 * durationSeconds) / 8) : undefined;
+}
+
+/** Size of the finished video file, to show progress when the downloader reports none. */
+function expectedVideoBytes(metadata: BlazfetchResponse, formatId: string, merging: boolean): number | undefined {
+  const video = sizeOf(metadata.formats.find((f) => f.formatId === formatId), metadata.durationSeconds);
+  if (!video || !merging) return video;
+  const audio = [...metadata.audioFormats]
+    .filter((a) => !a.isConverted)
+    .sort((a, b) => Number(!!b.codec?.startsWith('mp4a')) - Number(!!a.codec?.startsWith('mp4a')) || (b.bitrate ?? 0) - (a.bitrate ?? 0))[0];
+  return video + (sizeOf(audio, metadata.durationSeconds) ?? 0);
+}
+
+/** Saves a direct link to disk (in ranged chunks, SSRF-checked), reporting 0–100 as it goes. */
+async function downloadToFile(url: string, filePath: string, signal: AbortSignal, onPercent: (percent: number) => void): Promise<void> {
+  await assertUrlIsSafeToFetch(url);
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  const source = await openRanged(url, { signal });
+  let received = 0;
+  source.stream.on('data', (chunk: Buffer) => {
+    received += chunk.length;
+    if (received > env.MAX_DOWNLOAD_SIZE_BYTES) source.stream.destroy(new BlazfetchError('FILE_TOO_LARGE', 'The file exceeds the maximum allowed download size.'));
+    else if (source.totalBytes) onPercent((received / source.totalBytes) * 100);
+  });
+  await pipeline(source.stream, fs.createWriteStream(filePath), { signal });
+}
+
+/** "<title>.<ext>" for the saved file, instead of the id-based name yt-dlp wrote to disk. */
+function displayName(result: DownloadResult, metadata: BlazfetchResponse | undefined, requested: string | undefined, kind: 'video' | 'audio'): string {
+  if (!metadata) return result.filename;
+  const ext = (result.filename.split('.').pop() ?? 'mp4').toLowerCase();
+  // An audio-only MP4 is an M4A file: name it so, or phones file it under videos.
+  if (kind === 'audio' && ext === 'mp4') return buildFilename(requested, metadata, 'm4a');
+  return buildFilename(requested, metadata, ext);
 }
 
 export async function runDownloadJob(job: JobRecord, requestId: string, options: RunDownloadOptions = {}): Promise<RunDownloadResult> {
@@ -98,21 +168,30 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
   try {
     const outputDir = jobTempDir(job.id);
     let effectiveFormatId = job.requestedFormat.formatId;
+    let metadata: BlazfetchResponse | undefined;
+    let expectedBytes: number | undefined;
 
     if (job.requestedFormat.kind === 'audio') {
-      const metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
+      metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
       const standaloneAudio = metadata.audioFormats.find((f) => f.formatId === job.requestedFormat.formatId);
       // The media URL comes from the source page and yt-dlp fetches it without the SSRF checks.
       if (standaloneAudio?.url) await assertUrlIsSafeToFetch(standaloneAudio.url);
       if (!standaloneAudio) {
-        return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt, ctx);
+        return await runAudioExtraction(job, adapter, normalizedUrl, outputDir, signal, requestId, startedAt, { ...ctx, metadata, filename: options.filename });
       }
+      expectedBytes = sizeOf(standaloneAudio, metadata.durationSeconds);
     } else {
-      const metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
+      metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
-      const format = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
+      const requested = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
+      // The result has to be H.264/AAC: take the same quality in H.264 when there is one instead of re-encoding.
+      const equivalent = requested ? phoneSafeEquivalent(metadata.formats, requested) : undefined;
+      if (equivalent) logger.info({ jobId: job.id, requested: requested?.formatId, using: equivalent.formatId }, 'using the H.264 version of the requested quality');
+      const format = equivalent ?? requested;
+      if (format) effectiveFormatId = format.formatId;
       if (format?.url) await assertUrlIsSafeToFetch(format.url);
+      expectedBytes = format ? expectedVideoBytes(metadata, format.formatId, !!format.requiresMerge) : undefined;
       if (format?.requiresMerge) {
         // Prefer an AAC/mp4a audio track so the merged output is H.264+AAC MP4 without needing
         // to transcode; yt-dlp falls through to the best available audio if none matches.
@@ -128,13 +207,16 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
         kind: job.requestedFormat.kind,
         outputDir,
         signal,
+        expectedBytes,
         onProgress: (progress) => {
-          void updateJobProgress(job.id, progress.downloadedBytes, progress.totalBytes, progress.percent);
+          const share = job.requestedFormat.kind === 'video' ? DOWNLOAD_SHARE : 99;
+          reportProgress(job.id, progress.downloadedBytes, progress.totalBytes, progress.percent === undefined ? undefined : (progress.percent * share) / 100);
         },
       },
     );
 
     result = await ensureValidAndCompatible(job, result, signal);
+    result = { ...result, filename: displayName(result, metadata, options.filename, job.requestedFormat.kind) };
     await finalizeSuccess(job, result, startedAt, ctx);
     return { ...result, job: await refreshJob(job.id) };
   } catch (err) {
@@ -155,29 +237,51 @@ async function runAudioExtraction(
   signal: AbortSignal,
   requestId: string,
   startedAt: number,
-  ctx: StatContext,
+  ctx: StatContext & { metadata?: BlazfetchResponse; filename?: string },
 ): Promise<RunDownloadResult> {
   await updateJobStatus(job.id, 'streaming');
 
+  // "mp3-from-<id>" is the MP3 made from video format <id>: yt-dlp only knows <id>.
+  const requested = job.requestedFormat.formatId;
+  const sourceFormatId = requested.startsWith(MP3_FROM_PREFIX) ? requested.slice(MP3_FROM_PREFIX.length) : requested;
   const videoResult = await adapter.download(
     { requestId, normalizedUrl },
     {
-      formatId: job.requestedFormat.formatId,
+      formatId: sourceFormatId,
       kind: 'video',
       outputDir,
       signal,
       onProgress: (progress) => {
-        void updateJobProgress(job.id, progress.downloadedBytes, progress.totalBytes, progress.percent ? progress.percent / 2 : undefined);
+        reportProgress(job.id, progress.downloadedBytes, progress.totalBytes, progress.percent === undefined ? undefined : (progress.percent * AUDIO_DOWNLOAD_SHARE) / 100);
       },
     },
   );
 
+  // Fallback providers only hand out a direct link: fetch it to disk so the audio can be extracted from it.
+  if (!videoResult.filePath && videoResult.directUrl) {
+    const sourcePath = path.join(outputDir, `${job.id}-source`);
+    await downloadToFile(videoResult.directUrl, sourcePath, signal, (percent) =>
+      reportProgress(job.id, 0, undefined, (percent * AUDIO_DOWNLOAD_SHARE) / 100),
+    );
+    videoResult.filePath = sourcePath;
+  }
   if (!videoResult.filePath) {
     throw new BlazfetchError('FORMAT_UNAVAILABLE', 'Audio extraction requires a downloadable source file.');
   }
 
   const mp3Path = path.join(outputDir, `${job.id}.mp3`);
-  await runFfmpeg({ args: extractAudioArgs(videoResult.filePath, mp3Path), signal });
+  const source = await validateMediaFile(videoResult.filePath, 'video').catch(() => undefined);
+  await runFfmpeg({
+    args: extractAudioArgs(videoResult.filePath, mp3Path),
+    signal,
+    timeoutMs: convertTimeoutMs(source?.durationSeconds),
+    progress: source?.durationSeconds
+      ? {
+          durationSeconds: source.durationSeconds,
+          onProgress: (percent) => reportProgress(job.id, 0, undefined, AUDIO_DOWNLOAD_SHARE + (percent * (99 - AUDIO_DOWNLOAD_SHARE)) / 100),
+        }
+      : undefined,
+  });
   await fs.promises.rm(videoResult.filePath, { force: true });
 
   // A completed ffmpeg process doesn't guarantee a playable MP3 (e.g. the source had no usable
@@ -187,7 +291,7 @@ async function runAudioExtraction(
   const stat = await fs.promises.stat(mp3Path);
   const result: DownloadResult = {
     filePath: mp3Path,
-    filename: path.basename(mp3Path),
+    filename: ctx.metadata ? buildFilename(ctx.filename, ctx.metadata, 'mp3') : path.basename(mp3Path),
     mimeType: 'audio/mpeg',
     bytes: stat.size,
   };
@@ -221,12 +325,23 @@ async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, 
 
   const dir = path.dirname(result.filePath);
   const compatiblePath = path.join(dir, `${job.id}-compatible.mp4`);
-  await runFfmpeg({ args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath), signal });
+  reportProgress(job.id, result.bytes, undefined, DOWNLOAD_SHARE);
+  await runFfmpeg({
+    args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath),
+    signal,
+    timeoutMs: convertTimeoutMs(validation.durationSeconds),
+    progress: validation.durationSeconds
+      ? {
+          durationSeconds: validation.durationSeconds,
+          onProgress: (percent) => reportProgress(job.id, result.bytes, undefined, DOWNLOAD_SHARE + (percent * (99 - DOWNLOAD_SHARE)) / 100),
+        }
+      : undefined,
+  });
   await validateMediaFile(compatiblePath, 'video');
   await fs.promises.rm(result.filePath, { force: true });
 
   const stat = await fs.promises.stat(compatiblePath);
-  return { ...result, filePath: compatiblePath, filename: path.basename(compatiblePath), mimeType: 'video/mp4', bytes: stat.size };
+  return { ...result, filePath: compatiblePath, filename: `${path.parse(result.filename).name}.mp4`, mimeType: 'video/mp4', bytes: stat.size };
 }
 
 /** Facts about the media a download job worked on, for the statistics rows. */

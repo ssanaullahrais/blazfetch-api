@@ -193,6 +193,12 @@ export class InstagramAdapter implements PlatformAdapter {
     } catch (err) {
       logger.warn({ requestId: ctx.requestId, err: (err as Error).message }, 'yt-dlp download failed for Instagram, using proxy-stream fallback');
       const metadata = await this.fetchMetadata(ctx);
+      if (target.kind === 'audio') {
+        // An audio download must never be answered with the video: use an audio track, or report the failure.
+        const audio = metadata.audioFormats.find((f) => f.formatId === target.formatId) ?? metadata.audioFormats[0];
+        if (!audio?.url) throw err;
+        return { filePath: '', filename: `${metadata.mediaId}.${audio.ext}`, mimeType: 'audio/mp4', bytes: 0, directUrl: audio.url };
+      }
       const flatFormats = metadata.formats.length ? metadata.formats : metadata.items?.flatMap((i) => i.formats ?? []) ?? [];
       const format = flatFormats.find((f) => f.formatId === target.formatId) ?? flatFormats[0];
       if (!format?.url) throw err;

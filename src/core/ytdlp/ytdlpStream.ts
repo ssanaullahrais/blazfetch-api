@@ -5,6 +5,7 @@ import { BlazfetchError } from '../../constants/errors';
 import { logger } from '../../lib/logger';
 import { classifyYtdlpFailure, runYtdlp } from './ytdlpRunner';
 import { killProcessTree, processGroupOptions } from '../processTree';
+import { relayUrl } from './inputRelay';
 
 /**
  * Low-level building blocks for "direct stream" downloads: bytes flow from yt-dlp / ffmpeg
@@ -33,7 +34,8 @@ export interface ResolvedInput {
   protocol?: string;
 }
 
-export type FfmpegMode = 'merge' | 'remux' | 'mp3';
+/** merge: video + audio. remux: one input to MP4. audio: an audio track to M4A. mp3: convert to MP3. */
+export type FfmpegMode = 'merge' | 'remux' | 'audio' | 'mp3';
 
 const activeChildren = new Set<number>();
 
@@ -174,7 +176,9 @@ export function ffmpegStreamArgs(inputs: ResolvedInput[], mode: FfmpegMode): str
     return args;
   }
 
-  if (mode === 'merge' && inputs.length >= 2) {
+  if (mode === 'audio') {
+    args.push('-map', '0:a:0', '-vn');
+  } else if (mode === 'merge' && inputs.length >= 2) {
     args.push('-map', '0:v:0', '-map', '1:a:0');
   } else {
     args.push('-map', '0:v:0?', '-map', '0:a:0?');
@@ -198,4 +202,41 @@ export function spawnFfmpegToStdout(options: { inputs: ResolvedInput[]; mode: Ff
     () => new BlazfetchError('DOWNLOAD_FAILED', 'ffmpeg failed to process the stream.'),
     'ffmpeg',
   );
+}
+
+/** A playlist or segmented format, which ffmpeg must read itself (its segments are short requests anyway). */
+function isSegmented(input: ResolvedInput): boolean {
+  return (
+    /\.(m3u8|mpd)(\?|$)/i.test(input.url) ||
+    /\/(hls_playlist|dash_manifest|manifest\/dash)\//i.test(input.url) ||
+    /m3u8|dash|f4m|ism/i.test(input.protocol ?? '')
+  );
+}
+
+/**
+ * spawnFfmpegToStdout, with every plain-file input read through the local relay (see inputRelay) so it is fetched in
+ * ranged chunks instead of one long request that hosts like YouTube throttle to playback speed.
+ */
+export async function spawnFfmpegRelayed(options: { inputs: ResolvedInput[]; mode: FfmpegMode; signal?: AbortSignal }): Promise<StreamSource> {
+  const relays = await Promise.all(options.inputs.map((input) => (isSegmented(input) ? undefined : relayUrl(input.url, input.headers))));
+  const release = (): void => relays.forEach((relay) => relay?.release());
+  const inputs = options.inputs.map((input, index) => {
+    const relay = relays[index];
+    return relay ? { ...input, url: relay.url, headers: {} } : input;
+  });
+  let source: StreamSource;
+  try {
+    source = spawnFfmpegToStdout({ ...options, inputs });
+  } catch (err) {
+    release();
+    throw err;
+  }
+  source.stream.once('close', release);
+  return {
+    ...source,
+    kill: () => {
+      source.kill();
+      release();
+    },
+  };
 }

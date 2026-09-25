@@ -62,6 +62,7 @@ export class GenericYtDlpAdapter implements PlatformAdapter {
       outputDir: target.outputDir,
       signal: target.signal,
       onProgress: target.onProgress,
+      expectedBytes: target.expectedBytes,
     });
 
     const stat = await fs.promises.stat(filePath);
