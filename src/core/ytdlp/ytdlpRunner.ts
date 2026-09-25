@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { lowerPriority } from '../processPriority';
 import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
 import { BlazfetchError } from '../../constants/errors';
@@ -32,6 +33,7 @@ export function runYtdlp(options: YtdlpRunOptions): Promise<YtdlpRunResult> {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    lowerPriority(child);
 
     let stdout = '';
     let stderr = '';

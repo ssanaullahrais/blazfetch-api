@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { env } from '../../config/env';
 import { BlazfetchError } from '../../constants/errors';
 
@@ -31,6 +32,14 @@ class Semaphore {
 
 export const globalDownloadSemaphore = new Semaphore(env.MAX_CONCURRENT_DOWNLOADS_GLOBAL);
 export const globalFetchSemaphore = new Semaphore(env.MAX_CONCURRENT_FETCHES_GLOBAL);
+
+const cores = Math.max(1, os.availableParallelism?.() ?? os.cpus().length);
+/** Conversions allowed at once: MAX_CONCURRENT_CONVERSIONS, or half the CPU cores. */
+export const conversionLimit = env.MAX_CONCURRENT_CONVERSIONS || Math.max(1, Math.floor(cores / 2));
+/** CPU threads for each conversion: FFMPEG_THREADS, or the cores shared between the conversions allowed at once. */
+export const conversionThreads = env.FFMPEG_THREADS || Math.max(1, Math.floor(cores / conversionLimit));
+/** H.264/MP3 conversions wait here for a turn, so a burst of them cannot exhaust the server's CPU and memory. */
+export const conversionSemaphore = new Semaphore(conversionLimit);
 
 const perKeyDownloadCounts = new Map<string, number>();
 

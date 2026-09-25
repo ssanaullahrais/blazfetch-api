@@ -30,6 +30,16 @@ async function verifyStartupDependencies(): Promise<void> {
   logger.info({ ytdlpVersion: ytdlp.version, ffmpegVersion: ffmpeg.version }, 'startup dependency checks passed');
 }
 
+// A stray rejected promise must not take down every download in flight: log it and keep serving. An uncaught
+// exception leaves the process in an unknown state, so it is logged and the process exits for PM2 to restart.
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason instanceof Error ? { message: reason.message, stack: reason.stack } : reason }, 'unhandled promise rejection');
+});
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err: { message: err.message, stack: err.stack } }, 'uncaught exception, exiting');
+  process.exit(1);
+});
+
 async function main(): Promise<void> {
   await verifyStartupDependencies();
   await cleanupAbandonedTempDirs();

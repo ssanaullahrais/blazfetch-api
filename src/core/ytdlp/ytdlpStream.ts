@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { lowerPriority } from '../processPriority';
 import { PassThrough, Readable } from 'node:stream';
 import { env } from '../../config/env';
 import { BlazfetchError } from '../../constants/errors';
@@ -55,6 +56,7 @@ function spawnToStream(
 ): StreamSource {
   const out = new PassThrough();
   const child = spawn(command, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], ...processGroupOptions });
+  lowerPriority(child);
   if (child.pid !== undefined) activeChildren.add(child.pid);
 
   let stderr = '';

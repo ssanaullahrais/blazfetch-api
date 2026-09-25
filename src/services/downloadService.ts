@@ -5,7 +5,7 @@ import { assertUrlIsSafeToFetch, validateAndNormalizeUrl } from '../utils/url';
 import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { getAdapter } from '../core/adapters/registry';
 import { DownloadResult } from '../core/adapters/types';
-import { globalDownloadSemaphore, acquireVisitorDownloadSlots } from '../core/jobs/concurrencyLimiter';
+import { globalDownloadSemaphore, acquireVisitorDownloadSlots, conversionSemaphore, conversionThreads } from '../core/jobs/concurrencyLimiter';
 import { createJob, getJob, getJobSignal, updateJobProgress, updateJobStatus, clearJobController } from '../core/jobs/jobManager';
 import { jobTempDir, cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { runFfmpeg, extractAudioArgs, transcodeToCompatibleMp4Args } from '../core/ffmpeg/ffmpegRunner';
@@ -109,6 +109,26 @@ function convertTimeoutMs(durationSeconds: number | undefined): number {
   return Math.max(env.FFMPEG_TIMEOUT_MS, env.DOWNLOAD_TOTAL_TIMEOUT_MS, (durationSeconds ?? 0) * 2000);
 }
 
+/**
+ * Prepared downloads are written to TEMP_DIR first: refuse a new one while the disk is nearly full (MIN_FREE_DISK_MB)
+ * instead of letting it fill up and break everything else on the server.
+ */
+async function assertDiskSpace(): Promise<void> {
+  if (!env.MIN_FREE_DISK_MB) return;
+  try {
+    await fs.promises.mkdir(env.TEMP_DIR, { recursive: true });
+    const stats = await fs.promises.statfs(env.TEMP_DIR);
+    const freeMb = (stats.bavail * stats.bsize) / (1024 * 1024);
+    if (freeMb < env.MIN_FREE_DISK_MB) {
+      logger.warn({ freeMb: Math.round(freeMb), minFreeMb: env.MIN_FREE_DISK_MB }, 'refusing a prepared download: low disk space');
+      throw new BlazfetchError('SERVER_BUSY', 'The server is busy right now. Please try again in a few minutes.');
+    }
+  } catch (err) {
+    if (err instanceof BlazfetchError) throw err;
+    // statfs unsupported here: carry on rather than refuse every download.
+  }
+}
+
 /** Progress writes are best effort: one that fails must never turn into an unhandled rejection. */
 function reportProgress(jobId: string, downloadedBytes: number, totalBytes: number | undefined, percent: number | undefined): void {
   updateJobProgress(jobId, downloadedBytes, totalBytes, percent).catch((err) => {
@@ -160,7 +180,17 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
   const adapter = getAdapter(normalizedUrl);
   const signal = getJobSignal(job.id);
 
-  const releaseUserSlot = acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey });
+  // Refused before any work starts (too many downloads for this visitor, low disk): the job must still end as
+  // failed with the reason, or a client polling GET /jobs/:id would wait on "queued" forever.
+  let releaseUserSlot: () => void;
+  try {
+    await assertDiskSpace();
+    releaseUserSlot = acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey });
+  } catch (err) {
+    await finalizeFailure(job, err, Date.now(), false, { fellBack: options.fellBack, recordFailure: options.recordFailure });
+    clearJobController(job.id);
+    throw err;
+  }
   const releaseGlobalSlot = await globalDownloadSemaphore.acquire();
 
   const startedAt = Date.now();
@@ -273,17 +303,22 @@ async function runAudioExtraction(
 
   const mp3Path = path.join(outputDir, `${job.id}.mp3`);
   const source = await validateMediaFile(videoResult.filePath, 'video').catch(() => undefined);
-  await runFfmpeg({
-    args: extractAudioArgs(videoResult.filePath, mp3Path),
-    signal,
-    timeoutMs: convertTimeoutMs(source?.durationSeconds),
-    progress: source?.durationSeconds
-      ? {
-          durationSeconds: source.durationSeconds,
-          onProgress: (percent) => reportProgress(job.id, 0, undefined, AUDIO_DOWNLOAD_SHARE + (percent * (99 - AUDIO_DOWNLOAD_SHARE)) / 100),
-        }
-      : undefined,
-  });
+  const releaseConversion = await conversionSemaphore.acquire();
+  try {
+    await runFfmpeg({
+      args: extractAudioArgs(videoResult.filePath, mp3Path, 192, conversionThreads),
+      signal,
+      timeoutMs: convertTimeoutMs(source?.durationSeconds),
+      progress: source?.durationSeconds
+        ? {
+            durationSeconds: source.durationSeconds,
+            onProgress: (percent) => reportProgress(job.id, 0, undefined, AUDIO_DOWNLOAD_SHARE + (percent * (99 - AUDIO_DOWNLOAD_SHARE)) / 100),
+          }
+        : undefined,
+    });
+  } finally {
+    releaseConversion();
+  }
   await fs.promises.rm(videoResult.filePath, { force: true });
 
   // A completed ffmpeg process doesn't guarantee a playable MP3 (e.g. the source had no usable
@@ -328,17 +363,23 @@ async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, 
   const dir = path.dirname(result.filePath);
   const compatiblePath = path.join(dir, `${job.id}-compatible.mp4`);
   reportProgress(job.id, result.bytes, undefined, DOWNLOAD_SHARE);
-  await runFfmpeg({
-    args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath, { fast: fastConvert }),
-    signal,
-    timeoutMs: convertTimeoutMs(validation.durationSeconds),
-    progress: validation.durationSeconds
-      ? {
-          durationSeconds: validation.durationSeconds,
-          onProgress: (percent) => reportProgress(job.id, result.bytes, undefined, DOWNLOAD_SHARE + (percent * (99 - DOWNLOAD_SHARE)) / 100),
-        }
-      : undefined,
-  });
+  // Wait for a free conversion slot (see MAX_CONCURRENT_CONVERSIONS): the job stays at DOWNLOAD_SHARE meanwhile.
+  const releaseConversion = await conversionSemaphore.acquire();
+  try {
+    await runFfmpeg({
+      args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath, { fast: fastConvert, threads: conversionThreads }),
+      signal,
+      timeoutMs: convertTimeoutMs(validation.durationSeconds),
+      progress: validation.durationSeconds
+        ? {
+            durationSeconds: validation.durationSeconds,
+            onProgress: (percent) => reportProgress(job.id, result.bytes, undefined, DOWNLOAD_SHARE + (percent * (99 - DOWNLOAD_SHARE)) / 100),
+          }
+        : undefined,
+    });
+  } finally {
+    releaseConversion();
+  }
   await validateMediaFile(compatiblePath, 'video');
   await fs.promises.rm(result.filePath, { force: true });
 
