@@ -110,6 +110,10 @@ export interface StatsTotals {
   fetches: number;
   /** Successful downloads (stream and prepare). */
   downloads: number;
+  /** Distinct visitors with a live GET /stats/events connection seen within ONLINE_VISITOR_WINDOW_SECONDS.
+   * Backed by the database (not an in-memory count), so it stays correct across multiple API instances
+   * behind a load balancer, the same as fetches/downloads. */
+  online: number;
 }
 
 export interface StatsStore {
@@ -117,6 +121,11 @@ export interface StatsStore {
   recordDownloadStat(params: DownloadStatParams): Promise<void>;
   /** All-time totals, for the public counter. */
   totals(): Promise<StatsTotals>;
+  /** Marks `visitorId` as present right now (called on connect and on every live-stats heartbeat). */
+  recordPresence(visitorId: string): Promise<void>;
+  /** Removes presence rows old enough that no window could ever count them again — pure housekeeping,
+   * never load-bearing for correctness (totals() already filters by the same window itself). */
+  prunePresence(olderThanMs: number): Promise<void>;
 }
 
 export interface Database {

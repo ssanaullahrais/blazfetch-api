@@ -53,6 +53,9 @@ for (const target of targets) {
       }
       resetStatsTotalsCache();
       const app = express();
+      // The real app's requestId middleware assigns req.guestId from a cookie; this test app is minimal,
+      // so a header stands in for it — lets each test control exactly which visitor id a connection carries.
+      app.use((req, _res, next) => { req.guestId = (req.headers['x-test-visitor'] as string) || undefined; next(); });
       app.get('/stats', (req, res, next) => { void getStats(req, res).catch(next); });
       app.get('/stats/events', streamStats);
       server = app.listen(0, '127.0.0.1');
@@ -89,7 +92,7 @@ for (const target of targets) {
       const before = await statsStore.totals();
       await Promise.all(Array.from({ length: 20 }, () => recordFetchStat({ platform: 'youtube', success: true })));
       for (const success of [true, false, false]) await recordDownloadStat({ platform: 'youtube', kind: 'video', success });
-      expect(await getStatsTotals()).toEqual({ fetches: before.fetches + 20, downloads: before.downloads + 1 });
+      expect(await getStatsTotals()).toEqual({ fetches: before.fetches + 20, downloads: before.downloads + 1, online: before.online });
     });
 
     it('invalidates a warm total immediately after a committed write and forbids browser caching', async () => {
@@ -119,6 +122,48 @@ for (const target of targets) {
         await recordFetchStat({ platform: 'youtube', success: true });
         await recordDownloadStat({ platform: 'youtube', kind: 'audio', success: true });
         await vi.waitFor(() => expect(snapshots.at(-1)).toMatchObject({ fetches: before.fetches + 1, downloads: before.downloads + 1 }), { timeout: 1000 });
+      } finally { res.destroy(); req.destroy(); }
+    });
+
+    it('counts distinct present visitors, collapses repeated presence from the same one, and excludes stale rows', async () => {
+      const before = await statsStore.totals();
+      await statsStore.recordPresence('visitor-a');
+      await statsStore.recordPresence('visitor-b');
+      await statsStore.recordPresence('visitor-a'); // same visitor again: still one row, not two
+      expect((await statsStore.totals()).online).toBe(before.online + 2);
+
+      // A presence row older than the configured window (default 60s) must not count as online.
+      const staleAt = new Date(Date.now() - 5 * 60_000);
+      if (target.client === 'mongodb') {
+        await mongo.collection('visitor_presence').updateOne({ _id: 'visitor-a' } as never, { $set: { lastSeenAt: staleAt } });
+      } else {
+        await sql('visitor_presence').where({ visitor_id: 'visitor-a' }).update({ last_seen_at: staleAt });
+      }
+      expect((await statsStore.totals()).online).toBe(before.online + 1);
+    });
+
+    it('prunePresence removes only rows old enough that no window could ever count them again', async () => {
+      await statsStore.recordPresence('prune-fresh');
+      await statsStore.recordPresence('prune-stale');
+      const staleAt = new Date(Date.now() - 2 * 3_600_000);
+      if (target.client === 'mongodb') {
+        await mongo.collection('visitor_presence').updateOne({ _id: 'prune-stale' } as never, { $set: { lastSeenAt: staleAt } });
+      } else {
+        await sql('visitor_presence').where({ visitor_id: 'prune-stale' }).update({ last_seen_at: staleAt });
+      }
+      await statsStore.prunePresence(3_600_000);
+      const remainingIds = target.client === 'mongodb'
+        ? (await mongo.collection('visitor_presence').find({ _id: { $in: ['prune-fresh', 'prune-stale'] } } as never).toArray()).map((r) => r._id)
+        : (await sql('visitor_presence').whereIn('visitor_id', ['prune-fresh', 'prune-stale']).select('visitor_id')).map((r: { visitor_id: string }) => r.visitor_id);
+      expect(remainingIds).toEqual(['prune-fresh']);
+    });
+
+    it('counts a real /stats/events connection as an online visitor', async () => {
+      const before = await statsStore.totals();
+      const req = http.get(`http://127.0.0.1:${port}/stats/events`, { headers: { 'x-test-visitor': `sse-visitor-${target.client}` } });
+      const res = await new Promise<http.IncomingMessage>((resolve) => req.once('response', resolve));
+      try {
+        await vi.waitFor(async () => expect((await statsStore.totals()).online).toBe(before.online + 1), { timeout: 1000 });
       } finally { res.destroy(); req.destroy(); }
     });
 

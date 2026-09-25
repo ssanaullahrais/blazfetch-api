@@ -171,6 +171,18 @@ async function eventStats(knex: Knex): Promise<void> {
   });
 }
 
+/** v4: presence for the public "online now" counter. One row per visitor (their guest id, or user id when
+ * signed in); recordPresence upserts last_seen_at, totals() counts rows newer than the configured window. */
+async function visitorPresence(knex: Knex): Promise<void> {
+  if (!(await knex.schema.hasTable('visitor_presence'))) {
+    await knex.schema.createTable('visitor_presence', (t: Knex.CreateTableBuilder) => {
+      t.string('visitor_id', 255).primary();
+      t.timestamp('last_seen_at').notNullable().defaultTo(knex.fn.now());
+      t.index(['last_seen_at']);
+    });
+  }
+}
+
 interface Migration {
   version: number;
   name: string;
@@ -182,6 +194,7 @@ const MIGRATIONS: Migration[] = [
   { version: 1, name: 'baseline schema', up: baselineSchema },
   { version: 2, name: 'permanent media store', up: mediaStore },
   { version: 3, name: 'richer event statistics', up: eventStats },
+  { version: 4, name: 'visitor presence', up: visitorPresence },
 ];
 
 /** Applies every migration that has not run yet, in order, and records it. Safe to run repeatedly. */
