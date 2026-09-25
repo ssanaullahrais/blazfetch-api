@@ -38,6 +38,15 @@ export const streamQuerySchema = z.object({
 /** Failures that streaming can cause but preparing the file can still get around. */
 const FALLBACK_CODES = new Set(['DOWNLOAD_FAILED', 'EXTRACTOR_FAILED', 'PROCESS_TIMEOUT']);
 
+/**
+ * The source can't be streamed at all (ffmpeg is refused by the host, as v.redd.it does, or can't read a signed
+ * playlist, as with Loom). Even mode=stream prepares those, so the download still arrives; any other failure in
+ * mode=stream comes back as the error.
+ */
+export function isStreamUnsupported(err: unknown): boolean {
+  return err instanceof BlazfetchError && (err.details as { streamUnsupported?: boolean } | undefined)?.streamUnsupported === true;
+}
+
 export function isFallbackEligible(err: unknown): boolean {
   if (!(err instanceof BlazfetchError)) return false;
   if ((err.details as { streamUnsupported?: boolean } | undefined)?.streamUnsupported) return true;
@@ -52,6 +61,8 @@ export function isFallbackEligible(err: unknown): boolean {
  * - prepare: the file is built in TEMP_DIR first (merge/transcode, H.264/AAC guaranteed), then sent
  *   and deleted, all within this one request.
  * - auto: stream first; if that fails before the first byte, prepare in the same request.
+ *   Only formats that already play on phones are streamed; the rest are prepared.
+ * - stream also prepares, but only a source that cannot be streamed at all (see isStreamUnsupported).
  *
  * Before the first byte any failure is a normal JSON error. After it, the only way to signal a
  * problem is to abort the connection (so auto can only fall back before bytes are sent).
@@ -243,7 +254,9 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     const media = await fetchMedia({ url, requestId: req.requestId, internal: true }).catch(() => undefined);
     mediaKeyForStat = result.job.mediaId ?? (media ? mediaKeyForResponse(media) : undefined);
-    const ext = (result.filename.split('.').pop() ?? 'mp4').toLowerCase();
+    const fileExt = (result.filename.split('.').pop() ?? 'mp4').toLowerCase();
+    // An audio-only MP4 is an M4A file: name it so, or phones file it under videos.
+    const ext = kind === 'audio' && fileExt === 'mp4' ? 'm4a' : fileExt;
     const name = media ? buildFilename(filename, media, ext) : result.filename;
 
     armTimeout();
@@ -303,7 +316,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
         await runStream();
         return;
       } catch (err) {
-        if (mode === 'stream' || clientClosed || res.headersSent || !isFallbackEligible(err)) throw err;
+        const canFallBack = mode === 'stream' ? isStreamUnsupported(err) : isFallbackEligible(err);
+        if (clientClosed || res.headersSent || !canFallBack) throw err;
         logger.warn(
           { requestId: req.requestId, code: (err as BlazfetchError).code, err: (err as Error).message },
           'direct stream failed before the first byte, falling back to prepare mode',

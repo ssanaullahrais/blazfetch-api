@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import { assertUrlIsSafeToFetch, validateAndNormalizeUrl } from '../utils/url';
 import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { getAdapter } from '../core/adapters/registry';
@@ -9,7 +10,7 @@ import { createJob, getJob, getJobSignal, updateJobProgress, updateJobStatus, cl
 import { jobTempDir, cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { runFfmpeg, extractAudioArgs, transcodeToCompatibleMp4Args } from '../core/ffmpeg/ffmpegRunner';
 import { isBrowserCompatibleMp4, validateMediaFile } from '../core/ffmpeg/ffprobe';
-import { pickBestAudioFormat, pickBestVideoFormat } from '../core/adapters/formatSelection';
+import { phoneSafeEquivalent, pickBestAudioFormat, pickBestVideoFormat } from '../core/adapters/formatSelection';
 import { env } from '../config/env';
 import { logger } from '../lib/logger';
 import { recordDownloadStat } from './statsService';
@@ -19,6 +20,7 @@ import { fetchAudio } from './audioService';
 import { JobRecord, RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchError } from '../constants/errors';
 import { buildFilename } from '../utils/filename';
+import { openRanged } from '../utils/rangedFetch';
 import type { BlazfetchResponse } from '../types/blazfetch';
 
 export interface StartDownloadParams {
@@ -94,9 +96,16 @@ export interface RunDownloadOptions {
  */
 const DOWNLOAD_SHARE = 90;
 const AUDIO_DOWNLOAD_SHARE = 50;
+/** Prefix of the MP3 options made from a video format (see audioService). */
+const MP3_FROM_PREFIX = 'mp3-from-';
 
-/** Converting takes far longer than a remux, so it gets the whole download budget rather than ffmpeg's short one. */
-const CONVERT_TIMEOUT_MS = Math.max(env.FFMPEG_TIMEOUT_MS, env.DOWNLOAD_TOTAL_TIMEOUT_MS);
+/**
+ * Converting takes far longer than a remux, so it gets at least the whole download budget rather than ffmpeg's short
+ * one, and more for a long video (a small server can encode slower than real time).
+ */
+function convertTimeoutMs(durationSeconds: number | undefined): number {
+  return Math.max(env.FFMPEG_TIMEOUT_MS, env.DOWNLOAD_TOTAL_TIMEOUT_MS, (durationSeconds ?? 0) * 2000);
+}
 
 /** Progress writes are best effort: one that fails must never turn into an unhandled rejection. */
 function reportProgress(jobId: string, downloadedBytes: number, totalBytes: number | undefined, percent: number | undefined): void {
@@ -121,10 +130,26 @@ function expectedVideoBytes(metadata: BlazfetchResponse, formatId: string, mergi
   return video + (sizeOf(audio, metadata.durationSeconds) ?? 0);
 }
 
+/** Saves a direct link to disk (in ranged chunks, SSRF-checked), reporting 0–100 as it goes. */
+async function downloadToFile(url: string, filePath: string, signal: AbortSignal, onPercent: (percent: number) => void): Promise<void> {
+  await assertUrlIsSafeToFetch(url);
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  const source = await openRanged(url, { signal });
+  let received = 0;
+  source.stream.on('data', (chunk: Buffer) => {
+    received += chunk.length;
+    if (received > env.MAX_DOWNLOAD_SIZE_BYTES) source.stream.destroy(new BlazfetchError('FILE_TOO_LARGE', 'The file exceeds the maximum allowed download size.'));
+    else if (source.totalBytes) onPercent((received / source.totalBytes) * 100);
+  });
+  await pipeline(source.stream, fs.createWriteStream(filePath), { signal });
+}
+
 /** "<title>.<ext>" for the saved file, instead of the id-based name yt-dlp wrote to disk. */
-function displayName(result: DownloadResult, metadata: BlazfetchResponse | undefined, requested: string | undefined): string {
+function displayName(result: DownloadResult, metadata: BlazfetchResponse | undefined, requested: string | undefined, kind: 'video' | 'audio'): string {
   if (!metadata) return result.filename;
   const ext = (result.filename.split('.').pop() ?? 'mp4').toLowerCase();
+  // An audio-only MP4 is an M4A file: name it so, or phones file it under videos.
+  if (kind === 'audio' && ext === 'mp4') return buildFilename(requested, metadata, 'm4a');
   return buildFilename(requested, metadata, ext);
 }
 
@@ -159,9 +184,14 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
     } else {
       metadata = await fetchMedia({ url: job.canonicalUrl, requestId, internal: true });
       ctx.mediaKey = mediaKeyForResponse(metadata);
-      const format = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
+      const requested = metadata.formats.find((f) => f.formatId === job.requestedFormat.formatId);
+      // The result has to be H.264/AAC: take the same quality in H.264 when there is one instead of re-encoding.
+      const equivalent = requested ? phoneSafeEquivalent(metadata.formats, requested) : undefined;
+      if (equivalent) logger.info({ jobId: job.id, requested: requested?.formatId, using: equivalent.formatId }, 'using the H.264 version of the requested quality');
+      const format = equivalent ?? requested;
+      if (format) effectiveFormatId = format.formatId;
       if (format?.url) await assertUrlIsSafeToFetch(format.url);
-      expectedBytes = expectedVideoBytes(metadata, job.requestedFormat.formatId, !!format?.requiresMerge);
+      expectedBytes = format ? expectedVideoBytes(metadata, format.formatId, !!format.requiresMerge) : undefined;
       if (format?.requiresMerge) {
         // Prefer an AAC/mp4a audio track so the merged output is H.264+AAC MP4 without needing
         // to transcode; yt-dlp falls through to the best available audio if none matches.
@@ -186,7 +216,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
     );
 
     result = await ensureValidAndCompatible(job, result, signal);
-    result = { ...result, filename: displayName(result, metadata, options.filename) };
+    result = { ...result, filename: displayName(result, metadata, options.filename, job.requestedFormat.kind) };
     await finalizeSuccess(job, result, startedAt, ctx);
     return { ...result, job: await refreshJob(job.id) };
   } catch (err) {
@@ -211,10 +241,13 @@ async function runAudioExtraction(
 ): Promise<RunDownloadResult> {
   await updateJobStatus(job.id, 'streaming');
 
+  // "mp3-from-<id>" is the MP3 made from video format <id>: yt-dlp only knows <id>.
+  const requested = job.requestedFormat.formatId;
+  const sourceFormatId = requested.startsWith(MP3_FROM_PREFIX) ? requested.slice(MP3_FROM_PREFIX.length) : requested;
   const videoResult = await adapter.download(
     { requestId, normalizedUrl },
     {
-      formatId: job.requestedFormat.formatId,
+      formatId: sourceFormatId,
       kind: 'video',
       outputDir,
       signal,
@@ -224,6 +257,14 @@ async function runAudioExtraction(
     },
   );
 
+  // Fallback providers only hand out a direct link: fetch it to disk so the audio can be extracted from it.
+  if (!videoResult.filePath && videoResult.directUrl) {
+    const sourcePath = path.join(outputDir, `${job.id}-source`);
+    await downloadToFile(videoResult.directUrl, sourcePath, signal, (percent) =>
+      reportProgress(job.id, 0, undefined, (percent * AUDIO_DOWNLOAD_SHARE) / 100),
+    );
+    videoResult.filePath = sourcePath;
+  }
   if (!videoResult.filePath) {
     throw new BlazfetchError('FORMAT_UNAVAILABLE', 'Audio extraction requires a downloadable source file.');
   }
@@ -233,7 +274,7 @@ async function runAudioExtraction(
   await runFfmpeg({
     args: extractAudioArgs(videoResult.filePath, mp3Path),
     signal,
-    timeoutMs: CONVERT_TIMEOUT_MS,
+    timeoutMs: convertTimeoutMs(source?.durationSeconds),
     progress: source?.durationSeconds
       ? {
           durationSeconds: source.durationSeconds,
@@ -288,7 +329,7 @@ async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, 
   await runFfmpeg({
     args: transcodeToCompatibleMp4Args(result.filePath, compatiblePath),
     signal,
-    timeoutMs: CONVERT_TIMEOUT_MS,
+    timeoutMs: convertTimeoutMs(validation.durationSeconds),
     progress: validation.durationSeconds
       ? {
           durationSeconds: validation.durationSeconds,

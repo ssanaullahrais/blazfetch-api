@@ -1184,7 +1184,7 @@ _Trimmed for readability: showing 2 of 51 items. Long URLs are cut with `...`. F
 
 `POST /api/v1/fetch` with `{"url": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6"}`
 
-HLS video-only formats (merge required) plus a separate audio track. ffmpeg cannot read Loom's signed playlists, so `GET /stream?mode=stream` reports it cannot stream this source; use `mode=auto` (recommended) or `mode=prepare`, which fall back to the server-side download path.
+HLS video-only formats (merge required) plus a separate audio track. ffmpeg cannot read Loom's signed playlists, so `GET /stream` prepares this source on the server in every mode (`X-Blazfetch-Mode: prepare`).
 
 ```json
 {
@@ -1297,7 +1297,7 @@ transcode work continues in the background. Poll `GET /jobs/:id` or open
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `url` | string | yes | Any URL from a supported platform domain |
-| `formatId` | string | no (default `"best"`) | A `formatId` previously returned by `/fetch` or `/fetch/audio` — never a raw yt-dlp format string or shell argument. Omit it (or pass `"best"`) to skip picking a format entirely: the backend automatically selects the highest resolution for video, or the highest-bitrate audio (converting to MP3 via ffmpeg if the source has no standalone audio track) |
+| `formatId` | string | no (default `"best"`) | A `formatId` previously returned by `/fetch` or `/fetch/audio` — never a raw yt-dlp format string or shell argument. Omit it (or pass `"best"`) to skip picking a format entirely: the backend automatically selects the highest resolution for video (an H.264 file from 720p up, and the plain file rather than an HLS copy), or the highest-bitrate audio, preferring AAC/MP3 when it is within 80% of the top bitrate (converting to MP3 via ffmpeg if the source has no standalone audio track) |
 | `kind` | `"video"` \| `"audio"` | yes | |
 | `quality` | string | no | Informational only; doesn't affect selection |
 | `filename` | string | no | Name for the finished file, without extension (max 200 characters). Defaults to the media title |
@@ -1471,8 +1471,8 @@ GET /api/v1/stream?url=<source url>&formatId=<id|best>&kind=video|audio&filename
 
 | Mode | What happens | Best for |
 |---|---|---|
-| `stream` (default) | Bytes are piped from the source straight to the response. No file on the server, first byte in 1 to 3 s. Original codecs are kept (no transcode). | Speed |
-| `prepare` | The server builds the file first (download, merge, and a transcode to H.264/AAC when the source is not browser-compatible), then sends it with its exact size, then deletes it. All in this one request, so nothing arrives until it is ready. | Guaranteed H.264/AAC, or sources that cannot stream |
+| `stream` (default) | Bytes are piped from the source straight to the response. No file on the server, first byte in 1 to 3 s. Original codecs are kept (no transcode). A source that cannot be streamed at all is prepared instead (below). | Speed |
+| `prepare` | The server builds the file first (download, merge, and a transcode to H.264/AAC when the source is not browser-compatible), then sends it with its exact size, then deletes it. All in this one request, so nothing arrives until it is ready. When the chosen format is VP9/AV1/WebM and the source offers the same quality in H.264, that version is downloaded instead, so no re-encode is needed. | Guaranteed H.264/AAC, or sources that cannot stream |
 | `auto` | Tries `stream`. If that fails **before the first byte**, the server switches to `prepare` **in the same request**, so the client still just gets the file. Only formats that already play on phones (a plain H.264 MP4) are streamed; live merges, HLS, WebM and VP9/AV1/HEVC are prepared instead. | Recommended for the frontend: fast when possible, works when not |
 
 `auto` falls back only for failures that preparing can get around (the source could not be
@@ -1509,9 +1509,13 @@ HTTP status (`success:false`, `error:{code,message}`, `requestId`).
 - **No H.264 transcode in stream mode.** Codecs are copied as-is (for example VP9 or AV1 + AAC in
   MP4), which is what makes it fast. Modern browsers and players handle this, but if you need
   guaranteed H.264/AAC output use `POST /download` (prepare mode), which transcodes when needed.
-- **Sources that cannot stream:** some sources cannot be streamed directly (Loom's signed HLS playlists
-  are one, because ffmpeg cannot read them). With `mode=stream` they return a JSON error
-  (`DOWNLOAD_FAILED`); with `mode=auto` they are served by prepare mode automatically.
+- **Sources that cannot stream:** some sources cannot be streamed directly (Loom's signed HLS playlists,
+  and Reddit's `v.redd.it`, which refuses ffmpeg). Every mode serves them with prepare mode in the same
+  request (`X-Blazfetch-Mode: prepare`), so the download still arrives. Other failures in `mode=stream`
+  come back as the JSON error without a fallback.
+- **Full speed from throttling hosts:** plain files are fetched in 10 MB ranged requests (YouTube throttles one
+  long request to about playback speed). ffmpeg reads them through a relay on `127.0.0.1` that does the same, so
+  live merges and remuxes run at full speed too; HLS playlists are read by ffmpeg directly.
 - For the quickest start call `POST /fetch` first: the stream reuses the URLs it resolved, so the
   first byte typically arrives in 1 to 3 seconds. Without a prior fetch it has to resolve the media
   first, which can add several seconds on sites like YouTube.

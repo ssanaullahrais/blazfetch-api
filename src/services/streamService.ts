@@ -1,6 +1,6 @@
 import { Readable, Transform } from 'node:stream';
 import { env } from '../config/env';
-import { safeFetch } from '../utils/safeFetch';
+import { openRanged } from '../utils/rangedFetch';
 import { BlazfetchError } from '../constants/errors';
 import { logger } from '../lib/logger';
 import mime from '../lib/mime';
@@ -9,16 +9,18 @@ import { normalizeAndResolveUrl } from '../utils/shortLinks';
 import { RequestedFormat } from '../core/jobs/jobTypes';
 import { BlazfetchAudioFormat, BlazfetchFormat, BlazfetchResponse } from '../types/blazfetch';
 import {
+  FfmpegMode,
   ResolvedInput,
   StreamSource,
   resolveDirectInputs,
-  spawnFfmpegToStdout,
+  spawnFfmpegRelayed,
   spawnYtdlpToStdout,
 } from '../core/ytdlp/ytdlpStream';
 import { fetchMedia } from './fetchService';
 import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { resolveFormat } from './downloadService';
 import { buildFilename } from '../utils/filename';
+import { isManifestFormat } from '../core/adapters/formatSelection';
 
 export interface OpenStreamParams {
   url: string;
@@ -52,24 +54,24 @@ export interface OpenedStream {
 /** Direct media URLs already known from the (cached) fetch: lets ffmpeg start immediately instead of
  *  waiting for yt-dlp to re-extract the page, which can take several seconds. */
 type FastPath =
-  | { kind: 'ffmpeg'; inputs: ResolvedInput[]; mode: 'merge' | 'remux' | 'mp3' }
+  | { kind: 'ffmpeg'; inputs: ResolvedInput[]; mode: FfmpegMode }
   /** A plain single file: its bytes are passed through untouched (exact size, no ffmpeg). */
   | { kind: 'proxy'; url: string };
 
 type Plan =
   | { type: 'ytdlp'; selector: string; contentType: string; ext: string; contentLength?: number; fast?: FastPath }
-  | { type: 'ffmpeg'; selector: string; mode: 'merge' | 'remux' | 'mp3'; contentType: string; ext: string; fast?: FastPath }
+  | { type: 'ffmpeg'; selector: string; mode: FfmpegMode; contentType: string; ext: string; fast?: FastPath }
   | { type: 'proxy'; url: string; contentType: string; ext: string };
 
 const MERGE_SELECTOR = (id: string): string => `${id}+bestaudio[acodec^=mp4a]/${id}+bestaudio/best`;
 
 function isHls(format: BlazfetchFormat): boolean {
-  return /\.m3u8(\?|$)/i.test(format.url ?? '') || format.formatId.toLowerCase().startsWith('hls');
+  return isManifestFormat(format);
 }
 
 /** A playlist/manifest is not the media itself, so it can never be passed through as-is. */
 function isManifestUrl(url: string): boolean {
-  return /\.(m3u8|mpd)(\?|$)/i.test(url);
+  return isManifestFormat({ formatId: '', url });
 }
 
 function proxyFastPath(url: string | undefined): FastPath | undefined {
@@ -166,6 +168,17 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
   // Audio: a real standalone audio track is piped as-is; anything else becomes MP3 through ffmpeg.
   const audio: BlazfetchAudioFormat | undefined = media.audioFormats.find((f) => f.formatId === format.formatId);
   if (audio && !audio.isConverted) {
+    // An HLS audio track would come out of yt-dlp as MPEG-TS: remux it to a real M4A instead.
+    if (isYtdlp && isHls({ formatId: audio.formatId, url: audio.url } as BlazfetchFormat)) {
+      return {
+        type: 'ffmpeg',
+        selector: audio.formatId,
+        mode: 'audio',
+        contentType: 'audio/mp4',
+        ext: 'm4a',
+        fast: audio.url ? { kind: 'ffmpeg', inputs: [{ url: audio.url, headers: {} }], mode: 'audio' } : undefined,
+      };
+    }
     if (!isYtdlp) {
       if (!audio.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
       return { type: 'proxy', url: audio.url, contentType: contentTypeFor(audio.ext, 'audio'), ext: audio.ext };
@@ -242,17 +255,22 @@ export function waitForFirstChunk(stream: Readable): Promise<Buffer> {
 
 export { buildFilename } from '../utils/filename';
 
-/** Streams a plain HTTP(S) file through untouched. A source that ends early errors instead of finishing quietly. */
+/**
+ * Streams a plain HTTP(S) file through untouched, in ranged chunks (see openRanged) so hosts that throttle one long
+ * request (YouTube does, to about playback speed) still deliver at full speed. A source that ends early errors
+ * instead of finishing quietly.
+ */
 export async function openProxy(url: string, signal: AbortSignal, requestId: string): Promise<StreamSource> {
   await assertUrlIsSafeToFetch(url);
-  const upstream = await safeFetch(url, { signal, headers: { 'accept-encoding': 'identity' } });
-  if (!upstream.ok || !upstream.body) {
-    logger.warn({ requestId, status: upstream.status }, 'stream proxy upstream failed');
-    throw new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
+  let source: Awaited<ReturnType<typeof openRanged>>;
+  try {
+    source = await openRanged(url, { signal });
+  } catch (err) {
+    logger.warn({ requestId, err: (err as Error).message }, 'stream proxy upstream failed');
+    throw err instanceof BlazfetchError ? err : new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
   }
-  const stream = Readable.fromWeb(upstream.body as never);
-  const length = Number(upstream.headers.get('content-length'));
-  return { stream, kill: () => stream.destroy(), contentLength: Number.isFinite(length) && length > 0 ? length : undefined };
+  const { stream, totalBytes } = source;
+  return { stream, kill: () => stream.destroy(), contentLength: totalBytes };
 }
 
 /**
@@ -273,7 +291,7 @@ async function openSource(plan: Plan, url: string, signal: AbortSignal, requestI
   if (plan.type === 'ffmpeg') {
     const inputs: ResolvedInput[] = await resolveDirectInputs({ url, formatSelector: plan.selector, signal });
     await assertInputsAreSafe(inputs);
-    return spawnFfmpegToStdout({ inputs, mode: plan.mode, signal });
+    return spawnFfmpegRelayed({ inputs, mode: plan.mode, signal });
   }
 
   return openProxy(plan.url, signal, requestId);
@@ -325,7 +343,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
         open: async () =>
           fast.kind === 'proxy'
             ? openProxy(fast.url, params.signal, params.requestId)
-            : assertInputsAreSafe(fast.inputs).then(() => spawnFfmpegToStdout({ inputs: fast.inputs, mode: fast.mode, signal: params.signal })),
+            : assertInputsAreSafe(fast.inputs).then(() => spawnFfmpegRelayed({ inputs: fast.inputs, mode: fast.mode, signal: params.signal })),
       });
     }
     openers.push({ fast: false, open: () => openSource(plan, candidate, params.signal, params.requestId) });

@@ -7,7 +7,7 @@ import { getJob, cancelJob, updateJobStatus, updateJobProgress } from '../core/j
 import { cleanupJobTempDir } from '../core/jobs/tempFiles';
 import { assertUrlIsSafeToFetch } from '../utils/url';
 import { assertOwnership } from '../core/jobs/ownership';
-import { safeFetch } from '../utils/safeFetch';
+import { openRanged } from '../utils/rangedFetch';
 import { attachmentHeader } from '../utils/contentDisposition';
 import { BlazfetchError } from '../constants/errors';
 import { recordDownloadStat } from '../services/statsService';
@@ -177,35 +177,37 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
   await assertUrlIsSafeToFetch(sourceUrl);
   await updateJobStatus(job.id, 'streaming');
 
-  const upstream = await safeFetch(sourceUrl);
-  if (!upstream.ok || !upstream.body) {
-    await updateJobStatus(job.id, 'failed', { error_code: 'DOWNLOAD_FAILED', error_message: `Upstream responded with ${upstream.status}` });
+  // Ranged chunks: hosts that throttle one long request still deliver at full speed (see openRanged).
+  let upstream: Awaited<ReturnType<typeof openRanged>>;
+  try {
+    upstream = await openRanged(sourceUrl);
+  } catch (err) {
+    await updateJobStatus(job.id, 'failed', { error_code: 'DOWNLOAD_FAILED', error_message: (err as Error).message });
     throw new BlazfetchError('DOWNLOAD_FAILED', 'Failed to fetch media from the source.');
   }
 
-  const totalBytes = Number(upstream.headers.get('content-length')) || undefined;
-  res.setHeader('Content-Type', job.mimeType ?? upstream.headers.get('content-type') ?? 'application/octet-stream');
+  const totalBytes = upstream.totalBytes;
+  res.setHeader('Content-Type', job.mimeType ?? upstream.contentType ?? 'application/octet-stream');
   if (totalBytes) res.setHeader('Content-Length', String(totalBytes));
   res.setHeader('Content-Disposition', attachmentHeader(job.filename ?? 'download'));
 
   let downloaded = 0;
   let clientGone = false;
-  const reader = upstream.body.getReader();
+  const source = upstream.stream;
   // Stop pulling from the source as soon as the client goes away instead of reading it to the end.
   res.on('close', () => {
     if (res.writableFinished) return;
     clientGone = true;
-    void reader.cancel().catch(() => undefined);
+    source.destroy();
   });
   try {
     // Streams bytes through without ever buffering the full file on disk or in memory.
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    for await (const chunk of source) {
+      const value = chunk as Buffer;
       downloaded += value.byteLength;
       if (clientGone) break;
       countBytes(value.byteLength);
-      res.write(value);
+      if (!res.write(value)) await new Promise<void>((resolve) => res.once('drain', resolve).once('close', resolve));
       updateJobProgress(job.id, downloaded, totalBytes, totalBytes ? (downloaded / totalBytes) * 100 : undefined).catch(() => undefined);
     }
     if (clientGone) {
@@ -215,6 +217,11 @@ async function proxyRemoteFile(job: Awaited<ReturnType<typeof getJob>>, res: Res
     res.end();
     await updateJobStatus(job.id, 'completed', { progress: 100, downloaded_bytes: downloaded });
   } catch (err) {
+    if (clientGone) {
+      // Destroying the source when the client left ends the loop with an error: that is a cancel, not a failure.
+      await updateJobStatus(job.id, 'cancelled', { downloaded_bytes: downloaded });
+      return;
+    }
     await updateJobStatus(job.id, 'failed', { error_code: 'DOWNLOAD_FAILED', error_message: (err as Error).message });
     throw err;
   }
