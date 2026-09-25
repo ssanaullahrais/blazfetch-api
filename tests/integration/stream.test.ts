@@ -459,7 +459,26 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     expect(await body(next.res)).toBe('again');
   });
 
-  it('mode=stream never falls back: the failure comes back as JSON', async () => {
+  it('mode=stream prepares a source that cannot be streamed at all (ffmpeg refused by the host)', async () => {
+    behaviour = (child, args) => {
+      if (args.includes('--dump-single-json')) {
+        child.stdout.write(JSON.stringify({ requested_formats: [{ url: 'https://cdn.example/v.mp4' }, { url: 'https://cdn.example/a.m4a' }] }));
+        child.emit('close', 0);
+        return;
+      }
+      child.stderr.write('Server returned 403 Forbidden (access denied)');
+      setTimeout(() => child.emit('close', 8), 10);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=137&mode=stream`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    await waitFor(() => stats.length === 1);
+    expect(stats[0]).toMatchObject({ success: true, mode: 'prepare', fellBack: true });
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
+  });
+
+  it('mode=stream does not fall back for other failures: the error comes back as JSON', async () => {
     behaviour = failingStream;
     const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=stream`);
     expect(res.statusCode).toBeGreaterThanOrEqual(400);

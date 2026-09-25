@@ -285,7 +285,7 @@ npm run typecheck
 - **`LOGIN_REQUIRED`, `PRIVATE_MEDIA`, `AGE_RESTRICTED`, `MEDIA_UNAVAILABLE`:** the media itself needs a login, is
   private or age-gated, or was deleted. Nothing to fix on the server.
 - Extractor errors return a normalized code (`EXTRACTOR_FAILED`, ...); raw yt-dlp output is only in the server logs.
-- A download that fails with `mode=stream` for one source (Loom is one) works with `mode=auto` or `mode=prepare`.
+- Sources that cannot be streamed (Loom, Reddit) are prepared on the server instead, in every mode.
 
 ---
 
