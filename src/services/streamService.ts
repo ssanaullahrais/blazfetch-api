@@ -20,7 +20,7 @@ import { fetchMedia } from './fetchService';
 import { mediaKeyForResponse } from '../core/media/mediaPath';
 import { resolveFormat } from './downloadService';
 import { buildFilename } from '../utils/filename';
-import { isManifestFormat } from '../core/adapters/formatSelection';
+import { isManifestFormat, phoneSafeEquivalent } from '../core/adapters/formatSelection';
 
 export interface OpenStreamParams {
   url: string;
@@ -114,6 +114,22 @@ function fastPathFor(media: BlazfetchResponse, chosen: BlazfetchFormat, mode: 'm
 
 function contentTypeFor(ext: string, kind: 'video' | 'audio'): string {
   return mime.lookup(`x.${ext}`) ?? (kind === 'audio' ? 'audio/mpeg' : 'video/mp4');
+}
+
+/**
+ * When the top pick is VP9/AV1 (or needs a merge) and the source has no H.264 twin at that height, a plain
+ * single-file MP4 with sound (Instagram's and Facebook's progressive files) still plays everywhere and streams
+ * instantly with an exact size. Undefined when the pick is already fine or no such file exists.
+ */
+function progressiveH264Fallback(formats: BlazfetchFormat[], chosen: BlazfetchFormat): BlazfetchFormat | undefined {
+  if (!chosen.requiresMerge && isPhoneSafeVideo(chosen)) return undefined;
+  const candidates = formats.filter(
+    (f) => f.kind === 'video' && !f.requiresMerge && !!f.url && !isManifestFormat(f) && isPhoneSafeVideo(f) && f.formatId !== chosen.formatId,
+  );
+  if (candidates.length === 0) return undefined;
+  const score = (f: BlazfetchFormat): number => (f.height ?? 0) * 1e9 + (f.bitrate ?? 0) * 1e3 + (f.filesizeBytes ?? 0) / 1e6;
+  // Extractors list qualities worst to best, so on a tie the later entry wins.
+  return candidates.reduce((best, f) => (score(f) >= score(best) ? f : best));
 }
 
 export interface PlanOptions {
@@ -317,7 +333,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
   const normalized = await normalizeAndResolveUrl(params.url);
   await assertUrlIsSafeToFetch(normalized.canonicalUrl);
 
-  const resolved = await resolveFormat(params.url, params.requestId, { formatId: params.formatId, kind: params.kind });
+  let resolved = await resolveFormat(params.url, params.requestId, { formatId: params.formatId, kind: params.kind });
   // requireFreshUrls: the fast path below feeds the stored direct URLs to ffmpeg, so they must not be stale.
   const media = await fetchMedia({
     url: params.url,
@@ -328,6 +344,14 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
     requireFreshUrls: true,
     forceRefresh: retriedWithFreshLinks,
   });
+  // Same quality in H.264 when the source offers it, so the streamed file plays on phones (not VP9/AV1).
+  if (resolved.kind === 'video') {
+    const chosen = media.formats.find((f) => f.formatId === resolved.formatId);
+    const equivalent = chosen ? phoneSafeEquivalent(media.formats, chosen) : undefined;
+    const fallback = chosen && !equivalent && params.formatId.toLowerCase() === 'best' ? progressiveH264Fallback(media.formats, chosen) : undefined;
+    const better = equivalent ?? fallback;
+    if (better) resolved = { ...resolved, formatId: better.formatId };
+  }
   const plan = planStream(media, resolved, { phoneSafeOnly: params.phoneSafeOnly });
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);

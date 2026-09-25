@@ -202,26 +202,27 @@ describe('GET /api/v1/stream', () => {
     expect(fs.readdirSync(tempDir)).toEqual([]);
   });
 
-  it('prepares "best" in stream mode too, with fast conversion: a live merge would not play on phones', async () => {
-    const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&mode=stream`);
+  it.each(['stream', 'auto'])('live-merges "best" in %s mode instead of preparing it on the server', async (mode) => {
+    behaviour = (child, args) => {
+      if (args.includes('--dump-single-json')) {
+        child.stdout.write(JSON.stringify({ requested_formats: [{ url: 'https://cdn.example.com/v.mp4' }, { url: 'https://cdn.example.com/a.m4a' }] }));
+        child.emit('close', 0);
+        return;
+      }
+      child.stdout.write('merged-');
+      setTimeout(() => {
+        child.stdout.write('bytes');
+        child.emit('close', 0);
+      }, 20);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=137&kind=video&mode=${mode}`);
     expect(res.statusCode).toBe(200);
-    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
-    expect(await body(res)).toBe('prepared-bytes');
-    expect(children).toHaveLength(0); // nothing was live-merged
-    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: true });
+    expect(res.headers['x-blazfetch-mode']).toBe('stream');
+    expect(await body(res)).toBe('merged-bytes');
+    expect(children.length).toBeGreaterThan(0);
+    expect(preparedJobs).toEqual([]); // nothing was prepared on the server
     await waitFor(() => stats.length === 1);
-    expect(stats[0]).toMatchObject({ success: true, mode: 'prepare' });
-    await waitFor(() => fs.readdirSync(tempDir).length === 0);
-  });
-
-  it('prepares "best" instead of live-merging it in auto mode (a live merge would not play on phones)', async () => {
-    const { res } = await request(`/api/v1/stream?url=${VIDEO}&kind=video&mode=auto`);
-    expect(res.statusCode).toBe(200);
-    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
-    expect(await body(res)).toBe('prepared-bytes');
-    expect(children).toHaveLength(0);
-    await waitFor(() => stats.length === 1);
-    expect(stats[0]).toMatchObject({ success: true, mode: 'prepare' });
+    expect(stats[0]).toMatchObject({ success: true, mode: 'stream' });
     await waitFor(() => fs.readdirSync(tempDir).length === 0);
   });
 
