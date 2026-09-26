@@ -12,9 +12,11 @@ import { buildFilename, openProxy, openStream } from '../services/streamService'
 import { runDownloadJob, startDownloadJob } from '../services/downloadService';
 import { fetchMedia } from '../services/fetchService';
 import { recordDownloadStat } from '../services/statsService';
-import { mediaKeyForResponse } from '../core/media/mediaPath';
+import { mediaKeyForResponse, predictedMediaKey } from '../core/media/mediaPath';
 import { networkKey } from '../utils/clientKey';
 import { attachmentHeader } from '../utils/contentDisposition';
+import { validateAndNormalizeUrl } from '../utils/url';
+import { beginAttempt, record } from '../services/downloadLogs';
 
 export const DOWNLOAD_MODES = ['stream', 'prepare', 'auto'] as const;
 
@@ -74,6 +76,17 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   const { url, formatId, kind, filename, token } = parsed.data;
   const mode = parsed.data.mode ?? env.DEFAULT_DOWNLOAD_MODE;
 
+  // Best-effort: lets the visitor look this attempt's log back up at GET /media/<platform>/<id>/logs while
+  // it's still running (or shortly after) — only possible for YouTube, whose id is predictable from the URL
+  // alone; every other platform's key is only known once fetchMedia resolves, too late to register up front.
+  try {
+    const normalized = validateAndNormalizeUrl(url);
+    const mediaKey = predictedMediaKey(normalized);
+    if (mediaKey) beginAttempt({ requestId: req.requestId, platform: normalized.platform, mediaKey, guestId: req.guestId, userId: req.userId });
+  } catch {
+    // An invalid/unsupported URL is reported properly by the real fetch below; nothing to track here.
+  }
+
   const startedAt = Date.now();
   let abort = new AbortController();
   let clientClosed = false;
@@ -123,6 +136,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   const recordStat = (success: boolean, errorCode?: string): void => {
     if (statRecorded) return;
     statRecorded = true;
+    record(req.requestId, success ? 'info' : 'warn', success ? 'Download completed successfully.' : `Download failed${errorCode ? ` (${errorCode})` : ''}.`);
     void recordDownloadStat({
       platform: platformForStat,
       mediaId: mediaKeyForStat,
@@ -357,10 +371,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
         return;
       } catch (err) {
         if (clientClosed || res.headersSent || !isFallbackEligible(err)) throw err;
-        logger.warn(
-          { requestId: req.requestId, code: (err as BlazfetchError).code, err: (err as Error).message },
-          'direct stream failed before the first byte, falling back to prepare mode',
-        );
+        const fallbackCode = err instanceof BlazfetchError ? err.code : 'DOWNLOAD_FAILED';
+        record(req.requestId, 'warn', `Live streaming isn't possible for this pick (${fallbackCode}: ${(err as Error).message}) — preparing a compatible file on the server instead.`);
         fellBack = true;
         stopStreamAttempt();
         abort = new AbortController(); // the stream attempt's signal is spent
@@ -374,7 +386,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     } catch (err) {
       // The requested quality could not be produced: deliver the best one instead of failing the download.
       if (clientClosed || res.headersSent || !isFallbackEligible(err) || prepareFormatId === 'best') throw err;
-      logger.warn({ requestId: req.requestId, formatId, err: (err as Error).message }, 'prepare failed for the requested format, retrying with best');
+      record(req.requestId, 'warn', `Format ${formatId} couldn't be prepared (${(err as Error).message}) — trying the best available format instead.`);
       await cleanupPrepare();
       prepareFormatId = 'best';
       await runPrepare();

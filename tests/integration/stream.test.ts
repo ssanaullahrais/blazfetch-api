@@ -597,4 +597,33 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(await body(res)).error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('lets the visitor who started an attempt look its logs back up, but nobody else', async () => {
+    behaviour = (child) => {
+      child.stdout.write('hello world');
+      setTimeout(() => child.emit('close', 0), 10);
+    };
+    // A guest id must look like a real UUID (see requestId.ts) or the server issues a fresh one on every
+    // request, which would make the two requests below impossible to correlate as "the same visitor".
+    const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video`, owner);
+    await body(res);
+
+    const start = Date.now();
+    let parsed: { success: boolean; attempts: { lines: { message: string }[] }[] } | undefined;
+    while (!parsed) {
+      const attempt = await request('/api/v1/media/youtube/abc123/logs', owner);
+      if (attempt.res.statusCode === 200) parsed = JSON.parse(await body(attempt.res));
+      else {
+        await body(attempt.res);
+        if (Date.now() - start > 2000) throw new Error('logs never became available');
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+    expect(parsed.attempts[0].lines.some((l) => l.message.includes('completed successfully'))).toBe(true);
+
+    const strangerRes = await request('/api/v1/media/youtube/abc123/logs', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+    expect(strangerRes.res.statusCode).toBe(404);
+    await body(strangerRes.res);
+  });
 });
