@@ -347,8 +347,9 @@ async function runAudioExtraction(
  * intentionally left unprobed — we're not downloading it ourselves to inspect it.
  *
  * UNSAFE_LARGE_VIDEO_STREAM_ENABLED skips this transcode once the downloaded file's real size reaches
- * UNSAFE_LARGE_VIDEO_MIN_BYTES, delivering the incompatible codec as-is to save the conversion's CPU cost — off
- * by default, since it means even an explicit mode=prepare ("Compatible") can hand back an unplayable file.
+ * UNSAFE_LARGE_VIDEO_MIN_BYTES, delivering the incompatible codec as-is to save the conversion's CPU cost — on by
+ * default to protect server resources, meaning even an explicit mode=prepare ("Compatible") can hand back an
+ * unplayable file once a video crosses that size; set it to false to always guarantee playability instead.
  */
 export async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, signal: AbortSignal, fastConvert = false): Promise<DownloadResult> {
   if (!result.filePath) return result;

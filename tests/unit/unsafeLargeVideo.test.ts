@@ -37,14 +37,19 @@ describe('UNSAFE_LARGE_VIDEO_STREAM_ENABLED', () => {
     delete process.env.UNSAFE_LARGE_VIDEO_MIN_BYTES;
   });
 
-  it('is off by default: even a big incompatible video still gets transcoded', async () => {
+  it('is on by default: a big incompatible video skips the transcode', async () => {
     const { ensureValidAndCompatible } = await importWithEnv({});
-    await expect(ensureValidAndCompatible(job, bigResult, signal)).rejects.toThrow(FFMPEG_INVOKED);
+    await expect(ensureValidAndCompatible(job, bigResult, signal)).resolves.toBe(bigResult);
   });
 
-  it('once enabled, skips the transcode for a video at or above the size limit', async () => {
-    const { ensureValidAndCompatible } = await importWithEnv({ UNSAFE_LARGE_VIDEO_STREAM_ENABLED: 'true', UNSAFE_LARGE_VIDEO_MIN_BYTES: String(100 * 1024 * 1024) });
-    await expect(ensureValidAndCompatible(job, bigResult, signal)).resolves.toBe(bigResult);
+  it('by default, still transcodes a video under the size limit', async () => {
+    const { ensureValidAndCompatible } = await importWithEnv({});
+    await expect(ensureValidAndCompatible(job, smallResult, signal)).rejects.toThrow(FFMPEG_INVOKED);
+  });
+
+  it('once disabled, always transcodes, however big the video is', async () => {
+    const { ensureValidAndCompatible } = await importWithEnv({ UNSAFE_LARGE_VIDEO_STREAM_ENABLED: 'false' });
+    await expect(ensureValidAndCompatible(job, bigResult, signal)).rejects.toThrow(FFMPEG_INVOKED);
   });
 
   it('still transcodes a video under the size limit even when enabled', async () => {

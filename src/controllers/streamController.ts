@@ -59,7 +59,7 @@ export function isFallbackEligible(err: unknown): boolean {
  *   is big enough for that to matter (see AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES) — that preset choice is now the
  *   only thing that tells the two modes apart.
  *
- * UNSAFE_LARGE_VIDEO_STREAM_ENABLED (off by default) overrides all of the above once a video's real size reaches
+ * UNSAFE_LARGE_VIDEO_STREAM_ENABLED (on by default) overrides all of the above once a video's real size reaches
  * UNSAFE_LARGE_VIDEO_MIN_BYTES: it is delivered in its original, possibly phone-unplayable codec instead of being
  * made compatible, for every mode including an explicit mode=prepare — see ensureValidAndCompatible.
  *
