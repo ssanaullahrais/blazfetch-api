@@ -32,9 +32,6 @@ export interface OpenStreamParams {
   userId?: string | null;
   guestId?: string | null;
   signal: AbortSignal;
-  /** mode=auto: refuse what phones can't play as-is, so the caller prepares a compatible file instead.
-   *  mode=stream ("Fastest") passes the source through as it is (a live merge/remux when needed). */
-  phoneSafeOnly?: boolean;
 }
 
 export interface OpenedStream {
@@ -134,17 +131,13 @@ function progressiveH264Fallback(formats: BlazfetchFormat[], chosen: BlazfetchFo
   return candidates.reduce((best, f) => (score(f) >= score(best) ? f : best));
 }
 
-export interface PlanOptions {
-  /** Refuse anything that would not play on phones as-is (mode=auto), instead of streaming it anyway (mode=stream). */
-  phoneSafeOnly?: boolean;
-}
-
-/** Picks how to produce the bytes. Nothing here touches disk or transcodes video. */
-export function planStream(media: BlazfetchResponse, format: RequestedFormat, options: PlanOptions = {}): Plan {
+/** Picks how to produce the bytes. Nothing here touches disk or transcodes video. Refuses anything that would not
+ * play on phones as-is (VP9/AV1/HEVC, HLS); the caller prepares a compatible file instead — see streamController's
+ * UNSAFE_LARGE_VIDEO_STREAM_ENABLED for the one deliberate, opt-in exception to that, applied after the fact. */
+export function planStream(media: BlazfetchResponse, format: RequestedFormat): Plan {
   const isYtdlp = !media.extractor || media.extractor.startsWith('yt-dlp');
-  const phoneSafeOnly = options.phoneSafeOnly ?? true;
   const requirePhoneSafe = (f: BlazfetchFormat): void => {
-    if (phoneSafeOnly && !isPhoneSafeVideo(f)) throw notPhoneSafe(f.filesizeBytes);
+    if (!isPhoneSafeVideo(f)) throw notPhoneSafe(f.filesizeBytes);
   };
 
   if (format.kind === 'video') {
@@ -166,7 +159,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
     }
     // A live merge/remux of a non-H.264 source (VP9/AV1/HEVC) comes out as that codec inside an MP4 wrapper, which
     // phones cannot play at all: auto prepares a real H.264 file instead. An H.264 merge still streams live.
-    if (phoneSafeOnly && ((chosen.requiresMerge && !isPhoneSafeVideo(chosen)) || isHls(chosen))) throw notPhoneSafe(chosen.filesizeBytes);
+    if ((chosen.requiresMerge && !isPhoneSafeVideo(chosen)) || isHls(chosen)) throw notPhoneSafe(chosen.filesizeBytes);
     if (chosen.requiresMerge) {
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }
@@ -199,17 +192,9 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
   }
   if (audio && !audio.isConverted) {
     // An HLS audio track would come out of yt-dlp as MPEG-TS. A live remux gives a fragmented M4A, which phones may
-    // refuse, so the phone-safe modes prepare a normal M4A instead.
+    // refuse, so it is prepared into a normal M4A instead.
     if (isYtdlp && isHls({ formatId: audio.formatId, url: audio.url } as BlazfetchFormat)) {
-      if (phoneSafeOnly) throw notPhoneSafe(audio.filesizeBytes);
-      return {
-        type: 'ffmpeg',
-        selector: audio.formatId,
-        mode: 'audio',
-        contentType: 'audio/mp4',
-        ext: 'm4a',
-        fast: audio.url ? { kind: 'ffmpeg', inputs: [{ url: audio.url, headers: {} }], mode: 'audio' } : undefined,
-      };
+      throw notPhoneSafe(audio.filesizeBytes);
     }
     if (!isYtdlp) {
       if (!audio.url) throw new BlazfetchError('FORMAT_UNAVAILABLE', 'This media can only be downloaded with POST /api/v1/download.', { streamUnsupported: true });
@@ -366,7 +351,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
     const better = equivalent ?? fallback;
     if (better) resolved = { ...resolved, formatId: better.formatId };
   }
-  const plan = planStream(media, resolved, { phoneSafeOnly: params.phoneSafeOnly });
+  const plan = planStream(media, resolved);
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);
   let lastError: unknown;

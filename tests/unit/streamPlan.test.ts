@@ -72,31 +72,21 @@ describe('planStream', () => {
   });
 });
 
-describe('planStream in stream mode (Fastest: no phone-safe rule)', () => {
-  const fastest = { phoneSafeOnly: false };
-
-  it('live-merges a video-only format with audio instead of refusing it', () => {
-    expect(planStream(media(), { formatId: '137', kind: 'video' }, fastest)).toMatchObject({ type: 'ffmpeg', mode: 'merge', ext: 'mp4', selector: '137+bestaudio[acodec^=mp4a]/137+bestaudio/best' });
-  });
-
-  it('remuxes HLS to MP4 on the fly', () => {
-    expect(planStream(media(), { formatId: 'hls-720', kind: 'video' }, fastest)).toMatchObject({ type: 'ffmpeg', mode: 'remux', ext: 'mp4' });
-  });
-
-  it('passes WebM / VP9 through as they are, with their own extension', () => {
+describe('planStream refuses a phone-unsafe pick from every source, not just yt-dlp', () => {
+  it('refuses WebM / VP9, whatever their extension', () => {
     const codecs = media({
       formats: [
         { formatId: 'webm', ext: 'webm', kind: 'video', codec: 'vp9' },
         { formatId: 'vp9', ext: 'mp4', kind: 'video', codec: 'vp09.00.40.08' },
       ],
     });
-    expect(planStream(codecs, { formatId: 'webm', kind: 'video' }, fastest)).toMatchObject({ type: 'ytdlp', ext: 'webm', contentType: 'video/webm' });
-    expect(planStream(codecs, { formatId: 'vp9', kind: 'video' }, fastest)).toMatchObject({ type: 'ytdlp', ext: 'mp4' });
+    expect(() => planStream(codecs, { formatId: 'webm', kind: 'video' })).toThrowError(/would not play on phones/);
+    expect(() => planStream(codecs, { formatId: 'vp9', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 
-  it('proxies a fallback provider link even when it is not phone-safe', () => {
-    const plan = planStream(media({ extractor: 'btch-downloader', formats: [{ formatId: 'x', ext: 'webm', kind: 'video', url: 'https://cdn.example/a.webm' }] }), { formatId: 'x', kind: 'video' }, fastest);
-    expect(plan).toMatchObject({ type: 'proxy', url: 'https://cdn.example/a.webm', ext: 'webm' });
+  it('refuses a non-yt-dlp fallback provider link too, not just yt-dlp sources', () => {
+    const fallback = media({ extractor: 'btch-downloader', formats: [{ formatId: 'x', ext: 'webm', kind: 'video', url: 'https://cdn.example/a.webm' }] });
+    expect(() => planStream(fallback, { formatId: 'x', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 });
 
@@ -142,9 +132,7 @@ describe('planStream fast path', () => {
 
   it('never passes an HLS/DASH manifest through as if it were the media', () => {
     const hlsAudio = media({ audioFormats: [{ formatId: 'hls_mp3', ext: 'mp3', bitrate: 128, isConverted: false, url: 'https://cdn.example/playlist.m3u8?x=1' }] });
-    // Phone-safe modes prepare it; without that rule ffmpeg reads the playlist. It is never proxied as the file.
     expect(() => planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' })).toThrowError(/would not play on phones/);
-    expect((planStream(hlsAudio, { formatId: 'hls_mp3', kind: 'audio' }, { phoneSafeOnly: false }) as { fast?: { kind: string } }).fast?.kind).not.toBe('proxy');
   });
 
   it('has no fast path when the cached format has no URL', () => {
@@ -215,16 +203,9 @@ describe('waitForFirstChunk', () => {
 });
 
 describe('planStream: HLS audio', () => {
-  it('prepares an HLS audio track in the phone-safe modes, and can remux it to M4A with ffmpeg otherwise', () => {
+  it('always refuses to remux an HLS audio track live, and prepares a normal M4A instead', () => {
     const hlsAudio = media({ audioFormats: [{ formatId: 'hls-raw-audio-audio', ext: 'mp4', isConverted: false, url: 'https://cdn.example/audio.m3u8?sig=1' }] });
     expect(() => planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' })).toThrowError(/would not play on phones/);
-    expect(planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' }, { phoneSafeOnly: false })).toMatchObject({
-      type: 'ffmpeg',
-      mode: 'audio',
-      ext: 'm4a',
-      contentType: 'audio/mp4',
-      fast: { kind: 'ffmpeg', mode: 'audio', inputs: [{ url: 'https://cdn.example/audio.m3u8?sig=1' }] },
-    });
   });
 
   it('maps only the audio track and writes fragmented MP4', () => {

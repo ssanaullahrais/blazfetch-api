@@ -51,11 +51,17 @@ export function isFallbackEligible(err: unknown): boolean {
  * - stream: yt-dlp/ffmpeg output is piped straight to the response; no file on disk.
  * - prepare: the file is built in TEMP_DIR first (merge/transcode, H.264/AAC guaranteed), then sent
  *   and deleted, all within this one request.
- * - auto: stream first; if that fails before the first byte, prepare in the same request. An H.264 source (even one
- *   that needs merging with an audio track) still streams live; a VP9/AV1/HEVC source, or HLS, is refused before any
- *   byte is sent and prepared into a normal H.264 MP4 instead, since phones cannot play those live-merged as-is.
- * - stream (Fastest in the app): the same, but skips that check (speed over guaranteed compatibility) and, when a
- *   conversion cannot be avoided, uses ffmpeg's quickest settings.
+ * - auto and stream (Fastest in the app): stream first; if that fails before the first byte, prepare in the same
+ *   request. An H.264 source (even one that needs merging with an audio track) still streams live either way; a
+ *   VP9/AV1/HEVC source, or HLS, is refused before any byte is sent and prepared into a normal H.264 MP4 instead,
+ *   since phones cannot play those live-merged as-is — shipping a broken file just to be fast helps no one. Once
+ *   prepare does run, stream always uses ffmpeg's quickest (larger-output) preset; auto only does once the source
+ *   is big enough for that to matter (see AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES) — that preset choice is now the
+ *   only thing that tells the two modes apart.
+ *
+ * UNSAFE_LARGE_VIDEO_STREAM_ENABLED (off by default) overrides all of the above once a video's real size reaches
+ * UNSAFE_LARGE_VIDEO_MIN_BYTES: it is delivered in its original, possibly phone-unplayable codec instead of being
+ * made compatible, for every mode including an explicit mode=prepare — see ensureValidAndCompatible.
  *
  * Before the first byte any failure is a normal JSON error. After it, the only way to signal a
  * problem is to abort the connection (so auto can only fall back before bytes are sent).
@@ -185,10 +191,11 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       userId: req.userId,
       guestId: req.guestId,
       signal: abort.signal,
-      // auto: refuse a pick that would come out unplayable on phones (VP9/AV1/HEVC, or HLS) before any byte is
-      // sent, so it falls back to prepare instead. An H.264 merge is still fine and keeps streaming live.
-      // stream ("Fastest"): skip that check and stream it anyway, even if it will not play on a phone.
-      phoneSafeOnly: mode !== 'stream',
+      // Both auto and stream ("Fastest") refuse a pick that would come out unplayable on phones (VP9/AV1/HEVC, or
+      // HLS) before any byte is sent, so it falls back to prepare instead — shipping a broken file just to be
+      // fast helps no one. An H.264 merge needs no such fallback and keeps streaming live either way. Once
+      // prepare runs, fastConvert (below) is still what tells the two modes apart: stream always uses the
+      // quicker, larger-output ffmpeg preset; auto only does once the source is big enough for that to matter.
     });
     killSource = opened.kill;
     platformForStat = opened.platform;

@@ -226,7 +226,7 @@ describe('GET /api/v1/stream', () => {
     await waitFor(() => fs.readdirSync(tempDir).length === 0);
   });
 
-  it('mode=auto prepares a VP9 merge instead of streaming it broken, but mode=stream streams it anyway', async () => {
+  it.each(['auto', 'stream'] as const)('mode=%s prepares a VP9 merge instead of streaming it broken', async (mode) => {
     const vp9Media = {
       success: true,
       platform: 'instagram',
@@ -239,30 +239,13 @@ describe('GET /api/v1/stream', () => {
       extractor: 'yt-dlp',
     };
     vi.mocked(fetchMedia).mockResolvedValueOnce(vp9Media as never).mockResolvedValueOnce(vp9Media as never);
-    const auto = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-1080&kind=video&mode=auto`);
-    expect(auto.res.statusCode).toBe(200);
-    expect(auto.res.headers['x-blazfetch-mode']).toBe('prepare');
-    expect(await body(auto.res)).toBe('prepared-bytes');
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-1080&kind=video&mode=${mode}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
     expect(preparedJobs).toHaveLength(1);
-
-    vi.mocked(fetchMedia).mockResolvedValueOnce(vp9Media as never);
-    behaviour = (child, args) => {
-      if (args.includes('--dump-single-json')) {
-        child.stdout.write(JSON.stringify({ requested_formats: [{ url: 'https://cdn.example.com/v.mp4' }, { url: 'https://cdn.example.com/a.m4a' }] }));
-        child.emit('close', 0);
-        return;
-      }
-      child.stdout.write('merged-');
-      setTimeout(() => {
-        child.stdout.write('bytes');
-        child.emit('close', 0);
-      }, 20);
-    };
-    const stream = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-1080&kind=video&mode=stream`);
-    expect(stream.res.statusCode).toBe(200);
-    expect(stream.res.headers['x-blazfetch-mode']).toBe('stream');
-    expect(await body(stream.res)).toBe('merged-bytes');
-    expect(preparedJobs).toHaveLength(1); // still just the one from the auto request above
+    // stream ("Fastest") always uses the quick preset once a conversion is unavoidable; auto only for a big source.
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: mode === 'stream' });
   });
 
   it('mode=auto uses the quick ffmpeg preset for a big VP9 fallback, but not a small one', async () => {
