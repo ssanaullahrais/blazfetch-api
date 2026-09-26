@@ -456,6 +456,18 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     expect(preparedJobs).toHaveLength(0);
   });
 
+  it.each(['auto', 'stream'] as const)('audio always prepares under mode=%s, even a real standalone track that could stream live', async (mode) => {
+    behaviour = () => {
+      throw new Error('no child process should be spawned for a direct audio stream attempt');
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=140&kind=audio&mode=${mode}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(children).toHaveLength(0); // no direct-stream process was ever started
+    expect(preparedJobs).toHaveLength(1);
+  });
+
   it('mode=prepare builds the file on the server, sends it with its size, and deletes it', async () => {
     const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&mode=prepare`);
     expect(res.statusCode).toBe(200);

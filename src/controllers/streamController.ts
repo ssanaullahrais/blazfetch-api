@@ -336,7 +336,11 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   };
 
   try {
-    if (mode !== 'prepare') {
+    // Audio always goes through prepare, whatever the mode: it is a much smaller, cheaper build than video (no
+    // heavy H.264 transcode, just a real audio track or a quick MP3 conversion), so there is no speed trade-off
+    // worth risking an incompatible codec for — and UNSAFE_LARGE_VIDEO_STREAM_ENABLED's size cutoff (built for big
+    // video conversions) never applies to it either way.
+    if (mode !== 'prepare' && kind !== 'audio') {
       try {
         await runStream();
         return;
