@@ -36,8 +36,10 @@ describe('planStream', () => {
     expect(() => planStream(vp9, { formatId: 'vp9-137', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 
-  it('refuses to stream HLS through a live remux for the same reason', () => {
-    expect(() => planStream(media(), { formatId: 'hls-720', kind: 'video' })).toThrowError(/would not play on phones/);
+  it('remuxes an H.264 HLS source live, but refuses one whose codec is not phone-safe', () => {
+    expect(planStream(media(), { formatId: 'hls-720', kind: 'video' })).toMatchObject({ type: 'ffmpeg', mode: 'remux', ext: 'mp4' });
+    const vp9Hls = media({ formats: [{ formatId: 'hls-vp9', ext: 'mp4', kind: 'video', height: 720, url: 'https://cdn.example/a.m3u8?x=1', codec: 'vp09.00.40.08' }] });
+    expect(() => planStream(vp9Hls, { formatId: 'hls-vp9', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 
   it('refuses formats phones cannot play as-is (VP9/AV1/HEVC, WebM)', () => {
@@ -203,9 +205,14 @@ describe('waitForFirstChunk', () => {
 });
 
 describe('planStream: HLS audio', () => {
-  it('always refuses to remux an HLS audio track live, and prepares a normal M4A instead', () => {
+  it('refuses to remux a non-AAC HLS audio track live, and prepares a normal M4A instead', () => {
     const hlsAudio = media({ audioFormats: [{ formatId: 'hls-raw-audio-audio', ext: 'mp4', isConverted: false, url: 'https://cdn.example/audio.m3u8?sig=1' }] });
     expect(() => planStream(hlsAudio, { formatId: 'hls-raw-audio-audio', kind: 'audio' })).toThrowError(/would not play on phones/);
+  });
+
+  it('remuxes an AAC HLS audio track live instead of preparing it', () => {
+    const hlsAudio = media({ audioFormats: [{ formatId: 'hls-aac-audio', ext: 'mp4', codec: 'mp4a.40.2', isConverted: false, url: 'https://cdn.example/audio.m3u8?sig=1' }] });
+    expect(planStream(hlsAudio, { formatId: 'hls-aac-audio', kind: 'audio' })).toMatchObject({ type: 'ffmpeg', mode: 'audio', ext: 'm4a', contentType: 'audio/mp4' });
   });
 
   it('maps only the audio track and writes fragmented MP4', () => {
