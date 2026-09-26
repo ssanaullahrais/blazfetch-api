@@ -185,8 +185,8 @@ GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpe
 
 | You want | Use |
 |---|---|
-| Fastest start, nothing on the server's disk | `GET /stream?mode=stream` (default) |
-| It to work for every source in one request (**recommended**) | `GET /stream?mode=auto` |
+| It to work for every source in one request, streaming when it can (**recommended, default**) | `GET /stream?mode=auto` |
+| Fastest start, nothing on the server's disk (may not play on some phones for VP9/AV1/HEVC sources) | `GET /stream?mode=stream` |
 | A guaranteed H.264/AAC file | `GET /stream?mode=prepare` |
 | Server-side progress for a long file | `POST /download`, then poll `GET /jobs/:id` |
 
