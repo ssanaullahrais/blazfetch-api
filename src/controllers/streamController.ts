@@ -146,6 +146,17 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       logger.warn({ requestId: req.requestId, mode }, 'download timed out, stopping processes');
       recordStat(false, 'PROCESS_TIMEOUT');
       cleanup();
+      // Not a single byte has gone out yet: say so with a real JSON error instead of just resetting the
+      // connection, so a client watching for a response (the hidden download frame) sees a clear failure
+      // right away instead of waiting out its own much longer give-up timer for a reply that never comes.
+      if (!res.headersSent) {
+        res.status(504).json({
+          success: false,
+          error: { code: 'PROCESS_TIMEOUT', message: 'The download took too long and was stopped.' },
+          requestId: req.requestId,
+        });
+        return;
+      }
       res.destroy();
     }, env.DOWNLOAD_TOTAL_TIMEOUT_MS);
   };
