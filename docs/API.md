@@ -1704,8 +1704,10 @@ media, the platform and the (guest) user.
 ## Cloudflare Turnstile (optional bot check)
 
 Turnstile is Cloudflare's free, privacy-friendly CAPTCHA replacement. It is **off by default**. When
-`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /media/...`, `GET /stream` and `POST /download` need a passed check.
-The media route can extract missing or stale metadata, so it uses the same gate as fetch. Public configuration,
+`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /stream` and `POST /download` need a passed check.
+`GET /media/...` is never gated, even though it can extract missing or stale metadata like fetch does: it's the
+endpoint a stable/shared link opens, so a brand-new visitor arriving from one sees the page immediately rather than
+a CAPTCHA before they've done anything; it's still behind the same rate limiter as fetch. Public configuration,
 aggregate statistics, the platform list and health endpoints remain open. Existing job delivery checks job ownership.
 
 How it works:
