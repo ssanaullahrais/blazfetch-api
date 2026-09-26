@@ -62,6 +62,12 @@ const envSchema = z.object({
   // this size uses the same quick ffmpeg preset as "Fastest" (~3x quicker, a somewhat larger file) instead of the
   // slower, smaller-file preset — the CPU/time saved on a big video matters more than it does on a small one.
   AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES: z.coerce.number().default(100 * 1024 * 1024),
+  // Off by default: every video, whatever its size, is always made to play everywhere. Turning this on skips the
+  // compatibility transcode (VP9/AV1/HEVC -> H.264) once a video's real downloaded size reaches
+  // UNSAFE_LARGE_VIDEO_MIN_BYTES, delivering it in its original, possibly phone-unplayable codec instead, to save
+  // the server the CPU cost of converting it — for every mode, including an explicit mode=prepare ("Compatible").
+  UNSAFE_LARGE_VIDEO_STREAM_ENABLED: boolFromString(false),
+  UNSAFE_LARGE_VIDEO_MIN_BYTES: z.coerce.number().default(100 * 1024 * 1024),
   TEMP_DIR: z.string().default('./tmp'),
   // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
   // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).

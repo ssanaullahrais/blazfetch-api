@@ -345,14 +345,28 @@ async function runAudioExtraction(
  * than handing back a technically-complete file that shows black or won't play. A result that
  * only has a directUrl (proxied straight from the source CDN, never touching local disk) is
  * intentionally left unprobed — we're not downloading it ourselves to inspect it.
+ *
+ * UNSAFE_LARGE_VIDEO_STREAM_ENABLED skips this transcode once the downloaded file's real size reaches
+ * UNSAFE_LARGE_VIDEO_MIN_BYTES, delivering the incompatible codec as-is to save the conversion's CPU cost — off
+ * by default, since it means even an explicit mode=prepare ("Compatible") can hand back an unplayable file.
  */
-async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, signal: AbortSignal, fastConvert = false): Promise<DownloadResult> {
+export async function ensureValidAndCompatible(job: JobRecord, result: DownloadResult, signal: AbortSignal, fastConvert = false): Promise<DownloadResult> {
   if (!result.filePath) return result;
 
   const kind = job.requestedFormat.kind;
   const validation = await validateMediaFile(result.filePath, kind);
 
   if (kind === 'audio' || isBrowserCompatibleMp4(validation)) {
+    return result;
+  }
+
+  if (env.UNSAFE_LARGE_VIDEO_STREAM_ENABLED && result.bytes >= env.UNSAFE_LARGE_VIDEO_MIN_BYTES) {
+    // UNSAFE_LARGE_VIDEO_STREAM_ENABLED trades this video's playability on some phones for skipping the
+    // conversion's CPU cost, once it is this big — deliberately, for every mode including mode=prepare.
+    logger.info(
+      { jobId: job.id, videoCodec: validation.videoCodec, bytes: result.bytes },
+      'skipping compatibility transcode: video is at or above UNSAFE_LARGE_VIDEO_MIN_BYTES',
+    );
     return result;
   }
 
