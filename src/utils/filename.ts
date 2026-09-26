@@ -2,6 +2,7 @@ import type { BlazfetchResponse } from '../types/blazfetch';
 
 function sanitizeFilename(name: string): string {
   return name
+    // eslint-disable-next-line no-control-regex -- deliberately stripping control characters, not a typo
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .replace(/[\\/:*?"<>|]+/g, '_')
     .replace(/\s+/g, ' ')

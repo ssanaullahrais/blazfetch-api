@@ -10,7 +10,7 @@ import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
 import { fetchInstagramViaBtchDownloader } from '../fallback/instagram/btchDownloader';
 import { fetchInstagramViaCakkatrok } from '../fallback/instagram/cakkatrokAdapter';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
-import { BlazfetchItem, BlazfetchPlaylistItem, BlazfetchResponse } from '../../types/blazfetch';
+import { BlazfetchItem, BlazfetchResponse } from '../../types/blazfetch';
 
 interface YtdlpPlaylistInfo extends YtdlpRawInfo {
   _type?: string;
