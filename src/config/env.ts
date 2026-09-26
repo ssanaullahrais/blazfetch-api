@@ -58,6 +58,10 @@ const envSchema = z.object({
 
   MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
   MAX_DOWNLOAD_SIZE_BYTES: z.coerce.number().default(2147483648),
+  // When auto mode falls back to prepare because a pick is not phone-safe (VP9/AV1/HEVC), a source at or above
+  // this size uses the same quick ffmpeg preset as "Fastest" (~3x quicker, a somewhat larger file) instead of the
+  // slower, smaller-file preset — the CPU/time saved on a big video matters more than it does on a small one.
+  AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES: z.coerce.number().default(100 * 1024 * 1024),
   TEMP_DIR: z.string().default('./tmp'),
   // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
   // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).

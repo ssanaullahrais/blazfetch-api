@@ -89,6 +89,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   let prepareFinished = false;
   /** The format the prepare step builds: the requested one first, then "best" if that cannot be produced. */
   let prepareFormatId = formatId;
+  /** Set when auto's phone-safety fallback reports a big source, so prepare uses the quicker ffmpeg preset. */
+  let fastConvertOverride = false;
 
   const releaseSlots = (): void => {
     releaseGlobal?.();
@@ -252,8 +254,14 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      // Fastest (mode=stream) converts with ffmpeg's quickest settings when a conversion cannot be avoided.
-      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: networkKey(req), fastConvert: mode === 'stream' });
+      // Fastest (mode=stream) always converts with ffmpeg's quickest settings when a conversion cannot be avoided;
+      // auto does too, but only once the source is big enough that the time/CPU saved actually matters.
+      result = await runDownloadJob(job, req.requestId, {
+        fellBack,
+        recordFailure: false,
+        networkKey: networkKey(req),
+        fastConvert: mode === 'stream' || fastConvertOverride,
+      });
     } finally {
       prepareFinished = true;
     }
@@ -334,6 +342,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
         fellBack = true;
         stopStreamAttempt();
         abort = new AbortController(); // the stream attempt's signal is spent
+        const sizeHint = (err instanceof BlazfetchError ? (err.details as { filesizeBytes?: number } | undefined)?.filesizeBytes : undefined) ?? 0;
+        if (sizeHint >= env.AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES) fastConvertOverride = true;
       }
     }
 

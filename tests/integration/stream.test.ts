@@ -265,6 +265,30 @@ describe('GET /api/v1/stream', () => {
     expect(preparedJobs).toHaveLength(1); // still just the one from the auto request above
   });
 
+  it('mode=auto uses the quick ffmpeg preset for a big VP9 fallback, but not a small one', async () => {
+    const bigVp9 = {
+      success: true,
+      platform: 'instagram',
+      mediaType: 'video',
+      mediaId: 'vp9-big',
+      canonicalUrl: 'https://www.instagram.com/reel/vp9-big',
+      title: 'Big VP9 Video',
+      formats: [{ formatId: 'vp9-big', ext: 'mp4', kind: 'video_only', height: 1080, requiresMerge: true, codec: 'vp09.00.40.08', filesizeBytes: 200 * 1024 * 1024 }],
+      audioFormats: [{ formatId: '140', ext: 'm4a', bitrate: 128, isConverted: false }],
+      extractor: 'yt-dlp',
+    };
+    vi.mocked(fetchMedia).mockResolvedValueOnce(bigVp9 as never).mockResolvedValueOnce(bigVp9 as never);
+    const big = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-big&kind=video&mode=auto`);
+    expect(big.res.statusCode).toBe(200);
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: true });
+
+    const smallVp9 = { ...bigVp9, mediaId: 'vp9-small', formats: [{ ...bigVp9.formats[0], formatId: 'vp9-small', filesizeBytes: 10 * 1024 * 1024 }] };
+    vi.mocked(fetchMedia).mockResolvedValueOnce(smallVp9 as never).mockResolvedValueOnce(smallVp9 as never);
+    const small = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-small&kind=video&mode=auto`);
+    expect(small.res.statusCode).toBe(200);
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: false });
+  });
+
   it('returns a JSON error with the right status when yt-dlp fails before the first byte', async () => {
     behaviour = (child) => {
       child.stderr.write('ERROR: This video is private video');

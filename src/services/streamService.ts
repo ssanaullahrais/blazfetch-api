@@ -90,11 +90,12 @@ function isPhoneSafeVideo(format: BlazfetchFormat): boolean {
   return format.ext.toLowerCase() === 'mp4' && codecOk;
 }
 
-function notPhoneSafe(): BlazfetchError {
+/** sizeBytes, when known, lets the controller pick a quicker (larger-output) ffmpeg preset for a big prepare. */
+function notPhoneSafe(sizeBytes?: number): BlazfetchError {
   return new BlazfetchError(
     'DOWNLOAD_FAILED',
     'This format would not play on phones when streamed as-is. Use mode=auto or mode=prepare for a compatible MP4.',
-    { streamUnsupported: true },
+    { streamUnsupported: true, filesizeBytes: sizeBytes },
   );
 }
 
@@ -143,7 +144,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
   const isYtdlp = !media.extractor || media.extractor.startsWith('yt-dlp');
   const phoneSafeOnly = options.phoneSafeOnly ?? true;
   const requirePhoneSafe = (f: BlazfetchFormat): void => {
-    if (phoneSafeOnly && !isPhoneSafeVideo(f)) throw notPhoneSafe();
+    if (phoneSafeOnly && !isPhoneSafeVideo(f)) throw notPhoneSafe(f.filesizeBytes);
   };
 
   if (format.kind === 'video') {
@@ -165,7 +166,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
     }
     // A live merge/remux of a non-H.264 source (VP9/AV1/HEVC) comes out as that codec inside an MP4 wrapper, which
     // phones cannot play at all: auto prepares a real H.264 file instead. An H.264 merge still streams live.
-    if (phoneSafeOnly && ((chosen.requiresMerge && !isPhoneSafeVideo(chosen)) || isHls(chosen))) throw notPhoneSafe();
+    if (phoneSafeOnly && ((chosen.requiresMerge && !isPhoneSafeVideo(chosen)) || isHls(chosen))) throw notPhoneSafe(chosen.filesizeBytes);
     if (chosen.requiresMerge) {
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }
@@ -200,7 +201,7 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
     // An HLS audio track would come out of yt-dlp as MPEG-TS. A live remux gives a fragmented M4A, which phones may
     // refuse, so the phone-safe modes prepare a normal M4A instead.
     if (isYtdlp && isHls({ formatId: audio.formatId, url: audio.url } as BlazfetchFormat)) {
-      if (phoneSafeOnly) throw notPhoneSafe();
+      if (phoneSafeOnly) throw notPhoneSafe(audio.filesizeBytes);
       return {
         type: 'ffmpeg',
         selector: audio.formatId,
