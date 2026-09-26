@@ -52,13 +52,26 @@ export function beginAttempt(params: { requestId: string; platform: string; medi
   }
 }
 
-/** Records one line against a tracked attempt, and always logs through the normal server logger too. A
- * no-op on the tracking side when `requestId` was never registered (see beginAttempt). */
+const IPV4 = /\b\d{1,3}(?:\.\d{1,3}){3}\b/g;
+// A deliberately loose IPv6 match (hex groups joined by colons, including the "::" zero-compression form): good
+// enough to redact an address embedded in a URL or error message without needing to fully validate IPv6 syntax.
+const IPV6 = /\b[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,}\b/gi;
+
+/** Strips anything that looks like an IP address (the visitor's own, or one from an upstream CDN URL in an error
+ * message) before a line is ever stored or shown back to a visitor. */
+function redact(message: string): string {
+  return message.replace(IPV4, '[ip]').replace(IPV6, '[ip]');
+}
+
+/** Records one line against a tracked attempt, and always logs through the normal server logger too (the real,
+ * unredacted message — redaction only applies to what a visitor can read back via getVisitorLogs). A no-op on
+ * the tracking side when `requestId` was never registered (see beginAttempt). */
 export function record(requestId: string, level: LogLevel, message: string): void {
   logger[level]({ requestId }, message);
-  attempts.get(requestId)?.lines.push({ ts: Date.now(), level, message });
   const attempt = attempts.get(requestId);
-  if (attempt && attempt.lines.length > MAX_LINES_PER_ATTEMPT) attempt.lines.shift();
+  if (!attempt) return;
+  attempt.lines.push({ ts: Date.now(), level, message: redact(message) });
+  if (attempt.lines.length > MAX_LINES_PER_ATTEMPT) attempt.lines.shift();
 }
 
 /** The visitor (guest or logged-in user) who started an attempt for this media can look its own attempts'

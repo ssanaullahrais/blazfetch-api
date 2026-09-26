@@ -37,6 +37,13 @@ describe('downloadLogs', () => {
     expect(getVisitorLogs('youtube', 'user-media', 'some-guest', undefined)).toBeUndefined();
   });
 
+  it('redacts anything that looks like an IPv4 or IPv6 address before storing a line', () => {
+    beginAttempt({ requestId: 'r6', platform: 'youtube', mediaKey: 'ip-test', guestId: 'guest-ip' });
+    record('r6', 'warn', 'upstream refused (203.0.113.42) and again from 2001:db8::1');
+    const [line] = getVisitorLogs('youtube', 'ip-test', 'guest-ip', undefined)![0].lines;
+    expect(line.message).toBe('upstream refused ([ip]) and again from [ip]');
+  });
+
   it('returns the most recent attempt first', () => {
     beginAttempt({ requestId: 'r4', platform: 'youtube', mediaKey: 'multi', guestId: 'guest-multi' });
     beginAttempt({ requestId: 'r5', platform: 'youtube', mediaKey: 'multi', guestId: 'guest-multi' });
