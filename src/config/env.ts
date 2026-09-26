@@ -88,8 +88,9 @@ const envSchema = z.object({
   // Optional: secret used to sign the pass cookie. Defaults to one derived from TURNSTILE_SECRET_KEY.
   TURNSTILE_COOKIE_SECRET: z.string().optional().default(''),
   // Delivery mode for GET /api/v1/stream when the request has no ?mode=: "stream" pipes straight through,
-  // "prepare" builds the file on the server first, "auto" tries stream and falls back to prepare.
-  DEFAULT_DOWNLOAD_MODE: z.enum(['stream', 'prepare', 'auto']).default('stream'),
+  // "prepare" builds the file on the server first, "auto" tries stream and falls back to prepare. Only matters
+  // for a caller that never sends ?mode= — the official frontend always sends its own choice explicitly.
+  DEFAULT_DOWNLOAD_MODE: z.enum(['stream', 'prepare', 'auto']).default('auto'),
   // How old (ms) a file/folder in TEMP_DIR must be before the periodic sweep deletes it.
   TEMP_SWEEP_MAX_AGE_MS: z.coerce.number().default(3600000),
   TEMP_SWEEP_INTERVAL_MS: z.coerce.number().default(600000),

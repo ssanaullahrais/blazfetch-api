@@ -445,7 +445,7 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     setTimeout(() => child.emit('close', 1), 10);
   };
 
-  it('uses stream by default and says so in X-Blazfetch-Mode', async () => {
+  it('uses auto by default, which streams a phone-safe format directly (X-Blazfetch-Mode: stream)', async () => {
     behaviour = (child) => {
       child.stdout.write('streamed');
       child.emit('close', 0);
