@@ -30,8 +30,10 @@ describe('planStream', () => {
     expect(plan).toMatchObject({ type: 'ytdlp', selector: '18', contentType: 'video/mp4', ext: 'mp4', contentLength: 1000 });
   });
 
-  it('refuses to stream a live merge (fragmented MP4 goes black on phones), so auto prepares it', () => {
-    expect(() => planStream(media(), { formatId: '137', kind: 'video' })).toThrowError(/would not play on phones/);
+  it('streams an H.264 merge live, but refuses one whose video is not phone-safe (VP9/AV1/HEVC)', () => {
+    expect(planStream(media(), { formatId: '137', kind: 'video' })).toMatchObject({ type: 'ffmpeg', mode: 'merge', ext: 'mp4' });
+    const vp9 = media({ formats: [{ formatId: 'vp9-137', ext: 'mp4', kind: 'video_only', height: 1080, requiresMerge: true, codec: 'vp09.00.40.08' }] });
+    expect(() => planStream(vp9, { formatId: 'vp9-137', kind: 'video' })).toThrowError(/would not play on phones/);
   });
 
   it('refuses to stream HLS through a live remux for the same reason', () => {
@@ -129,9 +131,9 @@ describe('planStream fast path', () => {
     expect(planStream(withUrls, { formatId: '18', kind: 'video' })).toMatchObject({ type: 'ytdlp', fast: { kind: 'proxy', url: 'https://cdn.example/18.mp4' } });
   });
 
-  it('does not stream a WebM or a video-only format, which would not play on phones', () => {
+  it('does not stream a WebM (never phone-safe), but does stream an H.264 video-only merge', () => {
     expect(() => planStream(withUrls, { formatId: '43', kind: 'video' })).toThrowError(/would not play on phones/);
-    expect(() => planStream(withUrls, { formatId: '137', kind: 'video' })).toThrowError(/would not play on phones/);
+    expect(planStream(withUrls, { formatId: '137', kind: 'video' })).toMatchObject({ type: 'ffmpeg', mode: 'merge' });
   });
 
   it('passes a standalone audio track through untouched from its cached URL', () => {

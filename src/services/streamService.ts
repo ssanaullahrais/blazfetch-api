@@ -163,8 +163,9 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
       requirePhoneSafe(chosen);
       return { type: 'proxy', url: chosen.url, contentType: contentTypeFor(chosen.ext, 'video'), ext: chosen.ext };
     }
-    // A live merge/remux produces fragmented MP4, which phone galleries show black: auto prepares those instead.
-    if (phoneSafeOnly && (chosen.requiresMerge || isHls(chosen))) throw notPhoneSafe();
+    // A live merge/remux of a non-H.264 source (VP9/AV1/HEVC) comes out as that codec inside an MP4 wrapper, which
+    // phones cannot play at all: auto prepares a real H.264 file instead. An H.264 merge still streams live.
+    if (phoneSafeOnly && ((chosen.requiresMerge && !isPhoneSafeVideo(chosen)) || isHls(chosen))) throw notPhoneSafe();
     if (chosen.requiresMerge) {
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }

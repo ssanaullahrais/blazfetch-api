@@ -51,10 +51,11 @@ export function isFallbackEligible(err: unknown): boolean {
  * - stream: yt-dlp/ffmpeg output is piped straight to the response; no file on disk.
  * - prepare: the file is built in TEMP_DIR first (merge/transcode, H.264/AAC guaranteed), then sent
  *   and deleted, all within this one request.
- * - auto: stream first; if that fails before the first byte, prepare in the same request.
- * - stream (Fastest in the app): the same, but a conversion that cannot be avoided uses ffmpeg's quickest settings.
- * Both stream only what already plays on phones (a single H.264 MP4, a standalone audio track); merges, HLS, WebM and
- * VP9/AV1/HEVC are prepared as a normal MP4, using the same quality in H.264 when the source has it.
+ * - auto: stream first; if that fails before the first byte, prepare in the same request. An H.264 source (even one
+ *   that needs merging with an audio track) still streams live; a VP9/AV1/HEVC source, or HLS, is refused before any
+ *   byte is sent and prepared into a normal H.264 MP4 instead, since phones cannot play those live-merged as-is.
+ * - stream (Fastest in the app): the same, but skips that check (speed over guaranteed compatibility) and, when a
+ *   conversion cannot be avoided, uses ffmpeg's quickest settings.
  *
  * Before the first byte any failure is a normal JSON error. After it, the only way to signal a
  * problem is to abort the connection (so auto can only fall back before bytes are sent).
@@ -182,9 +183,10 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       userId: req.userId,
       guestId: req.guestId,
       signal: abort.signal,
-      // Streaming always comes first (prepare puts load on the server): merges, remuxes and HLS are piped live as
-      // fragmented MP4. Only a failure before the first byte falls back to prepare (auto/stream).
-      phoneSafeOnly: false,
+      // auto: refuse a pick that would come out unplayable on phones (VP9/AV1/HEVC, or HLS) before any byte is
+      // sent, so it falls back to prepare instead. An H.264 merge is still fine and keeps streaming live.
+      // stream ("Fastest"): skip that check and stream it anyway, even if it will not play on a phone.
+      phoneSafeOnly: mode !== 'stream',
     });
     killSource = opened.kill;
     platformForStat = opened.platform;
