@@ -1,3 +1,4 @@
+import { getDb } from '../db';
 import { logger } from '../lib/logger';
 
 export type LogLevel = 'info' | 'warn' | 'error';
@@ -10,46 +11,23 @@ export interface LogLine {
 
 export interface LogAttempt {
   requestId: string;
-  platform: string;
-  mediaKey: string;
-  guestId?: string;
-  userId?: string;
   startedAt: number;
   lines: LogLine[];
 }
 
-const MAX_LINES_PER_ATTEMPT = 200;
-const MAX_ATTEMPTS_TRACKED = 2000;
-const MAX_ATTEMPTS_PER_MEDIA = 10;
-const ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000; // how long a finished attempt's log stays available to look up
-
-const attempts = new Map<string, LogAttempt>(); // requestId -> attempt, oldest first (Map preserves insertion order)
-const byMedia = new Map<string, string[]>(); // "platform:mediaKey" -> requestIds, oldest first
-
-const mediaIndexKey = (platform: string, mediaKey: string): string => `${platform}:${mediaKey}`;
+/** How many of a media's most recent attempts GET /media/<platform>/<id>/logs returns. */
+const MAX_ATTEMPTS_RETURNED = 10;
 
 /**
- * Starts tracking one download/stream attempt so its log lines can be looked up later by whoever started
- * it (see getVisitorLogs). Best-effort and in-memory only: a media key that can't be predicted from the
- * URL up front (every platform except YouTube, whose id is in the URL itself) is simply never tracked,
- * and a restart of the process drops everything — this is a debugging aid, not a permanent record.
+ * Starts tracking one download/stream attempt in the database (see downloadLogs in db/types.ts), so its log
+ * lines can be looked up later at GET /media/<platform>/<id>/logs. Best-effort and fire-and-forget: a failure
+ * here must never affect the download itself. A media key that can't be predicted from the URL up front (every
+ * platform except YouTube, whose id is in the URL itself) is simply never tracked.
  */
-export function beginAttempt(params: { requestId: string; platform: string; mediaKey: string; guestId?: string; userId?: string }): void {
-  attempts.set(params.requestId, { ...params, startedAt: Date.now(), lines: [] });
-
-  const key = mediaIndexKey(params.platform, params.mediaKey);
-  const list = byMedia.get(key) ?? [];
-  list.push(params.requestId);
-  while (list.length > MAX_ATTEMPTS_PER_MEDIA) {
-    const dropped = list.shift();
-    if (dropped) attempts.delete(dropped);
-  }
-  byMedia.set(key, list);
-
-  if (attempts.size > MAX_ATTEMPTS_TRACKED) {
-    const oldest = attempts.keys().next().value;
-    if (oldest) attempts.delete(oldest);
-  }
+export function beginAttempt(params: { requestId: string; platform: string; mediaKey: string; guestId?: string; userId?: string }): Promise<void> {
+  return getDb()
+    .downloadLogs.begin(params)
+    .catch((err) => logger.warn({ requestId: params.requestId, err: (err as Error).message }, 'failed to record a download-log attempt start'));
 }
 
 const IPV4 = /\b\d{1,3}(?:\.\d{1,3}){3}\b/g;
@@ -64,38 +42,27 @@ function redact(message: string): string {
 }
 
 /** Records one line against a tracked attempt, and always logs through the normal server logger too (the real,
- * unredacted message — redaction only applies to what a visitor can read back via getVisitorLogs). A no-op on
- * the tracking side when `requestId` was never registered (see beginAttempt). */
-export function record(requestId: string, level: LogLevel, message: string): void {
+ * unredacted message — redaction only applies to what a visitor can read back via getMediaDownloadLogs).
+ * Fire-and-forget, like beginAttempt: never lets a logging failure affect the download itself. A no-op on the
+ * storage side when `requestId` was never begun. */
+export function record(requestId: string, level: LogLevel, message: string): Promise<void> {
   logger[level]({ requestId }, message);
-  const attempt = attempts.get(requestId);
-  if (!attempt) return;
-  attempt.lines.push({ ts: Date.now(), level, message: redact(message) });
-  if (attempt.lines.length > MAX_LINES_PER_ATTEMPT) attempt.lines.shift();
+  return getDb()
+    .downloadLogs.appendLine(requestId, level, redact(message))
+    .catch((err) => logger.warn({ requestId, err: (err as Error).message }, 'failed to record a download-log line'));
 }
 
-/** The visitor (guest or logged-in user) who started an attempt for this media can look its own attempts'
- * logs back up; nobody else can. Returns the most recent attempts first, or undefined when this visitor
- * has none on record (including "never tracked at all" and "the attempt already expired"). */
-export function getVisitorLogs(platform: string, mediaKey: string, guestId?: string, userId?: string): LogAttempt[] | undefined {
-  const list = byMedia.get(mediaIndexKey(platform, mediaKey));
-  if (!list) return undefined;
-  const own = list
-    .map((id) => attempts.get(id))
-    .filter((a): a is LogAttempt => !!a && ((!!userId && a.userId === userId) || (!!guestId && a.guestId === guestId)))
-    .reverse();
-  return own.length ? own : undefined;
+/**
+ * Recent attempts for this media, most recent first, or undefined when none are on record. Public — no
+ * ownership check: anyone who knows a media's platform/id can look these up, for now, until an admin-only view
+ * replaces this (see GET /media/<platform>/<id>/logs).
+ */
+export async function getMediaDownloadLogs(platform: string, mediaKey: string): Promise<LogAttempt[] | undefined> {
+  const attempts = await getDb().downloadLogs.listForMedia(platform, mediaKey, MAX_ATTEMPTS_RETURNED);
+  if (attempts.length === 0) return undefined;
+  return attempts.map((a) => ({
+    requestId: a.requestId,
+    startedAt: new Date(a.startedAt).getTime(),
+    lines: a.lines.map((l) => ({ ts: new Date(l.ts).getTime(), level: l.level, message: l.message })),
+  }));
 }
-
-// Drops attempts old enough that nobody is still watching them, so the in-memory store doesn't grow forever.
-setInterval(() => {
-  const cutoff = Date.now() - ATTEMPT_TTL_MS;
-  for (const [id, attempt] of attempts) {
-    if (attempt.startedAt < cutoff) attempts.delete(id);
-  }
-  for (const [key, list] of byMedia) {
-    const kept = list.filter((id) => attempts.has(id));
-    if (kept.length) byMedia.set(key, kept);
-    else byMedia.delete(key);
-  }
-}, 10 * 60 * 1000).unref();

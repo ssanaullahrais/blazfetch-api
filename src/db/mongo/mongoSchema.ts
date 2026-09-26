@@ -36,6 +36,9 @@ export async function runMongoMigrations(): Promise<void> {
 
   await db.collection('download_stats').createIndex({ createdAt: 1 });
 
+  await db.collection('download_logs').createIndex({ platform: 1, mediaKey: 1, startedAt: -1 });
+  await db.collection('download_log_lines').createIndex({ requestId: 1, ts: 1 });
+
   // TTL index: MongoDB itself removes a presence row this long after its lastSeenAt was last written,
   // which is what recordPresence's upsert refreshes on every heartbeat — the row only actually expires
   // once a visitor stops sending them. Pure housekeeping (like SQL's prunePresence): totals() still filters

@@ -16,6 +16,12 @@ const tempDir = await vi.hoisted(async () => {
   process.env.TEMP_DIR = dir;
   process.env.LOG_LEVEL = 'silent';
   process.env.RATE_LIMIT_MAX_DOWNLOAD = '1000';
+  // The download-logs service writes here now (see downloadLogs.ts), so it needs a real, migrated database
+  // instead of the process default path — in its own directory, since several tests assert TEMP_DIR ends up
+  // completely empty once a download is done.
+  const dbDir = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'blazfetch-stream-db-'));
+  process.env.DATABASE_DRIVER = 'sqlite';
+  process.env.DATABASE_SQLITE_PATH = nodePath.join(dbDir, 'stream.sqlite3');
   return dir;
 });
 
@@ -117,11 +123,13 @@ import { createApp } from '../../src/app';
 import { fetchMedia } from '../../src/services/fetchService';
 import { BlazfetchError } from '../../src/constants/errors';
 import { activeStreamProcessCount } from '../../src/core/ytdlp/ytdlpStream';
+import { getDb } from '../../src/db';
 
 let server: http.Server;
 let port: number;
 
 beforeAll(async () => {
+  await getDb().migrate();
   server = createApp().listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));
   port = (server.address() as AddressInfo).port;
@@ -129,6 +137,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  await getDb().close();
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -158,7 +167,10 @@ async function body(res: http.IncomingMessage): Promise<string> {
   return out;
 }
 
-const waitFor = async (predicate: () => boolean, ms = 2000): Promise<void> => {
+// The download-logs service now does real (fire-and-forget) SQLite writes on every request, which adds a
+// little real disk I/O contention when many test files run their own database in parallel — 2s cut it close
+// even before that; 5s gives enough headroom without masking a genuine hang.
+const waitFor = async (predicate: () => boolean, ms = 5000): Promise<void> => {
   const start = Date.now();
   while (!predicate()) {
     if (Date.now() - start > ms) throw new Error('timed out waiting for condition');
@@ -598,21 +610,19 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     expect(JSON.parse(await body(res)).error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('lets the visitor who started an attempt look its logs back up, but nobody else', async () => {
+  it('persists a download log for anyone to look up later, not just the visitor who started it', async () => {
     behaviour = (child) => {
       child.stdout.write('hello world');
       setTimeout(() => child.emit('close', 0), 10);
     };
-    // A guest id must look like a real UUID (see requestId.ts) or the server issues a fresh one on every
-    // request, which would make the two requests below impossible to correlate as "the same visitor".
-    const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video`, owner);
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video`);
     await body(res);
 
     const start = Date.now();
     let parsed: { success: boolean; attempts: { lines: { message: string }[] }[] } | undefined;
     while (!parsed) {
-      const attempt = await request('/api/v1/media/youtube/abc123/logs', owner);
+      // A different, unrelated guest cookie: logs are public now, with no ownership check at all.
+      const attempt = await request('/api/v1/media/youtube/abc123/logs', 'a-completely-different-visitor');
       if (attempt.res.statusCode === 200) parsed = JSON.parse(await body(attempt.res));
       else {
         await body(attempt.res);
@@ -621,9 +631,5 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
       }
     }
     expect(parsed.attempts[0].lines.some((l) => l.message.includes('completed successfully'))).toBe(true);
-
-    const strangerRes = await request('/api/v1/media/youtube/abc123/logs', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
-    expect(strangerRes.res.statusCode).toBe(404);
-    await body(strangerRes.res);
   });
 });

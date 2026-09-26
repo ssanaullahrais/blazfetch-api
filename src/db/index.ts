@@ -5,11 +5,13 @@ import { runSqlMigrations } from './sql/sqlSchema';
 import { SqlMetadataCacheRepository } from './sql/sqlMetadataCacheRepository';
 import { SqlJobRepository } from './sql/sqlJobRepository';
 import { SqlStatsRepository } from './sql/sqlStatsRepository';
+import { SqlDownloadLogsRepository } from './sql/sqlDownloadLogsRepository';
 import { getMongoDb, closeMongo } from './mongo/mongoClient';
 import { runMongoMigrations } from './mongo/mongoSchema';
 import { MongoMetadataCacheRepository } from './mongo/mongoMetadataCacheRepository';
 import { MongoJobRepository } from './mongo/mongoJobRepository';
 import { MongoStatsRepository } from './mongo/mongoStatsRepository';
+import { MongoDownloadLogsRepository } from './mongo/mongoDownloadLogsRepository';
 
 let instance: Database | null = null;
 
@@ -18,6 +20,7 @@ function buildSqlDatabase(): Database {
     metadataCache: new SqlMetadataCacheRepository(),
     jobs: new SqlJobRepository(),
     stats: new SqlStatsRepository(),
+    downloadLogs: new SqlDownloadLogsRepository(),
     async checkConnection() {
       try {
         await getKnex().raw('select 1');
@@ -36,6 +39,7 @@ function buildMongoDatabase(): Database {
     metadataCache: new MongoMetadataCacheRepository(),
     jobs: new MongoJobRepository(),
     stats: new MongoStatsRepository(),
+    downloadLogs: new MongoDownloadLogsRepository(),
     async checkConnection() {
       try {
         const db = await getMongoDb();

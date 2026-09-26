@@ -6,7 +6,7 @@ import { parseMediaPath, sourceUrlForKey } from '../core/media/mediaPath';
 import { fetchMedia, isPublicSource } from '../services/fetchService';
 import { presentMedia } from '../utils/audioMp3';
 import { recordVisitorFetch } from '../services/statsService';
-import { getVisitorLogs } from '../services/downloadLogs';
+import { getMediaDownloadLogs } from '../services/downloadLogs';
 
 const querySchema = z.object({
   // Only answer from what is already stored; never extract from the source.
@@ -63,17 +63,17 @@ export async function getMedia(req: Request, res: Response): Promise<void> {
 /**
  * GET /api/v1/media/<platform>/<id>/logs
  *
- * Lets a visitor look back at what happened on their own recent GET /stream attempts for this media — useful
- * when a download seemed to hang or fail and they want the real reason, not just a generic error toast. Only
- * ever shows attempts started by the same guest/user cookie that is asking; in-memory and short-lived (see
- * downloadLogs.ts), and currently only tracked for YouTube, the one platform whose id is predictable from the
- * URL before anything is fetched.
+ * Shows what happened on this media's recent GET /stream attempts — useful when a download seemed to hang or
+ * fail and someone wants the real reason, not just a generic error toast. Stored permanently in the database
+ * (see downloadLogs in db/types.ts) and, for now, public: anyone who knows the platform/id can look these up,
+ * with no ownership check — planned to move behind an admin-only view later. Currently only tracked for
+ * YouTube, the one platform whose id is predictable from the URL before anything is fetched.
  */
 export async function getMediaLogs(req: Request, res: Response): Promise<void> {
   const { platform, id } = req.params;
-  const attempts = getVisitorLogs(platform, id, req.guestId, req.userId);
+  const attempts = await getMediaDownloadLogs(platform, id);
   if (!attempts) {
-    throw new BlazfetchError('MEDIA_NOT_FOUND', 'No recent download attempt from you was found for this media.');
+    throw new BlazfetchError('MEDIA_NOT_FOUND', 'No download attempt was found for this media.');
   }
   res.json({
     success: true,

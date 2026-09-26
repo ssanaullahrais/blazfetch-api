@@ -169,6 +169,7 @@ response for each platform) and a frontend walkthrough. The endpoints:
 POST   /api/v1/fetch                     resolve metadata + formats (rangeStart/rangeEnd for Pinterest boards)
 POST   /api/v1/fetch/audio               resolve audio options
 GET    /api/v1/media/<platform>/<id>     stored media by stable path (e.g. /youtube/Cwkej79U3ek)
+GET    /api/v1/media/<platform>/<id>/logs  that media's download logs (public, persisted, YouTube only for now)
 GET    /api/v1/stream                    one-request download: ?mode=stream (default) | prepare | auto
 POST   /api/v1/download                  start a download job (formatId defaults to "best")
 GET    /api/v1/jobs/:id                  poll job status/progress

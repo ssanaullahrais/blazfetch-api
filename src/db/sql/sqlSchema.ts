@@ -183,6 +183,36 @@ async function visitorPresence(knex: Knex): Promise<void> {
   }
 }
 
+/** v5: per-visitor download logs (see downloadLogs.ts) — one row per attempt, one row per log line within it.
+ * Rows are never deleted, same as the metadata cache. */
+async function downloadLogs(knex: Knex): Promise<void> {
+  if (!(await knex.schema.hasTable('download_logs'))) {
+    await knex.schema.createTable('download_logs', (t: Knex.CreateTableBuilder) => {
+      // `id` (not started_at) orders attempts: SQLite's CURRENT_TIMESTAMP default only has second precision,
+      // so two attempts on the same media within the same second would otherwise tie and sort unpredictably.
+      // An autoincrement column is always monotonic with insertion order, on every driver.
+      t.increments('id');
+      t.string('request_id', 64).notNullable().unique();
+      t.string('platform', 64).notNullable();
+      t.string('media_key', 255).notNullable();
+      t.string('guest_id', 255);
+      t.string('user_id', 36);
+      t.timestamp('started_at').notNullable().defaultTo(knex.fn.now());
+      t.index(['platform', 'media_key']);
+    });
+  }
+  if (!(await knex.schema.hasTable('download_log_lines'))) {
+    await knex.schema.createTable('download_log_lines', (t: Knex.CreateTableBuilder) => {
+      t.increments('id');
+      t.string('request_id', 64).notNullable();
+      t.timestamp('ts').notNullable().defaultTo(knex.fn.now());
+      t.string('level', 8).notNullable();
+      t.text('message').notNullable();
+      t.index(['request_id']);
+    });
+  }
+}
+
 interface Migration {
   version: number;
   name: string;
@@ -195,6 +225,7 @@ const MIGRATIONS: Migration[] = [
   { version: 2, name: 'permanent media store', up: mediaStore },
   { version: 3, name: 'richer event statistics', up: eventStats },
   { version: 4, name: 'visitor presence', up: visitorPresence },
+  { version: 5, name: 'download logs', up: downloadLogs },
 ];
 
 /** Applies every migration that has not run yet, in order, and records it. Safe to run repeatedly. */
