@@ -82,6 +82,7 @@ export function parseMediaPath(pathname: string): ParsedMediaPath | null {
 
   const [platform, ...rest] = decoded;
   if (!PLATFORM_IDS.has(platform)) return null;
+  // eslint-disable-next-line no-control-regex -- deliberately rejecting control characters, not a typo
   const valid = (v: string | undefined): v is string => !!v && v.length <= 255 && !/[\u0000-\u001f]/.test(v);
 
   if (rest.length === 1 && rest[0] !== 'playlist' && valid(rest[0])) {

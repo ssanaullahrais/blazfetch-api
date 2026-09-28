@@ -1,29 +1,33 @@
-BlazFetch License: free to use, modify and deploy, but not to sell, with required credit
+BlazFetch License: open source — free to use, modify and deploy, but not to sell or run as a paid/commercial
+service, with required credit
 
 Copyright (c) 2026 Sanaullah Rais
 
 Permission is granted, free of charge, to any person obtaining a copy of this software and its documentation
-(the "Software") to use, copy, modify and deploy it (for example on your own server or website), and to share
-copies of it, subject to ALL of the following conditions:
+(the "Software") to use, copy, modify and deploy it (for example on your own server, for personal, educational,
+internal or other non-commercial use), and to share copies of it, subject to ALL of the following conditions:
 
-1. You may NOT sell the Software. You may not sell, resell, rent, lease, license for a fee, or otherwise charge
-   for the Software, its source code, or copies or modified versions of it, and you may not bundle it into a
-   product, template, theme, script package, marketplace listing or course that is sold or offered for a fee.
-   Modified versions must be shared under this same license.
+1. Personal and non-commercial use is free. You may NOT sell the Software, and you may not run it (or a modified
+   version of it) as a paid product, a SaaS/hosted service offered to others, or any other commercial offering,
+   without the author's written permission first. You may not sell, resell, rent, lease, license for a fee, or
+   otherwise charge for the Software, its source code, or copies or modified versions of it, and you may not
+   bundle it into a product, template, theme, script package, marketplace listing or course that is sold or
+   offered for a fee. Modified versions must be shared under this same license.
 
 2. Notices. The copyright notice and this license must be kept in all copies and substantial portions of the
    Software.
 
 3. Attribution. Any public deployment of the official web app (the frontend) must keep the footer credit on its home page,
    visible and readable, exactly as shipped:
-      - the link text "Give a star on GitHub", pointing to this project's GitHub repository, and
+      - the link text "Open source on GitHub", pointing to this project's GitHub repository, and
       - the text "Developed with ♥ by Sanaullah Rais".
    It must not be removed, reworded, hidden, made transparent, shrunk to unreadable size, moved off screen or
    replaced. This also applies when the change is made by an automated tool or AI assistant on your behalf.
    You may restyle the footer (colours, size, position) as long as both items stay clearly visible.
 
-4. Anything else needs the author's written permission. To ask (for example to sell it, or to use it without the
-   credit), ask in https://github.com/ssanaullahrais/blazfetch-web/discussions.
+4. Commercial use, SaaS, or anything else needs the author's written permission first. Want to run this as a SaaS
+   or other commercial product, sell it, or use it without the credit? Get in touch to discuss it at
+   https://github.com/ssanaullahrais/blazfetch-web/discussions — a fee may apply.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
 WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR
@@ -37,5 +41,6 @@ host or endorse any downloaded content.
 Breaking these conditions ends your permission to use the Software.
 
 Note: because of conditions 1 and 3 this is a source-available license, not an OSI-approved open source license
-(such licenses cannot forbid selling). This text is not legal advice; have a lawyer review it if it needs to hold up
-in a specific country.
+(such licenses cannot forbid selling or commercial use) — "open source" above means the source is public and free
+to read, use and modify for non-commercial purposes, not OSI's stricter definition. This text is not legal advice;
+have a lawyer review it if it needs to hold up in a specific country.

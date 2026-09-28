@@ -12,9 +12,11 @@ import { buildFilename, openProxy, openStream } from '../services/streamService'
 import { runDownloadJob, startDownloadJob } from '../services/downloadService';
 import { fetchMedia } from '../services/fetchService';
 import { recordDownloadStat } from '../services/statsService';
-import { mediaKeyForResponse } from '../core/media/mediaPath';
+import { mediaKeyForResponse, predictedMediaKey } from '../core/media/mediaPath';
 import { networkKey } from '../utils/clientKey';
 import { attachmentHeader } from '../utils/contentDisposition';
+import { validateAndNormalizeUrl } from '../utils/url';
+import { beginAttempt, record } from '../services/downloadLogs';
 
 export const DOWNLOAD_MODES = ['stream', 'prepare', 'auto'] as const;
 
@@ -51,10 +53,17 @@ export function isFallbackEligible(err: unknown): boolean {
  * - stream: yt-dlp/ffmpeg output is piped straight to the response; no file on disk.
  * - prepare: the file is built in TEMP_DIR first (merge/transcode, H.264/AAC guaranteed), then sent
  *   and deleted, all within this one request.
- * - auto: stream first; if that fails before the first byte, prepare in the same request.
- * - stream (Fastest in the app): the same, but a conversion that cannot be avoided uses ffmpeg's quickest settings.
- * Both stream only what already plays on phones (a single H.264 MP4, a standalone audio track); merges, HLS, WebM and
- * VP9/AV1/HEVC are prepared as a normal MP4, using the same quality in H.264 when the source has it.
+ * - auto and stream (Fastest in the app): stream first; if that fails before the first byte, prepare in the same
+ *   request. An H.264 source (even one that needs merging with an audio track) still streams live either way; a
+ *   VP9/AV1/HEVC source, or HLS, is refused before any byte is sent and prepared into a normal H.264 MP4 instead,
+ *   since phones cannot play those live-merged as-is — shipping a broken file just to be fast helps no one. Once
+ *   prepare does run, stream always uses ffmpeg's quickest (larger-output) preset; auto only does once the source
+ *   is big enough for that to matter (see AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES) — that preset choice is now the
+ *   only thing that tells the two modes apart.
+ *
+ * UNSAFE_LARGE_VIDEO_STREAM_ENABLED (on by default) overrides all of the above once a video's real size reaches
+ * UNSAFE_LARGE_VIDEO_MIN_BYTES: it is delivered in its original, possibly phone-unplayable codec instead of being
+ * made compatible, for every mode including an explicit mode=prepare — see ensureValidAndCompatible.
  *
  * Before the first byte any failure is a normal JSON error. After it, the only way to signal a
  * problem is to abort the connection (so auto can only fall back before bytes are sent).
@@ -66,6 +75,17 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   }
   const { url, formatId, kind, filename, token } = parsed.data;
   const mode = parsed.data.mode ?? env.DEFAULT_DOWNLOAD_MODE;
+
+  // Best-effort: lets the visitor look this attempt's log back up at GET /media/<platform>/<id>/logs while
+  // it's still running (or shortly after) — only possible for YouTube, whose id is predictable from the URL
+  // alone; every other platform's key is only known once fetchMedia resolves, too late to register up front.
+  try {
+    const normalized = validateAndNormalizeUrl(url);
+    const mediaKey = predictedMediaKey(normalized);
+    if (mediaKey) beginAttempt({ requestId: req.requestId, platform: normalized.platform, mediaKey, guestId: req.guestId, userId: req.userId });
+  } catch {
+    // An invalid/unsupported URL is reported properly by the real fetch below; nothing to track here.
+  }
 
   const startedAt = Date.now();
   let abort = new AbortController();
@@ -88,6 +108,8 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   let prepareFinished = false;
   /** The format the prepare step builds: the requested one first, then "best" if that cannot be produced. */
   let prepareFormatId = formatId;
+  /** Set when auto's phone-safety fallback reports a big source, so prepare uses the quicker ffmpeg preset. */
+  let fastConvertOverride = false;
 
   const releaseSlots = (): void => {
     releaseGlobal?.();
@@ -114,6 +136,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   const recordStat = (success: boolean, errorCode?: string): void => {
     if (statRecorded) return;
     statRecorded = true;
+    record(req.requestId, success ? 'info' : 'warn', success ? 'Download completed successfully.' : `Download failed${errorCode ? ` (${errorCode})` : ''}.`);
     void recordDownloadStat({
       platform: platformForStat,
       mediaId: mediaKeyForStat,
@@ -137,6 +160,17 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       logger.warn({ requestId: req.requestId, mode }, 'download timed out, stopping processes');
       recordStat(false, 'PROCESS_TIMEOUT');
       cleanup();
+      // Not a single byte has gone out yet: say so with a real JSON error instead of just resetting the
+      // connection, so a client watching for a response (the hidden download frame) sees a clear failure
+      // right away instead of waiting out its own much longer give-up timer for a reply that never comes.
+      if (!res.headersSent) {
+        res.status(504).json({
+          success: false,
+          error: { code: 'PROCESS_TIMEOUT', message: 'The download took too long and was stopped.' },
+          requestId: req.requestId,
+        });
+        return;
+      }
       res.destroy();
     }, env.DOWNLOAD_TOTAL_TIMEOUT_MS);
   };
@@ -182,9 +216,11 @@ export async function getStream(req: Request, res: Response): Promise<void> {
       userId: req.userId,
       guestId: req.guestId,
       signal: abort.signal,
-      // Streaming always comes first (prepare puts load on the server): merges, remuxes and HLS are piped live as
-      // fragmented MP4. Only a failure before the first byte falls back to prepare (auto/stream).
-      phoneSafeOnly: false,
+      // Both auto and stream ("Fastest") refuse a pick that would come out unplayable on phones (VP9/AV1/HEVC, or
+      // HLS) before any byte is sent, so it falls back to prepare instead — shipping a broken file just to be
+      // fast helps no one. An H.264 merge needs no such fallback and keeps streaming live either way. Once
+      // prepare runs, fastConvert (below) is still what tells the two modes apart: stream always uses the
+      // quicker, larger-output ffmpeg preset; auto only does once the source is big enough for that to matter.
     });
     killSource = opened.kill;
     platformForStat = opened.platform;
@@ -250,8 +286,14 @@ export async function getStream(req: Request, res: Response): Promise<void> {
 
     let result: Awaited<ReturnType<typeof runDownloadJob>>;
     try {
-      // Fastest (mode=stream) converts with ffmpeg's quickest settings when a conversion cannot be avoided.
-      result = await runDownloadJob(job, req.requestId, { fellBack, recordFailure: false, networkKey: networkKey(req), fastConvert: mode === 'stream' });
+      // Fastest (mode=stream) always converts with ffmpeg's quickest settings when a conversion cannot be avoided;
+      // auto does too, but only once the source is big enough that the time/CPU saved actually matters.
+      result = await runDownloadJob(job, req.requestId, {
+        fellBack,
+        recordFailure: false,
+        networkKey: networkKey(req),
+        fastConvert: mode === 'stream' || fastConvertOverride,
+      });
     } finally {
       prepareFinished = true;
     }
@@ -319,19 +361,23 @@ export async function getStream(req: Request, res: Response): Promise<void> {
   };
 
   try {
-    if (mode !== 'prepare') {
+    // Audio always goes through prepare, whatever the mode: it is a much smaller, cheaper build than video (no
+    // heavy H.264 transcode, just a real audio track or a quick MP3 conversion), so there is no speed trade-off
+    // worth risking an incompatible codec for — and UNSAFE_LARGE_VIDEO_STREAM_ENABLED's size cutoff (built for big
+    // video conversions) never applies to it either way.
+    if (mode !== 'prepare' && kind !== 'audio') {
       try {
         await runStream();
         return;
       } catch (err) {
         if (clientClosed || res.headersSent || !isFallbackEligible(err)) throw err;
-        logger.warn(
-          { requestId: req.requestId, code: (err as BlazfetchError).code, err: (err as Error).message },
-          'direct stream failed before the first byte, falling back to prepare mode',
-        );
+        const fallbackCode = err instanceof BlazfetchError ? err.code : 'DOWNLOAD_FAILED';
+        record(req.requestId, 'warn', `Live streaming isn't possible for this pick (${fallbackCode}: ${(err as Error).message}) — preparing a compatible file on the server instead.`);
         fellBack = true;
         stopStreamAttempt();
         abort = new AbortController(); // the stream attempt's signal is spent
+        const sizeHint = (err instanceof BlazfetchError ? (err.details as { filesizeBytes?: number } | undefined)?.filesizeBytes : undefined) ?? 0;
+        if (sizeHint >= env.AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES) fastConvertOverride = true;
       }
     }
 
@@ -340,7 +386,7 @@ export async function getStream(req: Request, res: Response): Promise<void> {
     } catch (err) {
       // The requested quality could not be produced: deliver the best one instead of failing the download.
       if (clientClosed || res.headersSent || !isFallbackEligible(err) || prepareFormatId === 'best') throw err;
-      logger.warn({ requestId: req.requestId, formatId, err: (err as Error).message }, 'prepare failed for the requested format, retrying with best');
+      record(req.requestId, 'warn', `Format ${formatId} couldn't be prepared (${(err as Error).message}) — trying the best available format instead.`);
       await cleanupPrepare();
       prepareFormatId = 'best';
       await runPrepare();

@@ -39,12 +39,12 @@ const envSchema = z.object({
   FFMPEG_TIMEOUT_MS: z.coerce.number().default(180000),
   PROXY_STREAM_TIMEOUT_MS: z.coerce.number().default(600000),
 
-  MAX_CONCURRENT_DOWNLOADS_GLOBAL: z.coerce.number().default(10),
+  MAX_CONCURRENT_DOWNLOADS_GLOBAL: z.coerce.number().default(15),
   // H.264 conversions (ffmpeg) are what can exhaust a small server's CPU and memory: at most this many run at once,
   // the rest wait their turn. 0 = half the CPU cores (at least 1).
-  MAX_CONCURRENT_CONVERSIONS: z.coerce.number().int().min(0).default(0),
+  MAX_CONCURRENT_CONVERSIONS: z.coerce.number().int().min(0).default(2),
   // CPU threads per conversion. 0 = the cores divided between the conversions allowed at once.
-  FFMPEG_THREADS: z.coerce.number().int().min(0).default(0),
+  FFMPEG_THREADS: z.coerce.number().int().min(0).default(2),
   // yt-dlp/ffmpeg run at this lower priority (nice, 0-19) so the API keeps answering while they work. 0 = off.
   MEDIA_PROCESS_NICE: z.coerce.number().int().min(0).max(19).default(10),
   // A download that has to be prepared on disk is refused while TEMP_DIR has less free space than this.
@@ -58,6 +58,16 @@ const envSchema = z.object({
 
   MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
   MAX_DOWNLOAD_SIZE_BYTES: z.coerce.number().default(2147483648),
+  // When auto mode falls back to prepare because a pick is not phone-safe (VP9/AV1/HEVC), a source at or above
+  // this size uses the same quick ffmpeg preset as "Fastest" (~3x quicker, a somewhat larger file) instead of the
+  // slower, smaller-file preset — the CPU/time saved on a big video matters more than it does on a small one.
+  AUTO_FALLBACK_FAST_CONVERT_MIN_BYTES: z.coerce.number().default(100 * 1024 * 1024),
+  // On by default, to protect server resources: once a video's real downloaded size reaches
+  // UNSAFE_LARGE_VIDEO_MIN_BYTES, this skips the compatibility transcode (VP9/AV1/HEVC -> H.264) and delivers it
+  // in its original, possibly phone-unplayable codec instead — for every mode, including an explicit mode=prepare
+  // ("Compatible"). Set to false to always make every video play everywhere, however big it is (more CPU cost).
+  UNSAFE_LARGE_VIDEO_STREAM_ENABLED: boolFromString(true),
+  UNSAFE_LARGE_VIDEO_MIN_BYTES: z.coerce.number().default(100 * 1024 * 1024),
   TEMP_DIR: z.string().default('./tmp'),
   // GET /api/v1/stream pipes yt-dlp/ffmpeg output straight to the client with no temp file. Set to
   // false to disable the endpoint (POST /download -> /downloads/:id keeps working either way).
@@ -78,8 +88,9 @@ const envSchema = z.object({
   // Optional: secret used to sign the pass cookie. Defaults to one derived from TURNSTILE_SECRET_KEY.
   TURNSTILE_COOKIE_SECRET: z.string().optional().default(''),
   // Delivery mode for GET /api/v1/stream when the request has no ?mode=: "stream" pipes straight through,
-  // "prepare" builds the file on the server first, "auto" tries stream and falls back to prepare.
-  DEFAULT_DOWNLOAD_MODE: z.enum(['stream', 'prepare', 'auto']).default('stream'),
+  // "prepare" builds the file on the server first, "auto" tries stream and falls back to prepare. Only matters
+  // for a caller that never sends ?mode= — the official frontend always sends its own choice explicitly.
+  DEFAULT_DOWNLOAD_MODE: z.enum(['stream', 'prepare', 'auto']).default('auto'),
   // How old (ms) a file/folder in TEMP_DIR must be before the periodic sweep deletes it.
   TEMP_SWEEP_MAX_AGE_MS: z.coerce.number().default(3600000),
   TEMP_SWEEP_INTERVAL_MS: z.coerce.number().default(600000),

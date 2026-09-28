@@ -1648,6 +1648,34 @@ Returns the same response as `/fetch` (including `stored`). It is what a fronten
 - Anything extracted with the operator's own login (`INSTAGRAM_COOKIES_PATH`) is never served by path.
 - Uses the fetch rate limiter.
 
+### `GET /api/v1/media/<platform>/<id>/logs` (download logs for this media)
+
+```
+GET /api/v1/media/youtube/Cwkej79U3ek/logs
+```
+
+Shows what happened on this media's recent `GET /stream` attempts — when each started, and every notable
+event along the way (fell back to prepare and why, timed out, the real final error) — so a stuck or failed
+download shows the real reason instead of just a generic error. Stored permanently in the database, one row
+per attempt and one row per log line; nothing is ever deleted. Currently only tracked for YouTube, the one
+platform whose id is predictable from the URL alone before anything is fetched. Public, with no ownership
+check — anyone who knows the platform/id can look these up (planned to move behind an admin-only view later).
+Answers `404 MEDIA_NOT_FOUND` when nothing is on record for that media.
+
+```json
+{
+  "success": true,
+  "platform": "youtube",
+  "mediaId": "Cwkej79U3ek",
+  "attempts": [
+    { "requestId": "...", "startedAt": 1758901234567, "lines": [
+      { "ts": 1758901234600, "level": "warn", "message": "Live streaming isn't possible for this pick (...) — preparing a compatible file on the server instead." },
+      { "ts": 1758901240100, "level": "info", "message": "Download completed successfully." }
+    ] }
+  ]
+}
+```
+
 ### Weekly revalidation and unavailable media
 
 Every stored item is re-checked **every 7 days** (`REVALIDATE_AFTER_SECONDS`) to see whether it still
@@ -1704,8 +1732,10 @@ media, the platform and the (guest) user.
 ## Cloudflare Turnstile (optional bot check)
 
 Turnstile is Cloudflare's free, privacy-friendly CAPTCHA replacement. It is **off by default**. When
-`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /media/...`, `GET /stream` and `POST /download` need a passed check.
-The media route can extract missing or stale metadata, so it uses the same gate as fetch. Public configuration,
+`TURNSTILE_ENABLED=true`, `POST /fetch`, `POST /fetch/audio`, `GET /stream` and `POST /download` need a passed check.
+`GET /media/...` is never gated, even though it can extract missing or stale metadata like fetch does: it's the
+endpoint a stable/shared link opens, so a brand-new visitor arriving from one sees the page immediately rather than
+a CAPTCHA before they've done anything; it's still behind the same rate limiter as fetch. Public configuration,
 aggregate statistics, the platform list and health endpoints remain open. Existing job delivery checks job ownership.
 
 How it works:

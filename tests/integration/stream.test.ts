@@ -16,6 +16,12 @@ const tempDir = await vi.hoisted(async () => {
   process.env.TEMP_DIR = dir;
   process.env.LOG_LEVEL = 'silent';
   process.env.RATE_LIMIT_MAX_DOWNLOAD = '1000';
+  // The download-logs service writes here now (see downloadLogs.ts), so it needs a real, migrated database
+  // instead of the process default path — in its own directory, since several tests assert TEMP_DIR ends up
+  // completely empty once a download is done.
+  const dbDir = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'blazfetch-stream-db-'));
+  process.env.DATABASE_DRIVER = 'sqlite';
+  process.env.DATABASE_SQLITE_PATH = nodePath.join(dbDir, 'stream.sqlite3');
   return dir;
 });
 
@@ -117,11 +123,13 @@ import { createApp } from '../../src/app';
 import { fetchMedia } from '../../src/services/fetchService';
 import { BlazfetchError } from '../../src/constants/errors';
 import { activeStreamProcessCount } from '../../src/core/ytdlp/ytdlpStream';
+import { getDb } from '../../src/db';
 
 let server: http.Server;
 let port: number;
 
 beforeAll(async () => {
+  await getDb().migrate();
   server = createApp().listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));
   port = (server.address() as AddressInfo).port;
@@ -129,6 +137,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  await getDb().close();
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -158,7 +167,10 @@ async function body(res: http.IncomingMessage): Promise<string> {
   return out;
 }
 
-const waitFor = async (predicate: () => boolean, ms = 2000): Promise<void> => {
+// The download-logs service now does real (fire-and-forget) SQLite writes on every request, which adds a
+// little real disk I/O contention when many test files run their own database in parallel — 2s cut it close
+// even before that; 5s gives enough headroom without masking a genuine hang.
+const waitFor = async (predicate: () => boolean, ms = 5000): Promise<void> => {
   const start = Date.now();
   while (!predicate()) {
     if (Date.now() - start > ms) throw new Error('timed out waiting for condition');
@@ -224,6 +236,52 @@ describe('GET /api/v1/stream', () => {
     await waitFor(() => stats.length === 1);
     expect(stats[0]).toMatchObject({ success: true, mode: 'stream' });
     await waitFor(() => fs.readdirSync(tempDir).length === 0);
+  });
+
+  it.each(['auto', 'stream'] as const)('mode=%s prepares a VP9 merge instead of streaming it broken', async (mode) => {
+    const vp9Media = {
+      success: true,
+      platform: 'instagram',
+      mediaType: 'video',
+      mediaId: 'vp9-1',
+      canonicalUrl: 'https://www.instagram.com/reel/vp9-1',
+      title: 'VP9 Video',
+      formats: [{ formatId: 'vp9-1080', ext: 'mp4', kind: 'video_only', height: 1080, requiresMerge: true, codec: 'vp09.00.40.08' }],
+      audioFormats: [{ formatId: '140', ext: 'm4a', bitrate: 128, isConverted: false }],
+      extractor: 'yt-dlp',
+    };
+    vi.mocked(fetchMedia).mockResolvedValueOnce(vp9Media as never).mockResolvedValueOnce(vp9Media as never);
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-1080&kind=video&mode=${mode}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(preparedJobs).toHaveLength(1);
+    // stream ("Fastest") always uses the quick preset once a conversion is unavoidable; auto only for a big source.
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: mode === 'stream' });
+  });
+
+  it('mode=auto uses the quick ffmpeg preset for a big VP9 fallback, but not a small one', async () => {
+    const bigVp9 = {
+      success: true,
+      platform: 'instagram',
+      mediaType: 'video',
+      mediaId: 'vp9-big',
+      canonicalUrl: 'https://www.instagram.com/reel/vp9-big',
+      title: 'Big VP9 Video',
+      formats: [{ formatId: 'vp9-big', ext: 'mp4', kind: 'video_only', height: 1080, requiresMerge: true, codec: 'vp09.00.40.08', filesizeBytes: 200 * 1024 * 1024 }],
+      audioFormats: [{ formatId: '140', ext: 'm4a', bitrate: 128, isConverted: false }],
+      extractor: 'yt-dlp',
+    };
+    vi.mocked(fetchMedia).mockResolvedValueOnce(bigVp9 as never).mockResolvedValueOnce(bigVp9 as never);
+    const big = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-big&kind=video&mode=auto`);
+    expect(big.res.statusCode).toBe(200);
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: true });
+
+    const smallVp9 = { ...bigVp9, mediaId: 'vp9-small', formats: [{ ...bigVp9.formats[0], formatId: 'vp9-small', filesizeBytes: 10 * 1024 * 1024 }] };
+    vi.mocked(fetchMedia).mockResolvedValueOnce(smallVp9 as never).mockResolvedValueOnce(smallVp9 as never);
+    const small = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-small&kind=video&mode=auto`);
+    expect(small.res.statusCode).toBe(200);
+    expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: false });
   });
 
   it('returns a JSON error with the right status when yt-dlp fails before the first byte', async () => {
@@ -399,7 +457,7 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     setTimeout(() => child.emit('close', 1), 10);
   };
 
-  it('uses stream by default and says so in X-Blazfetch-Mode', async () => {
+  it('uses auto by default, which streams a phone-safe format directly (X-Blazfetch-Mode: stream)', async () => {
     behaviour = (child) => {
       child.stdout.write('streamed');
       child.emit('close', 0);
@@ -408,6 +466,18 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     expect(res.headers['x-blazfetch-mode']).toBe('stream');
     expect(await body(res)).toBe('streamed');
     expect(preparedJobs).toHaveLength(0);
+  });
+
+  it.each(['auto', 'stream'] as const)('audio always prepares under mode=%s, even a real standalone track that could stream live', async (mode) => {
+    behaviour = () => {
+      throw new Error('no child process should be spawned for a direct audio stream attempt');
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=140&kind=audio&mode=${mode}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['x-blazfetch-mode']).toBe('prepare');
+    expect(await body(res)).toBe('prepared-bytes');
+    expect(children).toHaveLength(0); // no direct-stream process was ever started
+    expect(preparedJobs).toHaveLength(1);
   });
 
   it('mode=prepare builds the file on the server, sends it with its size, and deletes it', async () => {
@@ -538,5 +608,28 @@ describe('delivery modes (?mode= / DEFAULT_DOWNLOAD_MODE)', () => {
     const { res } = await request(`/api/v1/stream?url=${VIDEO}&mode=turbo`);
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(await body(res)).error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('persists a download log for anyone to look up later, not just the visitor who started it', async () => {
+    behaviour = (child) => {
+      child.stdout.write('hello world');
+      setTimeout(() => child.emit('close', 0), 10);
+    };
+    const { res } = await request(`/api/v1/stream?url=${VIDEO}&formatId=18&kind=video`);
+    await body(res);
+
+    const start = Date.now();
+    let parsed: { success: boolean; attempts: { lines: { message: string }[] }[] } | undefined;
+    while (!parsed) {
+      // A different, unrelated guest cookie: logs are public now, with no ownership check at all.
+      const attempt = await request('/api/v1/media/youtube/abc123/logs', 'a-completely-different-visitor');
+      if (attempt.res.statusCode === 200) parsed = JSON.parse(await body(attempt.res));
+      else {
+        await body(attempt.res);
+        if (Date.now() - start > 2000) throw new Error('logs never became available');
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+    expect(parsed.attempts[0].lines.some((l) => l.message.includes('completed successfully'))).toBe(true);
   });
 });

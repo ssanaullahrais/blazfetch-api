@@ -32,9 +32,6 @@ export interface OpenStreamParams {
   userId?: string | null;
   guestId?: string | null;
   signal: AbortSignal;
-  /** mode=auto: refuse what phones can't play as-is, so the caller prepares a compatible file instead.
-   *  mode=stream ("Fastest") passes the source through as it is (a live merge/remux when needed). */
-  phoneSafeOnly?: boolean;
 }
 
 export interface OpenedStream {
@@ -80,9 +77,10 @@ function proxyFastPath(url: string | undefined): FastPath | undefined {
 }
 
 /**
- * Streaming can only hand over what the source already is, and phones (WhatsApp, iOS/Android galleries) play
- * nothing but a plain MP4 with H.264. VP9/AV1/HEVC, WebM, and the fragmented MP4 a live merge produces show a
- * black screen or "cannot be shared". Those cases are refused here so `auto` prepares a proper file instead.
+ * Streaming can only hand over what the source already is, and phones (WhatsApp, iOS/Android galleries) play a
+ * plain MP4 with H.264 just fine, including one a live merge/remux produced (fragmented MP4 is a normal, widely
+ * supported format). VP9/AV1/HEVC and WebM show a black screen or "cannot be shared" instead — those are refused
+ * so `auto`/`stream` prepare a proper H.264 file.
  */
 function isPhoneSafeVideo(format: BlazfetchFormat): boolean {
   const codec = (format.codec ?? '').toLowerCase();
@@ -90,11 +88,18 @@ function isPhoneSafeVideo(format: BlazfetchFormat): boolean {
   return format.ext.toLowerCase() === 'mp4' && codecOk;
 }
 
-function notPhoneSafe(): BlazfetchError {
+/** AAC/mp4a plays inside the M4A a live HLS-audio remux produces; anything else (Opus, etc.) needs a real prepare. */
+function isPhoneSafeAudioCodec(codec?: string): boolean {
+  const c = (codec ?? '').toLowerCase();
+  return c.startsWith('mp4a') || c.startsWith('aac');
+}
+
+/** sizeBytes, when known, lets the controller pick a quicker (larger-output) ffmpeg preset for a big prepare. */
+function notPhoneSafe(sizeBytes?: number): BlazfetchError {
   return new BlazfetchError(
     'DOWNLOAD_FAILED',
     'This format would not play on phones when streamed as-is. Use mode=auto or mode=prepare for a compatible MP4.',
-    { streamUnsupported: true },
+    { streamUnsupported: true, filesizeBytes: sizeBytes },
   );
 }
 
@@ -133,17 +138,14 @@ function progressiveH264Fallback(formats: BlazfetchFormat[], chosen: BlazfetchFo
   return candidates.reduce((best, f) => (score(f) >= score(best) ? f : best));
 }
 
-export interface PlanOptions {
-  /** Refuse anything that would not play on phones as-is (mode=auto), instead of streaming it anyway (mode=stream). */
-  phoneSafeOnly?: boolean;
-}
-
-/** Picks how to produce the bytes. Nothing here touches disk or transcodes video. */
-export function planStream(media: BlazfetchResponse, format: RequestedFormat, options: PlanOptions = {}): Plan {
+/** Picks how to produce the bytes. Nothing here touches disk or transcodes video. Refuses a codec that would not
+ * play on phones as-is (VP9/AV1/HEVC), whether the source is a merge, an HLS manifest, or a single file; the
+ * caller prepares a compatible file instead — see streamController's UNSAFE_LARGE_VIDEO_STREAM_ENABLED for the
+ * one deliberate, opt-in exception to that, applied after the fact. */
+export function planStream(media: BlazfetchResponse, format: RequestedFormat): Plan {
   const isYtdlp = !media.extractor || media.extractor.startsWith('yt-dlp');
-  const phoneSafeOnly = options.phoneSafeOnly ?? true;
   const requirePhoneSafe = (f: BlazfetchFormat): void => {
-    if (phoneSafeOnly && !isPhoneSafeVideo(f)) throw notPhoneSafe();
+    if (!isPhoneSafeVideo(f)) throw notPhoneSafe(f.filesizeBytes);
   };
 
   if (format.kind === 'video') {
@@ -163,8 +165,10 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
       requirePhoneSafe(chosen);
       return { type: 'proxy', url: chosen.url, contentType: contentTypeFor(chosen.ext, 'video'), ext: chosen.ext };
     }
-    // A live merge/remux produces fragmented MP4, which phone galleries show black: auto prepares those instead.
-    if (phoneSafeOnly && (chosen.requiresMerge || isHls(chosen))) throw notPhoneSafe();
+    // A live merge/remux (including from an HLS manifest — YouTube serves plenty of its H.264 formats that way) of
+    // a non-H.264 source (VP9/AV1/HEVC) comes out as that codec inside an MP4 wrapper, which phones cannot play at
+    // all: auto prepares a real H.264 file instead. An H.264 source still streams live either way.
+    if ((chosen.requiresMerge || isHls(chosen)) && !isPhoneSafeVideo(chosen)) throw notPhoneSafe(chosen.filesizeBytes);
     if (chosen.requiresMerge) {
       return { type: 'ffmpeg', selector: MERGE_SELECTOR(chosen.formatId), mode: 'merge', contentType: 'video/mp4', ext: 'mp4', fast: fastPathFor(media, chosen, 'merge') };
     }
@@ -196,10 +200,10 @@ export function planStream(media: BlazfetchResponse, format: RequestedFormat, op
     };
   }
   if (audio && !audio.isConverted) {
-    // An HLS audio track would come out of yt-dlp as MPEG-TS. A live remux gives a fragmented M4A, which phones may
-    // refuse, so the phone-safe modes prepare a normal M4A instead.
+    // An HLS audio track would come out of yt-dlp as MPEG-TS. A live remux to AAC-in-M4A plays fine; anything else
+    // (Opus, etc.) is prepared into a normal M4A instead.
     if (isYtdlp && isHls({ formatId: audio.formatId, url: audio.url } as BlazfetchFormat)) {
-      if (phoneSafeOnly) throw notPhoneSafe();
+      if (!isPhoneSafeAudioCodec(audio.codec)) throw notPhoneSafe(audio.filesizeBytes);
       return {
         type: 'ffmpeg',
         selector: audio.formatId,
@@ -364,7 +368,7 @@ export async function openStream(params: OpenStreamParams, retriedWithFreshLinks
     const better = equivalent ?? fallback;
     if (better) resolved = { ...resolved, formatId: better.formatId };
   }
-  const plan = planStream(media, resolved, { phoneSafeOnly: params.phoneSafeOnly });
+  const plan = planStream(media, resolved);
 
   const candidates = sourceUrlCandidates(normalized.canonicalUrl, normalized.platform);
   let lastError: unknown;

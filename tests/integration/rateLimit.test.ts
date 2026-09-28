@@ -65,4 +65,34 @@ describe('rate limits', () => {
       expect((await fetchAs(undefined, { 'x-forwarded-for': `198.51.100.${i}` })).status).toBe(200);
     }
   });
+
+  it('applies the IP ceiling to the real client address once TRUST_PROXY is set (behind Nginx)', async () => {
+    vi.resetModules();
+    process.env.TRUST_PROXY = '1';
+    const { createApp: createTrustedApp } = await import('../../src/app');
+    const trusted = createTrustedApp().listen(0);
+    await new Promise<void>((resolve) => trusted.once('listening', resolve));
+    const trustedBase = `http://127.0.0.1:${(trusted.address() as AddressInfo).port}/api/v1`;
+    const fetchTrusted = async (forwardedFor: string): Promise<number> => {
+      const res = await fetch(`${trustedBase}/fetch`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': forwardedFor },
+        body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=abc' }),
+      });
+      await res.text();
+      return res.status;
+    };
+    try {
+      // A single forwarded address, a fresh guest every time (no cookie sent): the per-IP ceiling (3 x 2 = 6) is
+      // what actually stops it here, proving TRUST_PROXY=1 resolves req.ip from X-Forwarded-For, not the loopback
+      // socket address every request in this test otherwise shares.
+      for (let i = 0; i < 6; i += 1) expect(await fetchTrusted('203.0.113.42')).toBe(200);
+      expect(await fetchTrusted('203.0.113.42')).toBe(429);
+      // A different forwarded address is a different network and gets its own ceiling.
+      expect(await fetchTrusted('203.0.113.99')).toBe(200);
+    } finally {
+      await new Promise<void>((resolve) => trusted.close(() => resolve()));
+      delete process.env.TRUST_PROXY;
+    }
+  });
 });

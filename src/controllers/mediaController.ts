@@ -6,6 +6,7 @@ import { parseMediaPath, sourceUrlForKey } from '../core/media/mediaPath';
 import { fetchMedia, isPublicSource } from '../services/fetchService';
 import { presentMedia } from '../utils/audioMp3';
 import { recordVisitorFetch } from '../services/statsService';
+import { getMediaDownloadLogs } from '../services/downloadLogs';
 
 const querySchema = z.object({
   // Only answer from what is already stored; never extract from the source.
@@ -57,4 +58,31 @@ export async function getMedia(req: Request, res: Response): Promise<void> {
   await recordVisitorFetch(response, { userId: req.userId, guestId: req.guestId });
   void store.recordAccess(parsed.platform, parsed.mediaKey, 'view').catch(() => undefined);
   res.json(presentMedia(response));
+}
+
+/**
+ * GET /api/v1/media/<platform>/<id>/logs
+ *
+ * Shows what happened on this media's recent GET /stream attempts — useful when a download seemed to hang or
+ * fail and someone wants the real reason, not just a generic error toast. Stored permanently in the database
+ * (see downloadLogs in db/types.ts) and, for now, public: anyone who knows the platform/id can look these up,
+ * with no ownership check — planned to move behind an admin-only view later. Currently only tracked for
+ * YouTube, the one platform whose id is predictable from the URL before anything is fetched.
+ */
+export async function getMediaLogs(req: Request, res: Response): Promise<void> {
+  const { platform, id } = req.params;
+  const attempts = await getMediaDownloadLogs(platform, id);
+  if (!attempts) {
+    throw new BlazfetchError('MEDIA_NOT_FOUND', 'No download attempt was found for this media.');
+  }
+  res.json({
+    success: true,
+    platform,
+    mediaId: id,
+    attempts: attempts.map((a) => ({
+      requestId: a.requestId,
+      startedAt: a.startedAt,
+      lines: a.lines,
+    })),
+  });
 }

@@ -130,10 +130,45 @@ export interface StatsStore {
   prunePresence(olderThanMs: number): Promise<void>;
 }
 
+export interface BeginDownloadLogInput {
+  requestId: string;
+  platform: string;
+  mediaKey: string;
+  guestId?: string | null;
+  userId?: string | null;
+}
+
+export interface DownloadLogLine {
+  ts: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
+export interface DownloadLogAttempt {
+  requestId: string;
+  startedAt: string;
+  lines: DownloadLogLine[];
+}
+
+/**
+ * One row per GET /stream attempt (see downloadLogs.ts), so a visitor — or, later, an admin — can see what
+ * actually happened on a stuck or failed download: when it started, and every notable event along the way
+ * (fell back to prepare and why, timed out, the real final error). Rows are never deleted, same as the
+ * metadata cache; this is meant to be looked back on, not just a live debugging aid.
+ */
+export interface DownloadLogsStore {
+  begin(input: BeginDownloadLogInput): Promise<void>;
+  /** A no-op if `requestId` was never begun (see begin) — never load-bearing for the download itself. */
+  appendLine(requestId: string, level: DownloadLogLine['level'], message: string): Promise<void>;
+  /** Attempts for one piece of media, most recent first, capped at `limit`. */
+  listForMedia(platform: string, mediaKey: string, limit: number): Promise<DownloadLogAttempt[]>;
+}
+
 export interface Database {
   metadataCache: MetadataCacheStore;
   jobs: JobStore;
   stats: StatsStore;
+  downloadLogs: DownloadLogsStore;
   checkConnection(): Promise<boolean>;
   migrate(): Promise<void>;
   close(): Promise<void>;

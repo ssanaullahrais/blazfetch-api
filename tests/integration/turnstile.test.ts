@@ -67,8 +67,12 @@ describe('Cloudflare Turnstile', () => {
     expect(await fetchRes.json()).toMatchObject({ error: { code: 'TURNSTILE_REQUIRED' } });
     expect((await realFetch(`${base}/stream?url=https://youtu.be/abc&kind=video`)).status).toBe(403);
     expect((await realFetch(`${base}/download`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'https://youtu.be/abc' }) })).status).toBe(403);
-    expect((await realFetch(`${base}/media/youtube/abc`)).status).toBe(403);
     expect((await realFetch(`${base}/fetch/audio`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'https://youtu.be/abc' }) })).status).toBe(403);
+  });
+
+  it('does not gate GET /media/*: a stored/shared page opens with no pass at all', async () => {
+    const res = await realFetch(`${base}/media/youtube/abc`);
+    expect(res.status).not.toBe(403);
   });
 
   it('lets the visitor through after a passed check, using the pass cookie', async () => {
@@ -118,7 +122,7 @@ describe('Cloudflare Turnstile', () => {
   });
 
   it('treats a malformed pass cookie as a missing pass', async () => {
-    const res = await realFetch(`${base}/media/youtube/abc`, { headers: { cookie: 'blazfetch_turnstile=%ZZ' } });
+    const res = await realFetch(`${base}/stream?url=https://youtu.be/abc&kind=video`, { headers: { cookie: 'blazfetch_turnstile=%ZZ' } });
     expect(res.status).toBe(403);
   });
 });

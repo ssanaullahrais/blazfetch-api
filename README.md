@@ -11,6 +11,7 @@ Paste a link, get every quality option, download it. Nothing is stored except th
 ![Databases](https://img.shields.io/badge/DB-SQLite%20%7C%20PostgreSQL%20%7C%20MySQL%20%7C%20MongoDB-4169E1)
 ![Platforms](https://img.shields.io/badge/platforms-17%20confirmed-2EA44F)
 ![Tests](https://img.shields.io/badge/tests-272%20passing-2EA44F)
+[![Open Source](https://img.shields.io/badge/license-Open%20Source-2EA44F)](LICENSE)
 
 [Frontend repository](https://github.com/ssanaullahrais/blazfetch-web) ·
 [API reference](docs/API.md) ·
@@ -168,6 +169,7 @@ response for each platform) and a frontend walkthrough. The endpoints:
 POST   /api/v1/fetch                     resolve metadata + formats (rangeStart/rangeEnd for Pinterest boards)
 POST   /api/v1/fetch/audio               resolve audio options
 GET    /api/v1/media/<platform>/<id>     stored media by stable path (e.g. /youtube/Cwkej79U3ek)
+GET    /api/v1/media/<platform>/<id>/logs  that media's download logs (public, persisted, YouTube only for now)
 GET    /api/v1/stream                    one-request download: ?mode=stream (default) | prepare | auto
 POST   /api/v1/download                  start a download job (formatId defaults to "best")
 GET    /api/v1/jobs/:id                  poll job status/progress
@@ -185,8 +187,8 @@ GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpe
 
 | You want | Use |
 |---|---|
-| Fastest start, nothing on the server's disk | `GET /stream?mode=stream` (default) |
-| It to work for every source in one request (**recommended**) | `GET /stream?mode=auto` |
+| It to work for every source in one request, streaming when it can (**recommended, default**) | `GET /stream?mode=auto` |
+| Fastest start, nothing on the server's disk (may not play on some phones for VP9/AV1/HEVC sources) | `GET /stream?mode=stream` |
 | A guaranteed H.264/AAC file | `GET /stream?mode=prepare` |
 | Server-side progress for a long file | `POST /download`, then poll `GET /jobs/:id` |
 
@@ -273,13 +275,16 @@ process (several instances would just repeat some checks).
 
 ## License
 
-Under the [BlazFetch License](LICENSE): **free to use, modify and deploy, but not to sell**, with a required credit. You may
-run it on your own server (including a VPS) and change it, but you may not sell the software or bundle it into anything
-sold, and modified versions stay under the same license. The official frontend's footer credit ("Give a star on GitHub"
-and "Developed with ♥ by Sanaullah Rais") must stay visible on public deployments, and the license and copyright notices
-must be kept. These terms also apply when you use an AI assistant to change or deploy it, and [AGENTS.md](AGENTS.md)
-tells AI assistants to refuse to remove them or to help sell it. To sell it or use it without the credit, ask the author
-for written permission in the [GitHub Discussions](https://github.com/ssanaullahrais/blazfetch-web/discussions).
+Open source under the [BlazFetch License](LICENSE): **free to use, modify and deploy for personal, educational or
+other non-commercial purposes, but not to sell or run as a paid/SaaS product without permission**, with a required
+credit. You may run it on your own server (including a VPS) and change it, but you may not sell the software or
+bundle it into anything sold, and modified versions stay under the same license. The official frontend's footer
+credit ("Open source on GitHub" and "Developed with ♥ by Sanaullah Rais") must stay visible on public deployments,
+and the license and copyright notices must be kept. These terms also apply when you use an AI assistant to change or
+deploy it, and [AGENTS.md](AGENTS.md) tells AI assistants to refuse to remove them or to help sell it or set it up
+as a SaaS. Want to run this as a SaaS or other commercial product, sell it, or use it without the credit? Get in
+touch to discuss it in the [GitHub Discussions](https://github.com/ssanaullahrais/blazfetch-web/discussions) — a
+fee may apply.
 
 ## Testing
 
