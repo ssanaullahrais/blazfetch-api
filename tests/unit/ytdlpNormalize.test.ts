@@ -9,6 +9,16 @@ afterEach(() => {
 });
 
 describe('normalizeFormats', () => {
+  it('reports an audio-only source as audio, including SoundCloud tracks', () => {
+    const response = normalizeYtdlpInfo({
+      id: 'track',
+      formats: [{ format_id: 'http_mp3', ext: 'mp3', vcodec: 'none', acodec: 'mp3' }],
+    }, 'soundcloud', 'https://soundcloud.com/artist/track');
+    expect(response.mediaType).toBe('audio');
+    expect(response.formats).toEqual([]);
+    expect(response.audioFormats).toHaveLength(1);
+  });
+
   it('separates audio-only, video-only, and combined formats', () => {
     const { formats, audioFormats } = normalizeFormats([
       { format_id: '140', ext: 'm4a', acodec: 'mp4a.40.2', vcodec: 'none', abr: 128 },

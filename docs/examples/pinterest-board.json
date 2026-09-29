@@ -8,6 +8,8 @@
       "rangeEnd": 20
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "pinterest",
@@ -17,7 +19,7 @@
     "title": "Official news",
     "thumbnail": "https://i.pinimg.com/upload/424605139806979476_board_thumbnail_2023-09-07-16-01-40_997_60.jpg",
     "isCarousel": true,
-    "itemCount": 51,
+    "itemCount": 20,
     "items": [
       {
         "id": "424605071112831904",
@@ -35,35 +37,13 @@
     "formats": [],
     "audioFormats": [],
     "metadata": {
-      "truncated": true,
-      "maxItemsPerRequest": 200,
+      "truncated": false,
+      "maxItemsPerRequest": 1000,
       "totalPinCount": 51,
       "rangeStart": 1,
-      "rangeEnd": 51
+      "rangeEnd": 20
     },
     "extractor": "pinterest-board-api",
-    "fallbackUsed": "pinterest-board-api",
-    "stored": {
-      "path": "/pinterest/424605139806979476",
-      "sourceUrl": "https://www.pinterest.com/pinterest/official-news/",
-      "status": "available",
-      "cached": false,
-      "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:11:04.171Z",
-      "lastFetchedAt": "2026-09-24T19:11:04.171Z",
-      "validatedAt": "2026-09-24T19:11:04.171Z",
-      "nextCheckAt": "2026-10-01T19:11:04.171Z",
-      "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
-        "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
-      }
-    }
+    "fallbackUsed": "pinterest-board-api"
   }
 }

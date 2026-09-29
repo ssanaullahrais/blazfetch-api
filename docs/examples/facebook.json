@@ -6,18 +6,20 @@
       "url": "https://www.facebook.com/reel/1097374499488415"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "facebook",
     "mediaType": "video",
     "mediaId": "1097374499488415",
     "canonicalUrl": "https://m.facebook.com/watch/?v=1097374499488415&_rdr",
-    "title": "232K views · 76K reactions | تفريغ البيانات من ورقة لبرنامج الاكسيل بكل سهولة. Extract Data from Paper Using Your Camera in Excel! #learnontiktok #excel #exceltips #exceltricks #data | Hussein Adel",
-    "description": "تفريغ البيانات من ورقة لبرنامج الاكسيل بكل سهولة.\nExtract Data from Paper Using Your Camera in Excel!\n\n #learnontiktok #excel #exceltips ...",
+    "title": "244K views · 83K reactions | تفريغ البيانات من ورقة لبرنامج الاكسيل بكل سهولة. Extract Data from Paper Using Your Camera in Excel! #learnontiktok #excel #exceltips #exceltricks #data | Hussein Adel",
+    "description": "تفريغ البيانات من ورقة لبرنامج الاكسيل بكل سهولة.\nExtract Data from Paper Using Your Camera in Excel!\n\n #learnontiktok #excel #exceltips #exceltricks #data",
     "author": {
       "name": "Hussein Adel"
     },
-    "thumbnail": "https://scontent.fisb1-2.fna.fbcdn.net/v/t51.82787-10/801284054_18625495702055500_67742985960207...",
+    "thumbnail": "https://scontent.fisb1-2.fna.fbcdn.net/...",
     "durationSeconds": 58.235,
     "uploadDate": "20260908",
     "formats": [
@@ -27,38 +29,36 @@
         "kind": "video",
         "quality": null,
         "bitrate": null,
-        "filesizeBytes": null,
+        "filesizeBytes": 1256641,
         "filesizeApprox": false,
-        "url": "https://video.fisb17-1.fna.fbcdn.net/o1/v/t2/f2/m367/AQMkPq3e_vXQxe0KzT3rIZXj_hZENa1hbGiHtSBSx9S...",
+        "url": "https://video.fisb17-1.fna.fbcdn.net/...",
         "requiresMerge": false,
         "compatible": false
       },
       {
-        "formatId": "1465289862165722v",
+        "formatId": "hd",
         "ext": "mp4",
-        "kind": "video_only",
-        "quality": "DASH video",
-        "width": 1080,
-        "height": 1920,
-        "fps": null,
-        "bitrate": 659.654,
-        "codec": "av01.0.08M.08.0.111.01.01.01.0",
+        "kind": "video",
+        "quality": null,
+        "bitrate": null,
+        "filesizeBytes": 3248033,
         "filesizeApprox": false,
-        "url": "https://video.fisb1-2.fna.fbcdn.net/o1/v/t2/f2/m367/AQOge4tMa-JFby81FQNULOAQVfETdb9QvaG8xyEvuFqA...",
-        "requiresMerge": true,
+        "url": "https://video.fisb1-2.fna.fbcdn.net/...",
+        "requiresMerge": false,
         "compatible": false
       }
     ],
     "audioFormats": [
       {
         "formatId": "1465249215503120a",
-        "ext": "m4a",
+        "ext": "mp3",
         "bitrate": 56.698,
-        "codec": "mp4a.40.5",
+        "codec": "mp3",
         "quality": "DASH audio",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://video.fisb1-2.fna.fbcdn.net/o1/v/t2/f2/m78/AQM9UaGP7t5i_qsKutF1KGgSAZQ81corg7yBwx5SaNGl5..."
+        "filesizeBytes": 1397640,
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://video.fisb1-2.fna.fbcdn.net/..."
       }
     ],
     "metadata": {
@@ -71,20 +71,20 @@
       "status": "available",
       "cached": false,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:09:44.647Z",
-      "lastFetchedAt": "2026-09-24T19:09:44.647Z",
-      "validatedAt": "2026-09-24T19:09:44.647Z",
-      "nextCheckAt": "2026-10-01T19:09:44.647Z",
+      "firstFetchedAt": "2026-09-24T21:12:50.047Z",
+      "lastFetchedAt": "2026-09-29T21:16:22.630Z",
+      "validatedAt": "2026-09-29T21:16:22.630Z",
+      "nextCheckAt": "2026-10-06T21:16:22.630Z",
       "stats": {
-        "fetchCount": 1,
+        "fetchCount": 58,
         "hitCount": 0,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 19,
+        "streamCount": 12,
+        "prepareCount": 7,
+        "bytesServed": 81020022,
+        "lastAccessedAt": "2026-09-25T17:21:17.418Z",
+        "lastDownloadedAt": "2026-09-25T17:21:17.418Z"
       }
     }
   }

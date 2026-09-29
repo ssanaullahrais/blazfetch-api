@@ -6,6 +6,8 @@
       "url": "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "youtube",
@@ -13,54 +15,58 @@
     "mediaId": "PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
     "canonicalUrl": "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
     "title": "Popular Music Videos",
-    "thumbnail": "https://i.ytimg.com/vi/fOT0BUpITw8/hqdefault.jpg?sqp=-oaymwEXCNACELwBSFryq4qpAwkIARUAAIhCGAE=&rs...",
+    "thumbnail": "https://i.ytimg.com/...",
     "isPlaylist": true,
     "itemCount": 183,
     "playlist": {
       "title": "Popular Music Videos",
-      "thumbnail": "https://i.ytimg.com/vi/fOT0BUpITw8/hqdefault.jpg?sqp=-oaymwEXCNACELwBSFryq4qpAwkIARUAAIhCGAE=&rs...",
+      "thumbnail": "https://i.ytimg.com/...",
       "channel": "Music",
       "itemCount": 183,
       "items": [
         {
           "videoId": "fOT0BUpITw8",
           "title": "BELLAKEO (Video Oficial) - Peso Pluma, Anitta",
-          "thumbnail": "https://i.ytimg.com/vi/fOT0BUpITw8/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcA...",
+          "thumbnail": "https://i.ytimg.com/...",
           "durationSeconds": 235,
-          "url": "https://www.youtube.com/watch?v=fOT0BUpITw8"
+          "url": "https://www.youtube.com/..."
         },
         {
           "videoId": "NFvDHYMzj9U",
           "title": "Arcángel - FN8 ( Video Lyric )",
-          "thumbnail": "https://i.ytimg.com/vi/NFvDHYMzj9U/hqdefault.jpg?sqp=-oaymwE2CNACELwBSFXyq4qpAygIARUAAIhCGAFwAcA...",
+          "thumbnail": "https://i.ytimg.com/...",
           "durationSeconds": 650,
-          "url": "https://www.youtube.com/watch?v=NFvDHYMzj9U"
+          "url": "https://www.youtube.com/..."
         }
       ]
     },
     "formats": [],
     "audioFormats": [],
-    "metadata": {},
+    "metadata": {
+      "playlistLimit": 1000,
+      "playlistTotal": 183,
+      "playlistTruncated": false
+    },
     "extractor": "yt-dlp",
     "stored": {
       "path": "/youtube/playlist/PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
       "sourceUrl": "https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:09:14.511Z",
-      "lastFetchedAt": "2026-09-24T19:09:14.511Z",
-      "validatedAt": "2026-09-24T19:09:14.511Z",
-      "nextCheckAt": "2026-10-01T19:09:14.511Z",
+      "firstFetchedAt": "2026-09-29T21:14:08.081Z",
+      "lastFetchedAt": "2026-09-29T21:14:08.081Z",
+      "validatedAt": "2026-09-29T21:14:08.081Z",
+      "nextCheckAt": "2026-10-06T21:14:08.081Z",
       "stats": {
         "fetchCount": 1,
-        "hitCount": 0,
+        "hitCount": 1,
         "viewCount": 0,
         "downloadCount": 0,
         "streamCount": 0,
         "prepareCount": 0,
         "bytesServed": 0,
-        "lastAccessedAt": null,
+        "lastAccessedAt": "2026-09-29T21:15:51.154Z",
         "lastDownloadedAt": null
       }
     }

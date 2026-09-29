@@ -1,0 +1,67 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://maskofthedragon.tumblr.com/post/626907179849564160/mona-talking-in-english"
+    }
+  },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. Response may use cached metadata; arrays are shortened. Source access varies by network.",
+  "response": {
+    "success": true,
+    "platform": "tumblr",
+    "mediaType": "video",
+    "mediaId": "626907179849564160",
+    "canonicalUrl": "https://maskofthedragon.tumblr.com/post/626907179849564160/mona-talking-in-english",
+    "title": "This video was shared by Tumblr user @maskofthedragon.",
+    "description": "Mona “talking” in “english”",
+    "author": {},
+    "thumbnail": "https://64.media.tumblr.com/tumblr_qfbsolGm3H1r8hd26_smart1.jpg",
+    "durationSeconds": 7,
+    "uploadDate": "20200819",
+    "formats": [
+      {
+        "formatId": "tumblr-generic-mp4",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": null,
+        "bitrate": null,
+        "codec": null,
+        "filesizeBytes": 1428784,
+        "filesizeApprox": false,
+        "url": "https://va.media.tumblr.com/tumblr_qfbsolGm3H1r8hd26_720.mp4",
+        "requiresMerge": false,
+        "compatible": false
+      }
+    ],
+    "audioFormats": [],
+    "metadata": {
+      "isLive": false
+    },
+    "extractor": "yt-dlp",
+    "fallbackUsed": "yt-dlp-generic",
+    "stored": {
+      "path": "/tumblr/626907179849564160",
+      "sourceUrl": "https://maskofthedragon.tumblr.com/post/626907179849564160/mona-talking-in-english",
+      "status": "available",
+      "cached": false,
+      "urlsStale": false,
+      "firstFetchedAt": "2026-09-29T21:18:53.717Z",
+      "lastFetchedAt": "2026-09-29T21:18:53.717Z",
+      "validatedAt": "2026-09-29T21:18:53.717Z",
+      "nextCheckAt": "2026-10-06T21:18:53.717Z",
+      "stats": {
+        "fetchCount": 1,
+        "hitCount": 0,
+        "viewCount": 0,
+        "downloadCount": 0,
+        "streamCount": 0,
+        "prepareCount": 0,
+        "bytesServed": 0,
+        "lastAccessedAt": null,
+        "lastDownloadedAt": null
+      }
+    }
+  }
+}

@@ -4,7 +4,19 @@ import { classifyYtdlpFailure } from '../../src/core/ytdlp/ytdlpRunner';
 describe('classifyYtdlpFailure', () => {
   it('does not mistake "webpage" for an age restriction', () => {
     const err = classifyYtdlpFailure('ERROR: [Newgrounds] 841932: Unable to download webpage: Read timed out');
-    expect(err.code).toBe('PLATFORM_RATE_LIMITED');
+    expect(err.code).toBe('PROCESS_TIMEOUT');
+  });
+
+  it('does not claim that every webpage failure is a rate limit', () => {
+    const refused = classifyYtdlpFailure('ERROR: [Newgrounds] 549479: Unable to download webpage: HTTP Error 403: Forbidden');
+    expect(refused.code).toBe('EXTRACTOR_FAILED');
+    expect(refused.message).toBe('The source platform refused the server request.');
+    expect(classifyYtdlpFailure('ERROR: Unable to download webpage: Connection reset by peer').code).toBe('EXTRACTOR_FAILED');
+  });
+
+  it('preserves explicit rate limits even when the message mentions a timeout', () => {
+    expect(classifyYtdlpFailure('ERROR: Unable to download webpage: HTTP Error 429: Too Many Requests').code).toBe('PLATFORM_RATE_LIMITED');
+    expect(classifyYtdlpFailure('ERROR: rate limit timeout').code).toBe('PLATFORM_RATE_LIMITED');
   });
 
   it('detects real age restrictions', () => {

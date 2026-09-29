@@ -6,16 +6,18 @@
       "url": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "snapchat",
     "mediaType": "video",
     "mediaId": "W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ-1",
-    "canonicalUrl": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPw...",
+    "canonicalUrl": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ",
     "title": "3.1 ہزار لائیکس، 1.0 ہزار تبصرے، اور 3.0 ہزار شیئرز | introducing reals  | Team Snapchat | 1 اپریل، 2026 کو پوسٹ کردہ | Spotlight (1)",
-    "description": "A man in a black t-shirt speaks directly to the camera in front of a wooden bookshelf, announcing a significant change for Snapchat. He e...",
+    "description": "A man in a black t-shirt speaks directly to the camera in front of a wooden bookshelf, announcing a significant change for Snapchat. He explains that the platfo...",
     "author": {},
-    "thumbnail": "https://cf-st.sc-cdn.net/d/rNe7IEIM72elKXhSclqCu.256.IRZXSOY?mo=GkYaCTIBBEgCUC5gAVCgAVoQRGZMYXJn...",
+    "thumbnail": "https://cf-st.sc-cdn.net/...",
     "durationSeconds": null,
     "formats": [
       {
@@ -27,9 +29,9 @@
         "height": null,
         "bitrate": null,
         "codec": null,
-        "filesizeBytes": null,
+        "filesizeBytes": 2414424,
         "filesizeApprox": false,
-        "url": "https://cf-st.sc-cdn.net/d/rNe7IEIM72elKXhSclqCu.27.IRZXSOY?mo=GmAaCTIBBEgCUC5gAVCiAVoQU3BvdGxpZ...",
+        "url": "https://cf-st.sc-cdn.net/...",
         "requiresMerge": false,
         "compatible": false
       }
@@ -41,24 +43,24 @@
     "extractor": "yt-dlp",
     "stored": {
       "path": "/snapchat/W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ-1",
-      "sourceUrl": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPw...",
+      "sourceUrl": "https://www.snapchat.com/p/8af53eee-e298-40c4-9d6e-af20cf881b61/spotlight/W7_EDlXWTBiXAEEniNoMPwAAYYnlvaXl5amp6AZ1H3xfEAZ1H2YQIAAAAAQ",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:10:45.954Z",
-      "lastFetchedAt": "2026-09-24T19:10:45.954Z",
-      "validatedAt": "2026-09-24T19:10:45.954Z",
-      "nextCheckAt": "2026-10-01T19:10:45.954Z",
+      "firstFetchedAt": "2026-09-24T21:15:18.184Z",
+      "lastFetchedAt": "2026-09-29T21:14:08.272Z",
+      "validatedAt": "2026-09-29T21:14:08.272Z",
+      "nextCheckAt": "2026-10-06T21:14:08.272Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 3,
+        "hitCount": 7,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
+        "downloadCount": 3,
+        "streamCount": 3,
         "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "bytesServed": 7243272,
+        "lastAccessedAt": "2026-09-29T21:15:49.148Z",
+        "lastDownloadedAt": "2026-09-25T17:15:02.610Z"
       }
     }
   }

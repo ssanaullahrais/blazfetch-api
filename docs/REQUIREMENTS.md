@@ -9,7 +9,7 @@ behind HTTPS. Everything after it is reference material (specs, updates, backups
 |---|---|
 | **OS** | Ubuntu 22.04 / 24.04 LTS (recommended) or Debian 12. Other current Linux distros should work. Windows is fine for local development only. |
 | **Server size** | 2 vCPU / 2 GB RAM / 20 GB SSD minimum. 4 vCPU / 4-8 GB recommended (see [sizing](#server-sizing)). |
-| **Software** | Node.js 20+, yt-dlp, ffmpeg (includes ffprobe), Nginx, PM2 |
+| **Software** | Node.js 22+ for the YouTube JavaScript solver, current yt-dlp with official EJS components, ffmpeg (includes ffprobe), Nginx, PM2 |
 | **Database (pick one)** | SQLite (nothing to install, default), PostgreSQL 14+, MySQL 8+ / MariaDB, or MongoDB 6+ |
 | **Domain** | A domain or subdomain pointing at the server (for HTTPS) |
 
@@ -26,8 +26,8 @@ Log in as a non-root user with sudo, then:
 sudo apt-get update
 sudo apt-get install -y git curl ffmpeg python3 nginx
 
-# Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Node.js 22 (the YouTube EJS Node runtime requires 22+)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # yt-dlp (standalone download, updates itself with `sudo yt-dlp -U`) and the process manager
@@ -121,6 +121,8 @@ Edit `.env` (`nano .env`) and set at least:
 APP_ENV=production
 APP_URL=https://api.your-domain.example
 CORS_ALLOWED_ORIGINS=https://your-frontend.example
+HOST=127.0.0.1
+TRUST_PROXY=1
 ```
 
 `TRUST_PROXY=1` tells the app it sits behind Nginx, so it sees real visitor IPs (leave it at 0 if clients reach the app directly).
@@ -136,11 +138,11 @@ Settings you may want to review for a public deployment:
 
 | Setting | Why |
 |---|---|
-| `DEFAULT_DOWNLOAD_MODE` | **Use `auto` for a public site.** Both `stream` and `auto` stream first, live merges and HLS remuxes included (no file on the server, the least load), preferring an H.264 file so it plays on phones. If streaming fails before the first byte the request falls back to preparing a compatible MP4 on the server (`stream` uses ffmpeg's quickest settings). `prepare` always builds the file first. Clients can always choose with `?mode=` |
-| `AUDIO_FORCE_MP3` | `true` delivers every audio download as MP3: sources that are not MP3 are converted with ffmpeg, live in stream/auto mode or through a temporary file that is deleted after sending in prepare/job mode. On in `.env.example` (recommended); off if the variable is left out. See [Audio as MP3](API.md#audio-as-mp3-audio_force_mp3) |
+| `DEFAULT_DOWNLOAD_MODE` | `auto` streams first and prepares when needed; `prepare` always builds a compatible file first |
+| `AUDIO_FORCE_MP3` | Convert audio downloads to MP3. Enabled in `.env.example`; off if omitted |
 | `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional Cloudflare bot check in front of fetch, stream and download. Set up in [Cloudflare Turnstile](#cloudflare-turnstile-optional) below. Off by default |
 | `INSTAGRAM_COOKIES_PATH` | Optional. Instagram often blocks datacenter IPs; a `cookies.txt` from a logged-in browser lets yt-dlp through. Without it the backup provider is used |
-| `YOUTUBE_FALLBACK_ENABLED` | Leave `true`: if YouTube blocks the server's IP, a fallback provider serves the request |
+| `YOUTUBE_FALLBACK_ENABLED` | Enables the existing best-effort fallback. Its upstream may return empty results; an authorized independent provider and a verified media proxy offer additional recovery paths, not guaranteed access |
 | `REVALIDATE_AFTER_SECONDS` | How often stored media is re-checked for deletion (default 7 days) |
 | `RATE_LIMIT_MAX_GUEST`, `RATE_LIMIT_MAX_DOWNLOAD`, `MAX_CONCURRENT_DOWNLOADS_*` | Protect the server's bandwidth and CPU |
 
@@ -161,8 +163,7 @@ Start PM2 from inside the project folder so the app finds its `.env`. Confirm it
 curl localhost:4000/health/ready
 ```
 
-`/health/ready` is public and returns only pass/fail flags (`database`, `ytdlp`, `ffmpeg`). Versions and the database
-type are not exposed; `npm run diagnostics` on the server shows them.
+`/health/ready` returns dependency flags and requires `X-API-Key` when API protection is enabled. Use `npm run diagnostics` for versions and database details; `/health` is public liveness only.
 
 ### 7. Put Nginx and HTTPS in front
 
@@ -200,6 +201,8 @@ sudo certbot --nginx -d api.your-domain.example
 
 ### 8. Lock down the firewall
 
+Keep `HOST=127.0.0.1` for same-host Nginx. To require a manual API key, follow [API-key setup](api-protection.md); inject it only on the official website's trusted proxy, not a public API-domain proxy.
+
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 'Nginx Full'
@@ -209,7 +212,53 @@ sudo ufw enable
 Do not open port 4000 (the app) or your database port (5432 / 3306 / 27017) to the internet. The app
 listens for Nginx on localhost, and databases should only accept local connections.
 
-**Done.** Test from anywhere: `curl https://api.your-domain.example/health/ready`
+**Done.** Test public liveness from anywhere: `curl https://api.your-domain.example/health`. Readiness is `/health/ready`; when API-key protection is enabled it requires the key through a trusted proxy or server-side client.
+
+## Media extraction dependencies and optional recovery
+
+### Node and yt-dlp EJS
+
+- Install Node 22+, current yt-dlp and ffmpeg/ffprobe.
+- Keep `YTDLP_REMOTE_EJS_ENABLED=true` to load official yt-dlp EJS components from GitHub.
+- For offline servers, install EJS components first, then disable remote loading. Follow the [official EJS guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
+- No extra npm package is needed for Cobalt or YouTube Data API integration; Cobalt is a separate optional service.
+
+### Media-only proxy on a VPS
+
+Use this when the deployment IP is blocked. The reported VPS setup used Cloudflare WARP on `127.0.0.1:40128`.
+
+1. Install WARP using [Cloudflare's Linux instructions](https://developers.cloudflare.com/warp-client/get-started/linux/).
+2. Select **local proxy mode**, not full-device tunneling. Check supported commands with `warp-cli mode --help` and `warp-cli proxy --help`.
+3. Confirm the loopback endpoint supports HTTP CONNECT; a SOCKS-only proxy is not sufficient for ffmpeg.
+4. Set backend `.env`:
+
+   ```dotenv
+   YTDLP_PROXY_URL=http://127.0.0.1:40128
+   YTDLP_REMOTE_EJS_ENABLED=true
+   ```
+
+5. Restart: `pm2 restart blazfetch-backend --update-env`.
+
+Check the route and extraction:
+
+```bash
+curl -fsS https://www.cloudflare.com/cdn-cgi/trace
+curl -fsS --proxy http://127.0.0.1:40128 https://www.cloudflare.com/cdn-cgi/trace
+yt-dlp --js-runtimes node --remote-components ejs:github --proxy http://127.0.0.1:40128 -J --no-playlist 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+```
+
+Then test a complete API video/audio download and refresh cached metadata.
+
+- Extraction, streaming, merging and prepared downloads must use the same egress route; signed media links can be IP-bound.
+- Keep the proxy loopback-only. Do not expose port 40128, export a global proxy or change SSH/Nginx routing.
+- WARP editions have different limits. See [Cloudflare One local proxy mode](https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/cloudflare-one-client/configure/modes/#local-proxy-mode); validate long transfers with your installed client.
+- A proxy does not guarantee access to restricted or blocked media.
+
+### Playlist limits and independent fallback
+
+See [playlist and fallback setup](playlist-and-fallback.md#configuration) for `MAX_PLAYLIST_ITEMS`, bulk limits, Cobalt and the optional YouTube Data API key.
+
+For existing deployments: set `MAX_PLAYLIST_ITEMS=1000`, restart and force-refresh cached playlists. Bulk preparation retains its separate 200-item default; keep concurrency low and budget temporary disk for the requested batch.
 
 ## Everyday operations
 
@@ -217,7 +266,7 @@ listens for Nginx on localhost, and databases should only accept local connectio
 
 ```bash
 cd blazfetch-backend
-git pull && npm ci && npm run build && npm run migrate && pm2 restart blazfetch-backend
+git pull --ff-only && npm ci && npm run build && npm run migrate && pm2 restart blazfetch-backend --update-env
 ```
 
 `npm run migrate` applies any database changes that have not run yet (it keeps a `schema_migrations` record) and does nothing when up to date, so it is safe to run on every deploy. It upgrades an existing database in place without losing stored data.
@@ -276,7 +325,7 @@ Deployment notes for Turnstile:
 - Add your production domain to the widget's hostname list in Cloudflare (and `localhost` if you test locally with real keys).
 - The server needs outbound HTTPS to `challenges.cloudflare.com`. Behind a firewall that blocks outbound traffic, allow it.
 - Put the secret key only in the server's `.env` (never in git, the frontend or chat). If it leaks, rotate it in Cloudflare and restart with `pm2 restart <name> --update-env`.
-  - Stored-media API requests also require a pass because they can trigger extraction. Configuration, aggregate stats, platform lists and health checks remain public.
+- Stored-media reads are not gated by backend Turnstile; the official frontend waits for a pass before requesting them. Optional API-key protection applies independently to all `/api/v1` routes and `/health/ready`.
 
 If a visitor sees "security check" errors: check the hostname is added to the widget in Cloudflare, that the secret is
 correct, and that the server can reach `challenges.cloudflare.com` (outbound HTTPS). The check fails closed by design.
@@ -287,7 +336,7 @@ correct, and that the server can reach `challenges.cloudflare.com` (outbound HTT
 |---|---|---|---|---|
 | Minimum | 2 | 2 GB | 20 GB SSD | Low concurrency (`MAX_CONCURRENT_DOWNLOADS_GLOBAL=2-3`) |
 | Recommended | 4 | 4-8 GB | 40 GB SSD | Comfortable for moderate traffic with several concurrent merges/transcodes |
-| High traffic | 8+ | 16 GB+ | 80 GB+ SSD | Raise `MAX_CONCURRENT_DOWNLOADS_GLOBAL`; consider several app instances behind Nginx |
+| High traffic | 8+ | 16 GB+ | 80 GB+ SSD | Raise limits within resource capacity; keep one process per database unless distributed coordination is added |
 
 ffmpeg transcoding (the H.264/AAC compatibility pass) is the most CPU-heavy operation, so size CPU
 around your expected number of simultaneous transcodes, not just request volume. With `DEFAULT_DOWNLOAD_MODE=auto`,
@@ -306,10 +355,10 @@ space for them (a few GB free per concurrent download).
 
 - **SQLite:** the database is one file (`DATABASE_SQLITE_PATH`, default `./data/blazfetch.sqlite3`).
   Keep it on persistent disk, outside any folder that gets wiped on deploy.
-- **`TEMP_DIR`** (default `./tmp`) must be writable by the app user. It holds in-flight merges and
-  transcodes only, never a permanent media library, and ideally sits on its own disk if download
+- **`TEMP_DIR`** (default `./tmp`) must be writable by the app user. It holds in-flight merges,
+  transcodes and prepared jobs awaiting delivery (including bulk playlist items), never a permanent media library, and ideally sits on its own disk if download
   volume is high.
-- No media is kept after a job finishes, fails, is cancelled or expires. On startup the app also
+- Prepared media is removed after delivery, failure, cancellation or expiry; preparation alone can retain it until the visitor downloads it or retention expires. On startup the app also
   deletes leftovers in `TEMP_DIR` older than 6 hours from any unclean shutdown.
 - Run the app as a regular user that cannot write outside `TEMP_DIR`, the data folder and the app
   directory: yt-dlp and ffmpeg run as this user.
@@ -327,7 +376,7 @@ Problems seen on real deployments are listed here with their fixes. After any up
 
 ```bash
 npm run diagnostics                      # database, yt-dlp, ffmpeg and ffprobe status in one command
-curl localhost:4000/health/ready         # the app's own readiness check (HTTP 503 if something is missing)
+curl localhost:4000/health               # public liveness; authenticated readiness: see API-key setup
 pm2 status && pm2 logs blazfetch-backend --lines 200
 sudo journalctl -u nginx -n 100
 ```
@@ -339,7 +388,7 @@ sudo journalctl -u nginx -n 100
 | A platform suddenly stops working | Update yt-dlp (see above); extractors break as sites change. |
 | Browser shows a CORS error | Add your frontend's origin to `CORS_ALLOWED_ORIGINS` and restart with `pm2 restart blazfetch-backend`. |
 | 502 from Nginx | The app is not running: check `pm2 status` and the logs. |
-| YouTube fails with "Sign in to confirm you're not a bot" | YouTube temporarily blocked the server's IP. The fallback provider takes over automatically (check `fallbackUsed` in responses); the block usually clears in minutes to hours. Fewer repeated requests and the media store help. |
+| YouTube fails with "Sign in to confirm you're not a bot" | Trace the same URL on the VPS. This may be a datacenter IP bot check, not a private video. Update yt-dlp/EJS, verify the configured media-only proxy and full transfers, and check configured fallback availability (`fallbackUsed`). Respect cooldown; never promise a particular block-clear time. |
 | Downloaded video is black or cannot be shared on a phone (WhatsApp, gallery) | Update to the latest version. A live merge is fragmented MP4, which a few phone galleries cannot open: the stream prefers an H.264 file, and `?mode=prepare` (Compatible in the frontend) always builds a normal H.264/AAC MP4. |
 | An Instagram link shows only a thumbnail or fails, but works locally | yt-dlp is blocked from the server's IP. Check with `yt-dlp -J "<link>"` on the server; add `INSTAGRAM_COOKIES_PATH` if it asks for a login. After fixing, use the app's Refresh button once on that link to replace the stored result. |
 | A download stops with `PROCESS_TIMEOUT` ("ffmpeg process timed out") | The chosen format needed a slow re-encode (VP9/AV1) on a small CPU. Current versions avoid most re-encodes: "best" picks H.264 from 720p up, and a VP9/AV1 pick in prepare mode downloads the same quality in H.264 when the source offers it. A conversion that is still needed may take the longest of `FFMPEG_TIMEOUT_MS`, `DOWNLOAD_TOTAL_TIMEOUT_MS` and twice the video's length. For 4K/1440p (no H.264 version) use a bigger server. |
@@ -350,7 +399,7 @@ sudo journalctl -u nginx -n 100
 | "Backup source" badge on Instagram | The main extractor (yt-dlp) is blocked from the server's IP and the backup provider answered. Fixes: `INSTAGRAM_COOKIES_PATH` with a `cookies.txt` from a throwaway logged-in account, or a residential proxy. Never use a personal account. |
 | A platform (for example Rutube) fails only from the server with a 504 or 403 | The site blocks or times out datacenter IPs. Try later or from another network; nothing to fix in the app. |
 | New settings in `.env` do not take effect | Restart with `pm2 restart <name> --update-env`, then `pm2 save`. Check the process name with `pm2 status` (this guide uses `blazfetch-backend`; yours may differ). |
-| The status button is red but the site works | `/health/ready` must be reachable through Nginx (`location /health`). Check `curl https://your-domain/health/ready`. |
+| The status button is red but the site works | Proxy `/health/ready`; if API protection is enabled, the trusted website proxy must inject `X-API-Key` here too. |
 | Old localhost origin still in `CORS_ALLOWED_ORIGINS` | Remove `localhost` entries in production, and if the app and `/api` share a domain CORS is not used at all. |
 | Visitors see "security check" errors | Turnstile is on. Check the domain is in the widget's hostname list in Cloudflare, `TURNSTILE_SECRET_KEY` is right, and the server can reach `challenges.cloudflare.com`. A page opened before you changed keys holds an old token: reload it. To switch the check off: `TURNSTILE_ENABLED=false`, then `pm2 restart <name> --update-env`. |
 | Downloads cut off partway | Nginx `proxy_read_timeout` too low, or `proxy_buffering` left on. |

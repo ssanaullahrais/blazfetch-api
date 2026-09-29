@@ -8,12 +8,17 @@ import mediaRoutes from './v1/media.routes';
 import turnstileRoutes from './v1/turnstile.routes';
 import { env } from '../config/env';
 import healthRoutes from './health.routes';
+import playlistRoutes from './v1/playlist.routes';
+import { requireApiKey } from '../middleware/apiAuth';
 
 const router = Router();
+router.use('/api/v1', requireApiKey);
+router.use('/health/ready', requireApiKey);
 
 router.use('/api/v1', turnstileRoutes);
 router.use('/api/v1', fetchRoutes);
 router.use('/api/v1', downloadRoutes);
+router.use('/api/v1', playlistRoutes);
 router.use('/api/v1', jobsRoutes);
 router.use('/api/v1', platformsRoutes);
 router.use('/api/v1', mediaRoutes);

@@ -34,22 +34,36 @@ export class GenericYtDlpAdapter implements PlatformAdapter {
     const targetUrl = ctx.normalizedUrl.canonicalUrl;
     await assertSafeTarget(targetUrl);
 
-    const { stdout, stderr, exitCode } = await runYtdlp({
-      args: ['-J', '--no-warnings', '--no-playlist', targetUrl],
-    });
-
-    if (exitCode !== 0) {
-      throw classifyYtdlpFailure(stderr);
+    let result;
+    let genericFallback = false;
+    try {
+      result = await runYtdlp({ args: ['-J', '--no-warnings', '--no-playlist', targetUrl] });
+      if (result.exitCode !== 0) throw classifyYtdlpFailure(result.stderr);
+    } catch (error) {
+      // Tumblr's dedicated extractor calls its login/iframe host even for public HTML5 video.
+      // Retry only transient failures, never private/deleted/restricted media.
+      if (this.platform !== 'tumblr' || !(error instanceof BlazfetchError) || !['PROCESS_TIMEOUT', 'EXTRACTOR_FAILED', 'PLATFORM_RATE_LIMITED'].includes(error.code)) throw error;
+      try {
+        result = await runYtdlp({ args: ['-J', '--no-warnings', '--no-playlist', '--force-generic-extractor', targetUrl] });
+        if (result.exitCode !== 0) throw classifyYtdlpFailure(result.stderr);
+        genericFallback = true;
+      } catch { throw error; }
     }
 
     let info: YtdlpRawInfo;
     try {
-      info = JSON.parse(stdout);
+      info = JSON.parse(result.stdout);
     } catch {
       throw new BlazfetchError('EXTRACTOR_FAILED', 'Failed to parse extractor output.');
     }
 
-    return normalizeYtdlpInfo(info, this.platform, targetUrl);
+    const response = normalizeYtdlpInfo(info, this.platform, targetUrl);
+    if (genericFallback) {
+      response.mediaId = new URL(targetUrl).pathname.match(/\/(?:post|video)\/(\d+)/)?.[1] ?? response.mediaId;
+      response.fallbackUsed = 'yt-dlp-generic';
+      for (const format of [...response.formats, ...response.audioFormats]) format.formatId = `tumblr-generic-${format.formatId}`;
+    }
+    return response;
   }
 
   async download(ctx: AdapterFetchContext, target: DownloadTarget): Promise<DownloadResult> {
@@ -58,7 +72,8 @@ export class GenericYtDlpAdapter implements PlatformAdapter {
 
     const filePath = await downloadWithYtdlp({
       url: targetUrl,
-      formatId: target.formatId,
+      formatId: this.platform === 'tumblr' ? target.formatId.replace(/^tumblr-generic-/, '') : target.formatId,
+      forceGenericExtractor: this.platform === 'tumblr' && target.formatId.startsWith('tumblr-generic-'),
       outputDir: target.outputDir,
       signal: target.signal,
       onProgress: target.onProgress,

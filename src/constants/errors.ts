@@ -1,4 +1,5 @@
 export const ErrorCode = {
+  API_AUTH_REQUIRED: 'API_AUTH_REQUIRED',
   UNSUPPORTED_PLATFORM: 'UNSUPPORTED_PLATFORM',
   INVALID_URL: 'INVALID_URL',
   MEDIA_NOT_FOUND: 'MEDIA_NOT_FOUND',
@@ -25,6 +26,7 @@ export const ErrorCode = {
 export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 const STATUS_BY_CODE: Record<ErrorCodeType, number> = {
+  API_AUTH_REQUIRED: 401,
   UNSUPPORTED_PLATFORM: 422,
   INVALID_URL: 400,
   MEDIA_NOT_FOUND: 404,

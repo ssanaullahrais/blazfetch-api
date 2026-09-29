@@ -6,6 +6,8 @@
       "url": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "loom",
@@ -13,7 +15,7 @@
     "mediaId": "9245fa69349d4dfa8a8ade8b728ce1f6",
     "canonicalUrl": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6",
     "title": "How to Upload a Downloadable Product on AFOMA Marketplace",
-    "description": "In this video, I walk you through the process of uploading a Downloadable product on our AFOMA Marketplace. Downloadable products are dig...",
+    "description": "In this video, I walk you through the process of uploading a Downloadable product on our AFOMA Marketplace. Downloadable products are digital files like e-books...",
     "author": {
       "name": "AFOMA Marketplace"
     },
@@ -30,7 +32,7 @@
         "fps": null,
         "bitrate": 1500,
         "filesizeApprox": false,
-        "url": "https://luna.loom.com/id/9245fa69349d4dfa8a8ade8b728ce1f6/rev/83c6758ef75a3f8c57d8e1a5ce037c0fa5...",
+        "url": "https://luna.loom.com/...",
         "requiresMerge": true,
         "compatible": false
       },
@@ -44,7 +46,7 @@
         "fps": null,
         "bitrate": 3200,
         "filesizeApprox": false,
-        "url": "https://luna.loom.com/id/9245fa69349d4dfa8a8ade8b728ce1f6/rev/83c6758ef75a3f8c57d8e1a5ce037c0fa5...",
+        "url": "https://luna.loom.com/...",
         "requiresMerge": true,
         "compatible": false
       }
@@ -52,12 +54,14 @@
     "audioFormats": [
       {
         "formatId": "hls-raw-audio-audio",
-        "ext": "mp4",
+        "ext": "mp3",
         "bitrate": null,
         "quality": "audio",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://luna.loom.com/id/9245fa69349d4dfa8a8ade8b728ce1f6/rev/83c6758ef75a3f8c57d8e1a5ce037c0fa5..."
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://luna.loom.com/...",
+        "codec": "mp3",
+        "filesizeBytes": 9264000
       }
     ],
     "metadata": {
@@ -68,22 +72,22 @@
       "path": "/loom/9245fa69349d4dfa8a8ade8b728ce1f6",
       "sourceUrl": "https://www.loom.com/share/9245fa69349d4dfa8a8ade8b728ce1f6",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:11:10.798Z",
-      "lastFetchedAt": "2026-09-24T19:11:10.798Z",
-      "validatedAt": "2026-09-24T19:11:10.798Z",
-      "nextCheckAt": "2026-10-01T19:11:10.798Z",
+      "firstFetchedAt": "2026-09-24T21:13:38.766Z",
+      "lastFetchedAt": "2026-09-29T21:14:03.408Z",
+      "validatedAt": "2026-09-29T21:14:03.408Z",
+      "nextCheckAt": "2026-10-06T21:14:03.408Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 3,
+        "hitCount": 16,
         "viewCount": 0,
-        "downloadCount": 0,
+        "downloadCount": 3,
         "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "prepareCount": 3,
+        "bytesServed": 219113484,
+        "lastAccessedAt": "2026-09-29T21:15:47.358Z",
+        "lastDownloadedAt": "2026-09-25T17:16:30.104Z"
       }
     }
   }

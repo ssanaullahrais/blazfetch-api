@@ -4,6 +4,7 @@ export interface RequestedFormat {
   formatId: string;
   kind: 'video' | 'audio';
   quality?: string;
+  playlist?: { title?: string; items: { id: string; title: string; url: string }[] };
 }
 
 export interface JobRecord {

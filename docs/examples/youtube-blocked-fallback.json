@@ -1,4 +1,5 @@
 {
+  "exampleNotes": "Historical btch-downloader response, not a fresh successful provider check. Availability and formats vary. URLs are shortened.",
   "request": {
     "method": "POST",
     "path": "/api/v1/fetch",

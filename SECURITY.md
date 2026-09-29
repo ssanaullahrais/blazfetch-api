@@ -34,7 +34,8 @@ leaks, rotate it in its dashboard first.
 - **No public details:** `/health/ready` returns only pass/fail flags, and raw tool output is never sent to clients.
 - **Optional Cloudflare Turnstile:** a signed, expiring pass cookie bound to the visitor; the secret key never leaves the
   server, and the check fails closed.
-- **Privacy:** downloaded media is never stored (only metadata), and temporary files are removed.
+- **Optional API key:** all `/api/v1` routes and `/health/ready` can require a manual server-side key. See [setup](docs/api-protection.md).
+- **Privacy:** metadata persists; media is streamed or held temporarily for prepared downloads, then cleaned up after delivery, cancellation, failure or expiry.
 
 ## What you must do when you deploy
 

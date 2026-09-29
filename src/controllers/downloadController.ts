@@ -13,6 +13,7 @@ import { BlazfetchError } from '../constants/errors';
 import { recordDownloadStat } from '../services/statsService';
 import { networkKey } from '../utils/clientKey';
 import type { JobRecord } from '../core/jobs/jobTypes';
+import { cancelPlaylistDownload } from '../services/playlistDownloadService';
 
 export const downloadBodySchema = z.object({
   url: z.string().min(1),
@@ -73,7 +74,8 @@ export async function getDownloadStream(req: Request, res: Response): Promise<vo
 export async function deleteDownload(req: Request, res: Response): Promise<void> {
   const job = await getJob(req.params.id);
   assertOwnership(req, job);
-  await cancelJob(job.id);
+  if (job.requestedFormat.playlist) await cancelPlaylistDownload(job);
+  else await cancelJob(job.id);
   await cleanupJobTempDir(job.id);
   res.json({ success: true, job: await getJob(job.id) });
 }

@@ -6,6 +6,8 @@
       "url": "https://vimeo.com/826026805"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "vimeo",
@@ -17,7 +19,7 @@
       "name": "Vimeo Curation",
       "url": "https://vimeo.com/vimeocuration"
     },
-    "thumbnail": "https://i.vimeocdn.com/video/1668695278-729a83f90922565e20a722487b89ef8c0787ff3cf48afe9f437f3d42...",
+    "thumbnail": "https://i.vimeocdn.com/video/1668695278-729a83f90922565e20a722487b89ef8c0787ff3cf48afe9f437f3d4217342f9c-d",
     "durationSeconds": 159,
     "formats": [
       {
@@ -31,22 +33,22 @@
         "bitrate": 408,
         "codec": "avc1.640015",
         "filesizeApprox": false,
-        "url": "https://vod-adaptive-ak.vimeocdn.com/exp=1790280597~acl=%2Fdea9d61e-4ed6-4453-9d56-4c3d0db49cf0%...",
+        "url": "https://vod-adaptive-ak.vimeocdn.com/...",
         "requiresMerge": true,
         "compatible": true
       },
       {
-        "formatId": "hls-fastly_skyfire-5357",
+        "formatId": "hls-fastly_skyfire-408",
         "ext": "mp4",
         "kind": "video_only",
-        "quality": "1920x1080",
-        "width": 1920,
-        "height": 1080,
+        "quality": "426x240",
+        "width": 426,
+        "height": 240,
         "fps": 23.976,
-        "bitrate": 5357,
-        "codec": "avc1.64002A",
+        "bitrate": 408,
+        "codec": "avc1.640015",
         "filesizeApprox": false,
-        "url": "https://skyfire.vimeocdn.com/1790280597-0x6ecce6205b8e9c9264839cbdd10f19c9329e5f63/dea9d61e-4ed6...",
+        "url": "https://skyfire.vimeocdn.com/...",
         "requiresMerge": true,
         "compatible": true
       }
@@ -54,12 +56,14 @@
     "audioFormats": [
       {
         "formatId": "hls-akfire_interconnect_quic-audio-low-Original",
-        "ext": "mp4",
+        "ext": "mp3",
         "bitrate": null,
         "quality": "Original, low",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://vod-adaptive-ak.vimeocdn.com/exp=1790280597~acl=%2Fdea9d61e-4ed6-4453-9d56-4c3d0db49cf0%..."
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://vod-adaptive-ak.vimeocdn.com/...",
+        "codec": "mp3",
+        "filesizeBytes": 3816000
       }
     ],
     "metadata": {
@@ -72,20 +76,20 @@
       "status": "available",
       "cached": false,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:10:00.186Z",
-      "lastFetchedAt": "2026-09-24T19:10:00.186Z",
-      "validatedAt": "2026-09-24T19:10:00.186Z",
-      "nextCheckAt": "2026-10-01T19:10:00.186Z",
+      "firstFetchedAt": "2026-09-24T21:19:04.881Z",
+      "lastFetchedAt": "2026-09-29T21:16:29.336Z",
+      "validatedAt": "2026-09-29T21:16:29.336Z",
+      "nextCheckAt": "2026-10-06T21:16:29.336Z",
       "stats": {
-        "fetchCount": 1,
+        "fetchCount": 51,
         "hitCount": 0,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 13,
+        "streamCount": 4,
+        "prepareCount": 9,
+        "bytesServed": 758389811,
+        "lastAccessedAt": "2026-09-25T17:07:50.380Z",
+        "lastDownloadedAt": "2026-09-25T17:07:50.380Z"
       }
     }
   }

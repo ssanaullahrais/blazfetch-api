@@ -6,6 +6,8 @@
       "url": "https://www.pinterest.com/pin/424605071136961057/"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "pinterest",
@@ -13,7 +15,7 @@
     "mediaId": "424605071136961057",
     "canonicalUrl": "https://www.pinterest.com/pin/424605071136961057/",
     "title": "The journey to a more inclusive Pinterest starts here. 📌",
-    "description": "Your favorite plus-size fashion tastemakers helped Pinterest develop new tech that champions diversity. Now you'll see more body shapes, ...",
+    "description": "Your favorite plus-size fashion tastemakers helped Pinterest develop new tech that champions diversity. Now you'll see more body shapes, sizes and skin tones wh...",
     "author": {
       "name": "Pinterest"
     },
@@ -37,29 +39,32 @@
         "compatible": true
       },
       {
-        "formatId": "V_EXP7",
+        "formatId": "V_HLSV3_MOBILE-727",
         "ext": "mp4",
-        "kind": "video",
-        "quality": "1080x1920",
-        "width": 1080,
-        "height": 1920,
-        "bitrate": null,
-        "filesizeBytes": null,
+        "kind": "video_only",
+        "quality": "360x640",
+        "width": 360,
+        "height": 640,
+        "fps": 30,
+        "bitrate": 727.31,
+        "codec": "avc1.77.30",
         "filesizeApprox": false,
-        "url": "https://v1.pinimg.com/videos/mc/720p/91/ee/22/91ee22f657cd9bf8979623646d9b26fb.mp4",
-        "requiresMerge": false,
-        "compatible": false
+        "url": "https://v1.pinimg.com/videos/mc/hls/91/ee/22/91ee22f657cd9bf8979623646d9b26fb_360w.m3u8",
+        "requiresMerge": true,
+        "compatible": true
       }
     ],
     "audioFormats": [
       {
         "formatId": "V_HLSV3_MOBILE-program_audio_0-Alternate_Audio",
-        "ext": "mp4",
+        "ext": "mp3",
         "bitrate": null,
         "quality": "Alternate Audio",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://v1.pinimg.com/videos/mc/hls/91/ee/22/91ee22f657cd9bf8979623646d9b26fb_audio.m3u8"
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://v1.pinimg.com/videos/mc/hls/91/ee/22/91ee22f657cd9bf8979623646d9b26fb_audio.m3u8",
+        "codec": "mp3",
+        "filesizeBytes": 1039992
       }
     ],
     "metadata": {
@@ -72,20 +77,20 @@
       "status": "available",
       "cached": false,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:12:21.249Z",
-      "lastFetchedAt": "2026-09-24T19:12:21.249Z",
-      "validatedAt": "2026-09-24T19:12:21.249Z",
-      "nextCheckAt": "2026-10-01T19:12:21.249Z",
+      "firstFetchedAt": "2026-09-24T21:14:03.075Z",
+      "lastFetchedAt": "2026-09-29T21:16:22.890Z",
+      "validatedAt": "2026-09-29T21:16:22.890Z",
+      "nextCheckAt": "2026-10-06T21:16:22.890Z",
       "stats": {
-        "fetchCount": 1,
+        "fetchCount": 13,
         "hitCount": 0,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 3,
+        "streamCount": 2,
+        "prepareCount": 1,
+        "bytesServed": 35308357,
+        "lastAccessedAt": "2026-09-25T17:15:25.829Z",
+        "lastDownloadedAt": "2026-09-25T17:15:25.829Z"
       }
     }
   }

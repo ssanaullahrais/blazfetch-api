@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getJob, cancelJob } from '../core/jobs/jobManager';
 import { assertOwnership } from '../core/jobs/ownership';
+import { cancelPlaylistDownload } from '../services/playlistDownloadService';
 
 export async function getJobById(req: Request, res: Response): Promise<void> {
   const job = await getJob(req.params.id);
@@ -11,6 +12,7 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
 export async function deleteJobById(req: Request, res: Response): Promise<void> {
   const job = await getJob(req.params.id);
   assertOwnership(req, job);
-  await cancelJob(job.id);
+  if (job.requestedFormat.playlist) await cancelPlaylistDownload(job);
+  else await cancelJob(job.id);
   res.json({ success: true, job: await getJob(job.id) });
 }

@@ -129,8 +129,14 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   ) {
     return new BlazfetchError('MEDIA_NOT_FOUND', 'Media could not be found at the given URL.');
   }
-  if (lower.includes('unable to download webpage') || lower.includes('429') || /rate.?limit|too many requests/.test(lower)) {
+  if (lower.includes('429') || /rate.?limit|too many requests/.test(lower)) {
     return new BlazfetchError('PLATFORM_RATE_LIMITED', 'The source platform is rate-limiting requests.');
+  }
+  if (/timed out|timeout|time out/.test(lower)) {
+    return new BlazfetchError('PROCESS_TIMEOUT', 'The source platform request timed out.');
+  }
+  if (/http error 403|403: forbidden/.test(lower)) {
+    return new BlazfetchError('EXTRACTOR_FAILED', 'The source platform refused the server request.');
   }
   if (lower.includes('unsupported url') || lower.includes('no video formats found')) {
     return new BlazfetchError('MEDIA_NOT_FOUND', 'Media could not be found at the given URL.');

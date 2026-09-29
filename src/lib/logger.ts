@@ -6,6 +6,8 @@ export const logger = pino({
   redact: {
     paths: [
       'req.headers.authorization',
+      'req.headers["x-api-key"]',
+      '*.API_AUTH_KEY',
       'req.headers.cookie',
       '*.password',
       '*.token',

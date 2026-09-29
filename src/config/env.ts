@@ -14,6 +14,9 @@ const boolFromString = (defaultValue: boolean) =>
 const envSchema = z.object({
   APP_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
+  HOST: z.string().default('0.0.0.0'),
+  API_AUTH_ENABLED: z.enum(['true', 'false']).optional().default('false').transform((v) => v === 'true'),
+  API_AUTH_KEY: z.string().default(''),
   APP_URL: z.string().default('http://localhost:4000'),
   LOG_LEVEL: z.string().default('info'),
 
@@ -34,6 +37,12 @@ const envSchema = z.object({
   // datacenter IP is temporarily blocked by a source platform. Keep the proxy on loopback
   // or otherwise protect it; credentials may be included in the URL and are never logged.
   YTDLP_PROXY_URL: z.union([z.literal(''), z.string().url()]).default(''),
+  // An operator-owned or explicitly authorized public Cobalt API; disabled when empty.
+  COBALT_API_URL: z.union([z.literal(''), z.string().url()]).default(''),
+  COBALT_API_KEY: z.string().default(''),
+  // Optional official API fallback for public YouTube playlist enumeration.
+  YOUTUBE_DATA_API_KEY: z.string().default(''),
+  PLAYLIST_DOWNLOAD_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(1),
   FFMPEG_PATH: z.string().default('ffmpeg'),
   FFPROBE_PATH: z.string().default('ffprobe'),
 
@@ -62,7 +71,8 @@ const envSchema = z.object({
   MAX_CONCURRENT_DOWNLOADS_PER_IP: z.coerce.number().default(5),
   MAX_CONCURRENT_FETCHES_GLOBAL: z.coerce.number().default(20),
 
-  MAX_PLAYLIST_ITEMS: z.coerce.number().default(200),
+  MAX_PLAYLIST_ITEMS: z.coerce.number().int().min(1).default(1000),
+  MAX_PLAYLIST_DOWNLOAD_ITEMS: z.coerce.number().int().min(1).default(200),
   MAX_DOWNLOAD_SIZE_BYTES: z.coerce.number().default(2147483648),
   // When auto mode falls back to prepare because a pick is not phone-safe (VP9/AV1/HEVC), a source at or above
   // this size uses the same quick ffmpeg preset as "Fastest" (~3x quicker, a somewhat larger file) instead of the
@@ -157,6 +167,10 @@ const envSchema = z.object({
   // Number of reverse proxies in front of the app (1 behind Nginx). Leave 0 when clients connect directly: trusting
   // X-Forwarded-For without a proxy would let anyone fake their IP.
   TRUST_PROXY: z.coerce.number().default(0),
+}).superRefine((config, ctx) => {
+  if (config.API_AUTH_ENABLED && !/^[\x21-\x7e]{32,256}$/.test(config.API_AUTH_KEY)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['API_AUTH_KEY'], message: 'When API authentication is enabled, supply a manually configured 32-256 character key without whitespace.' });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

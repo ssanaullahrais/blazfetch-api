@@ -6,6 +6,8 @@
       "url": "https://www.reddit.com/r/funny/comments/1bx4vqy/in_hot_pursuit/"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "reddit",
@@ -29,23 +31,24 @@
         "fps": null,
         "bitrate": 214.274,
         "codec": "avc1.4d401e",
+        "filesizeBytes": 1583985,
         "filesizeApprox": false,
         "url": "https://v.redd.it/vq983vm21tsc1/DASH_220.mp4",
         "requiresMerge": true,
         "compatible": true
       },
       {
-        "formatId": "fallback",
+        "formatId": "hls-290",
         "ext": "mp4",
         "kind": "video_only",
-        "quality": "DASH video, mp4_dash",
-        "width": 640,
-        "height": 350,
-        "bitrate": 800,
-        "codec": "h264",
-        "filesizeBytes": 6600000,
-        "filesizeApprox": true,
-        "url": "https://v.redd.it/vq983vm21tsc1/DASH_360.mp4?source=fallback",
+        "quality": "392x214",
+        "width": 392,
+        "height": 214,
+        "fps": 30,
+        "bitrate": 290.983,
+        "codec": "avc1.4D401E",
+        "filesizeApprox": false,
+        "url": "https://v.redd.it/vq983vm21tsc1/HLS_220.m3u8",
         "requiresMerge": true,
         "compatible": true
       }
@@ -53,12 +56,14 @@
     "audioFormats": [
       {
         "formatId": "hls-3-audio_0",
-        "ext": "mp4",
+        "ext": "mp3",
         "bitrate": null,
         "quality": "audio 0, low",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://v.redd.it/vq983vm21tsc1/HLS_AUDIO_64.m3u8"
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://v.redd.it/vq983vm21tsc1/HLS_AUDIO_64.m3u8",
+        "codec": "mp3",
+        "filesizeBytes": 1584000
       }
     ],
     "metadata": {
@@ -69,22 +74,22 @@
       "path": "/reddit/vq983vm21tsc1",
       "sourceUrl": "https://www.reddit.com/r/funny/comments/1bx4vqy/in_hot_pursuit/",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:09:51.772Z",
-      "lastFetchedAt": "2026-09-24T19:09:51.772Z",
-      "validatedAt": "2026-09-24T19:09:51.772Z",
-      "nextCheckAt": "2026-10-01T19:09:51.772Z",
+      "firstFetchedAt": "2026-09-24T21:14:37.468Z",
+      "lastFetchedAt": "2026-09-29T21:14:06.487Z",
+      "validatedAt": "2026-09-29T21:14:06.487Z",
+      "nextCheckAt": "2026-10-06T21:14:06.487Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
-        "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "fetchCount": 4,
+        "hitCount": 103,
+        "viewCount": 22,
+        "downloadCount": 31,
+        "streamCount": 18,
+        "prepareCount": 13,
+        "bytesServed": 110657351,
+        "lastAccessedAt": "2026-09-29T21:15:49.093Z",
+        "lastDownloadedAt": "2026-09-25T18:30:57.926Z"
       }
     }
   }

@@ -6,6 +6,7 @@ const EXT_TO_MIME: Record<string, string> = {
   m4a: 'audio/mp4',
   mp3: 'audio/mpeg',
   ogg: 'audio/ogg',
+  opus: 'audio/ogg',
   wav: 'audio/wav',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',

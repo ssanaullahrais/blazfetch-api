@@ -6,6 +6,8 @@
       "url": "https://www.dailymotion.com/video/x84sh87"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "dailymotion",
@@ -17,7 +19,7 @@
     "author": {
       "name": "Dailymotion"
     },
-    "thumbnail": "https://s2.dmcdn.net/v/TJ-et1gM9ma29OOy8/x1080",
+    "thumbnail": "https://s1.dmcdn.net/v/TJ-et1gM9ma29OOy8/x1080",
     "durationSeconds": 25,
     "uploadDate": "20211011",
     "formats": [
@@ -32,22 +34,22 @@
         "bitrate": 460.56,
         "codec": "avc1.42001e",
         "filesizeApprox": false,
-        "url": "https://vod3.cf.dmcdn.net/sec2(DeyrKU57lyyNj5se3eeL0x_lWcEZ6pfRLP1E7vOiXAAtfPNJJ9JEWR8yAIcObWXAj...",
+        "url": "https://vod3.cf.dmcdn.net/...",
         "requiresMerge": false,
         "compatible": true
       },
       {
-        "formatId": "hls-1080",
+        "formatId": "hls-480",
         "ext": "mp4",
         "kind": "video",
-        "quality": "1920x1080",
-        "width": 1920,
-        "height": 1080,
+        "quality": "848x480",
+        "width": 848,
+        "height": 480,
         "fps": null,
-        "bitrate": 6221.6,
-        "codec": "avc1.640028",
+        "bitrate": 836.28,
+        "codec": "avc1.64001f",
         "filesizeApprox": false,
-        "url": "https://vod3.cf.dmcdn.net/sec2(3O4NYZpyhz3FwHhynqXQY8EL6jgCATNA9JLL-eTlAI2iAEIhHqO3cCFFhtPn_-z74...",
+        "url": "https://vod3.cf.dmcdn.net/...",
         "requiresMerge": false,
         "compatible": true
       }
@@ -61,22 +63,22 @@
       "path": "/dailymotion/x84sh87",
       "sourceUrl": "https://www.dailymotion.com/video/x84sh87",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:10:07.115Z",
-      "lastFetchedAt": "2026-09-24T19:10:07.115Z",
-      "validatedAt": "2026-09-24T19:10:07.115Z",
-      "nextCheckAt": "2026-10-01T19:10:07.115Z",
+      "firstFetchedAt": "2026-09-24T21:12:38.372Z",
+      "lastFetchedAt": "2026-09-29T21:14:03.173Z",
+      "validatedAt": "2026-09-29T21:14:03.173Z",
+      "nextCheckAt": "2026-10-06T21:14:03.173Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 3,
+        "hitCount": 46,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 15,
+        "streamCount": 8,
+        "prepareCount": 7,
+        "bytesServed": 188061526,
+        "lastAccessedAt": "2026-09-29T21:15:47.297Z",
+        "lastDownloadedAt": "2026-09-25T17:14:54.132Z"
       }
     }
   }

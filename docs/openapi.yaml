@@ -5,12 +5,151 @@ info:
   description: >
     Resolves media metadata/formats and orchestrates downloads from supported social platforms
     (YouTube, TikTok, Instagram, X/Twitter, Facebook, Reddit, Vimeo, Dailymotion, Bluesky, Streamable,
-    Rutube, SoundCloud, Snapchat, Twitch, Pinterest, Loom, Newgrounds). Everything fetched is stored
-    (metadata only) with a stable path and re-checked weekly. See docs/API.md for the narrative
-    documentation and a real response for every platform, and docs/examples/ for them as JSON files.
+    Rutube, SoundCloud, Snapchat, Twitch, Pinterest, Loom, Newgrounds, Tumblr). Everything fetched is stored
+    (metadata only) with a stable path and re-checked weekly. See docs/API.md for the API
+    reference and docs/examples/ for sample JSON responses. Source access varies by network.
 servers:
   - url: /api/v1
+security:
+  - {}
+  - ApiKeyAuth: []
 paths:
+  /health:
+    servers: [{ url: / }]
+    get:
+      summary: Public liveness
+      security: []
+      responses:
+        '200':
+          description: App is running
+          content:
+            application/json:
+              schema: { type: object, properties: { success: { type: boolean }, status: { type: string, enum: [ok] } } }
+  /health/ready:
+    servers: [{ url: / }]
+    get:
+      summary: Dependency readiness (optional API key required)
+      responses:
+        '200': { description: Database, yt-dlp and ffmpeg are available }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { description: One or more dependencies unavailable }
+  /config:
+    get:
+      summary: Frontend Turnstile settings (no secret key)
+      responses:
+        '200':
+          description: Public settings through the optional authenticated proxy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  turnstile:
+                    type: object
+                    properties:
+                      enabled: { type: boolean }
+                      siteKey: { type: string }
+                      sessionSeconds: { type: integer }
+                      action: { type: string }
+  /turnstile/verify:
+    post:
+      summary: Exchange a widget token for an HttpOnly guest-bound pass cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 1, maxLength: 2048 }
+      responses:
+        '200':
+          description: Pass issued, or Turnstile disabled
+          content:
+            application/json:
+              schema: { type: object, properties: { success: { type: boolean }, enabled: { type: boolean }, expiresIn: { type: integer } } }
+        '4XX': { $ref: '#/components/responses/Error' }
+  /stats/events:
+    get:
+      summary: Live totals via server-sent events
+      description: Same fields as GET /stats. Disable proxy buffering; reconnect after interruption.
+      responses:
+        '200':
+          description: SSE data events and heartbeat comments
+          content:
+            text/event-stream:
+              schema: { type: string }
+  /media/{platform}/{id}/logs:
+    get:
+      summary: Persisted YouTube stream-attempt logs
+      description: No per-visitor ownership check. Optional API-key protection applies.
+      parameters:
+        - { name: platform, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Stream attempts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  platform: { type: string }
+                  mediaId: { type: string }
+                  attempts:
+                    type: array
+                    items: { type: object, properties: { requestId: { type: string }, startedAt: { type: number }, lines: { type: array, items: { type: object } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /playlist/download:
+    post:
+      summary: Prepare bounded best-quality YouTube playlist downloads
+      description: Requires the existing visitor cookie and Turnstile pass when enabled. Returns a parent job with per-item results; no ZIP. Listing and bulk-preparation limits are separate server settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+                kind: { type: string, enum: [video, audio], default: video }
+                maxItems: { type: integer, minimum: 1, description: 'Cannot exceed the smaller of MAX_PLAYLIST_DOWNLOAD_ITEMS (default 200) and MAX_PLAYLIST_ITEMS (default 1000).' }
+      responses:
+        '202':
+          description: Accepted; poll the playlist job URL with the same owner cookie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaylistJobResponse' }
+        '4XX': { $ref: '#/components/responses/Error' }
+        '5XX': { $ref: '#/components/responses/Error' }
+  /playlist/downloads/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read an owned playlist preparation job and its per-item download links
+      responses:
+        '200':
+          description: Preparation progress; ready means prepared, not delivered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaylistJobResponse' }
+        '4XX': { $ref: '#/components/responses/Error' }
+    delete:
+      summary: Cancel an owned playlist preparation and release its temporary files
+      responses:
+        '200':
+          description: Cancelled parent and per-item statuses
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlaylistJobResponse' }
+        '4XX': { $ref: '#/components/responses/Error' }
   /fetch:
     post:
       summary: Resolve metadata and video/image formats for a URL
@@ -102,7 +241,7 @@ paths:
           description: >
             stream pipes straight through (default, no temp file; merges and HLS are piped live too) and, if that
             fails before the first byte, prepares in the same request. auto does the same with balanced conversion
-            settings on the fallback (recommended). prepare builds the file on the server first (H.264/AAC guaranteed)
+            settings on the fallback (recommended). prepare builds a compatible H.264/AAC file on the server first
             then sends it. Default comes from DEFAULT_DOWNLOAD_MODE.
           schema: { type: string, enum: [stream, prepare, auto] }
       responses:
@@ -227,6 +366,12 @@ paths:
                     additionalProperties: { type: integer }
                   online: { type: integer }
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Required on all API routes when API_AUTH_ENABLED=true. Otherwise authentication is disabled. Never embed the shared key in browser code; use a trusted server-side proxy.
   parameters:
     JobId:
       name: id
@@ -241,6 +386,35 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    PlaylistJobResponse:
+      type: object
+      required: [success, job]
+      properties:
+        success: { type: boolean, enum: [true] }
+        job:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            title: { type: string }
+            status: { type: string }
+            outcome: { type: string, description: 'partial when some items failed and others prepared; otherwise the parent status' }
+            progress: { type: number }
+            total: { type: integer }
+            prepared: { type: integer }
+            failed: { type: integer }
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  title: { type: string }
+                  url: { type: string, format: uri }
+                  status: { type: string }
+                  progress: { type: number }
+                  errorCode: { type: string, nullable: true }
+                  errorMessage: { type: string, nullable: true }
+                  downloadUrl: { type: string, nullable: true, description: 'Owned individual file route, or null when unavailable' }
     FetchRequest:
       type: object
       required: [url]
@@ -251,7 +425,7 @@ components:
         rangeEnd: { type: integer, minimum: 1, description: Collection URLs (Pinterest boards) only. }
     DownloadRequest:
       type: object
-      required: [url, formatId, kind]
+      required: [url, kind]
       properties:
         url: { type: string }
         formatId: { type: string, default: best, description: A formatId from /fetch, or "best". }
@@ -264,12 +438,12 @@ components:
         formatId: { type: string }
         ext: { type: string }
         kind: { type: string, enum: [video, audio, video_only, audio_only] }
-        quality: { type: string }
-        width: { type: integer }
-        height: { type: integer }
-        fps: { type: number }
-        bitrate: { type: number }
-        codec: { type: string }
+        quality: { type: string, nullable: true }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        fps: { type: number, nullable: true }
+        bitrate: { type: number, nullable: true }
+        codec: { type: string, nullable: true }
         filesizeBytes: { type: integer }
         filesizeApprox: { type: boolean }
         url: { type: string }
@@ -337,6 +511,11 @@ components:
         itemCount: { type: integer }
         metadata:
           type: object
+          additionalProperties: true
+          properties:
+            playlistLimit: { type: integer, description: Configured listing cap. }
+            playlistTotal: { type: integer, nullable: true, description: Total reported by the source when available. }
+            playlistTruncated: { type: boolean, description: True when listing may be limited. }
         extractor: { type: string, description: yt-dlp, or the name of a fallback provider. }
         fallbackUsed: { type: string, description: Set when a fallback provider produced the answer. }
         stored: { $ref: '#/components/schemas/StoredInfo' }
@@ -415,7 +594,7 @@ components:
           properties:
             code:
               type: string
-              enum: [UNSUPPORTED_PLATFORM, INVALID_URL, MEDIA_NOT_FOUND, MEDIA_UNAVAILABLE, PRIVATE_MEDIA, LOGIN_REQUIRED, AGE_RESTRICTED, GEO_RESTRICTED, EXTRACTOR_FAILED, PLATFORM_RATE_LIMITED, DOWNLOAD_FAILED, FORMAT_UNAVAILABLE, PROCESS_TIMEOUT, FILE_TOO_LARGE, SERVER_BUSY, VALIDATION_ERROR, JOB_NOT_FOUND, NOT_FOUND, INTERNAL_ERROR]
+              enum: [UNSUPPORTED_PLATFORM, INVALID_URL, MEDIA_NOT_FOUND, MEDIA_UNAVAILABLE, PRIVATE_MEDIA, LOGIN_REQUIRED, AGE_RESTRICTED, GEO_RESTRICTED, EXTRACTOR_FAILED, PLATFORM_RATE_LIMITED, API_AUTH_REQUIRED, TURNSTILE_REQUIRED, TURNSTILE_FAILED, DOWNLOAD_FAILED, FORMAT_UNAVAILABLE, PROCESS_TIMEOUT, FILE_TOO_LARGE, SERVER_BUSY, VALIDATION_ERROR, JOB_NOT_FOUND, NOT_FOUND, INTERNAL_ERROR]
             message: { type: string }
             details:
               type: object

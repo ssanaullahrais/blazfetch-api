@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/fetch",
+    "body": {
+      "url": "https://www.newgrounds.com/audio/listen/549479"
+    }
+  },
+  "status": 502,
+  "exampleNotes": "Local API capture, 2026-09-30. Response may use cached metadata; arrays are shortened. Source access varies by network.",
+  "response": {
+    "success": false,
+    "error": {
+      "code": "EXTRACTOR_FAILED",
+      "message": "The source platform refused the server request."
+    },
+    "requestId": "5eb14d62-a526-4287-ad80-97292fac6fde"
+  }
+}

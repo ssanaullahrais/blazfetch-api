@@ -3,14 +3,13 @@
 # BlazFetch Backend
 
 **One API to fetch and download media from 18 social platforms.**<br/>
-Paste a link, get every quality option, download it. Nothing is stored except the metadata.
+Resolve a link, choose a format, and download. Media is streamed or prepared temporarily; metadata is stored.
 
-![Node](https://img.shields.io/badge/Node.js-20+-5FA04E?logo=nodedotjs&logoColor=white)
+![Node](https://img.shields.io/badge/Node.js-22+-5FA04E?logo=nodedotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
 ![Databases](https://img.shields.io/badge/DB-SQLite%20%7C%20PostgreSQL%20%7C%20MySQL%20%7C%20MongoDB-4169E1)
-![Platforms](https://img.shields.io/badge/platforms-17%20confirmed-2EA44F)
-![Tests](https://img.shields.io/badge/tests-272%20passing-2EA44F)
+![Platforms](https://img.shields.io/badge/platforms-18%20supported-2EA44F)
 [![Open Source](https://img.shields.io/badge/license-Open%20Source-2EA44F)](LICENSE)
 
 [Frontend repository](https://github.com/ssanaullahrais/blazfetch-web) ·
@@ -46,24 +45,23 @@ remember each link's details, such as title and formats, so repeat requests are 
 
 ## Highlights
 
-- **One API for 17 confirmed platforms** (plus Tumblr, wired but not yet verified): title, thumbnail and every quality option, then download.
+- **18 platform adapters:** metadata, formats and downloads. See [sample status](#platform-status) for known limitations.
 - **Three ways to download** with a single request, and streaming always comes first (preparing a file puts load on
   the server): `stream` and `auto` pipe the file straight through (merges and HLS included, preferring an H.264 file
   so it plays on phones) and fall back to preparing it on the server only if streaming fails before the first byte;
-  `prepare` builds a guaranteed H.264/AAC file first.
+  `prepare` builds a compatible H.264/AAC file first.
 - **Audio as MP3 on request:** `AUDIO_FORCE_MP3=true` delivers every audio download as MP3 (converted live, or through a
   temporary file that is deleted after sending).
 - **Everything fetched is remembered forever** (metadata only), with stable page paths like `/youtube/Cwkej79U3ek`,
   a weekly check that notices deleted videos, and usage statistics.
-- **Works when a platform blocks it.** If YouTube blocks the server's IP, a fallback provider answers instead.
+- **Best-effort recovery:** built-in platform fallbacks and an optional independent provider.
 - **Your choice of database:** SQLite (default, nothing to install), PostgreSQL, MySQL/MariaDB or MongoDB.
 - **Optional bot protection:** Cloudflare Turnstile can be switched on from `.env` (off by default).
-- **Clean by design:** no media is kept on disk, temporary files are always removed, and cancelling a download
-  stops every process it started.
+- **Temporary media only:** prepared files are removed after delivery, cancellation, failure or expiry; cancellation stops download processes.
 
 ## Quick start
 
-Needs Node.js 20+, yt-dlp and ffmpeg (see [Install](#install)).
+Needs Node.js 22+, current yt-dlp with EJS support, and ffmpeg (see [Install](#install)).
 
 ```bash
 npm install
@@ -83,11 +81,11 @@ Real responses for every platform are in [docs/API.md](docs/API.md#responses-by-
 
 ## Platform status
 
-Each platform was tested with real downloads. Its actual API response is in [docs/API.md](docs/API.md#responses-by-platform).
+Sample results are network-dependent, not a guarantee for every URL. See [latest sample checks](docs/playlist-and-fallback.md#last-sample-check-september-30-2026) and [response examples](docs/API.md#responses-by-platform).
 
 | Platform | Status | Notes |
 |---|---|---|
-| YouTube | ✅ Confirmed | Video, playlists, best-quality auto-select. If YouTube temporarily blocks the server's IP ("confirm you're not a bot"), a fallback provider serves the request automatically |
+| YouTube | ✅ Sample passed | Video/audio transfers and playlist listing; fallback availability varies |
 | TikTok | ✅ Confirmed | yt-dlp primary, `@tobyg74/tiktok-api-dl` fallback |
 | Instagram | ✅ Confirmed | Posts and reels (profile listing is not supported) |
 | X / Twitter | ✅ Confirmed | Both `x.com` and legacy `twitter.com`. Posts whose media X hides from yt-dlp ("No video could be found in this tweet", often sensitive posts) are served by a fallback provider (FixTweet), like TikTok's |
@@ -100,18 +98,18 @@ Each platform was tested with real downloads. Its actual API response is in [doc
 | Rutube | ✅ Confirmed | |
 | SoundCloud | ✅ Confirmed (single track) | Profile/browse pages rejected with a clear error. DRM-protected (Go+) tracks can't be downloaded |
 | Snapchat | ✅ Confirmed | |
-| Twitch | ✅ Confirmed | VODs, including 50+ minute recordings |
+| Twitch | ✅ Samples passed | Clip and complete 50-minute VOD at 160p; other qualities remain source-dependent |
 | Pinterest | ✅ Confirmed (pins + boards) | Public API, no auth needed — see below |
 | Loom | ✅ Confirmed | Video and audio, including HLS streams |
-| Newgrounds | ✅ Confirmed | Public movies with a video; ones with no video return a clear `MEDIA_NOT_FOUND` |
-| Tumblr | ⚠️ Wired, untested | |
+| Newgrounds | ⚠️ Network blocked | Latest test network returned HTTP 403 |
+| Tumblr | ✅ Sample passed | Public video, including generic-extractor recovery |
 
 ## Install
 
-**1. System tools** (install first; Node.js 20+ is also required):
+**1. System tools** (install first; Node.js 22+ is required for the YouTube solver):
 
 ```bash
-pip install -U yt-dlp
+pip install -U "yt-dlp[default]"
 # ffmpeg: sudo apt-get install ffmpeg (Linux) or https://ffmpeg.org/download.html
 ```
 
@@ -176,6 +174,9 @@ GET    /api/v1/jobs/:id                  poll job status/progress
 GET    /api/v1/downloads/:id             stream the file once the job is ready
 DELETE /api/v1/downloads/:id             cancel + clean up temp files
 DELETE /api/v1/jobs/:id                  cancel a job
+POST   /api/v1/playlist/download         prepare a bounded playlist batch
+GET    /api/v1/playlist/downloads/:id     poll batch and per-item results
+DELETE /api/v1/playlist/downloads/:id     cancel unfinished playlist work
 GET    /api/v1/platforms                 list supported platforms + domains
 GET    /api/v1/stats                     public all-time totals: successful fetches and downloads (total and per platform)
 GET    /api/v1/config                    public settings (is Turnstile on, and its site key)
@@ -189,7 +190,7 @@ GET    /health, /health/ready            liveness / readiness (DB, yt-dlp, ffmpe
 |---|---|
 | It to work for every source in one request, streaming when it can (**recommended, default**) | `GET /stream?mode=auto` |
 | Fastest start, nothing on the server's disk (may not play on some phones for VP9/AV1/HEVC sources) | `GET /stream?mode=stream` |
-| A guaranteed H.264/AAC file | `GET /stream?mode=prepare` |
+| Compatible H.264/AAC output | `GET /stream?mode=prepare` |
 | Server-side progress for a long file | `POST /download`, then poll `GET /jobs/:id` |
 
 ### Optional bot check (Cloudflare Turnstile)
@@ -235,11 +236,16 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | `DATABASE_DRIVER`, `DATABASE_URL` | `sqlite` | Which database, and where (`npm run setup` sets these) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Your frontend's origin(s), comma separated. `*` is refused in production |
 | `TRUST_PROXY` | `0` | Set to `1` behind Nginx so real visitor IPs are seen |
+| `HOST` | `0.0.0.0` | Set `127.0.0.1` behind same-host Nginx; keep the backend port private |
+| `API_AUTH_ENABLED` | `false` | Require a manual server-to-server key; see [API protection](docs/api-protection.md) |
+| `API_AUTH_KEY` | empty | Private 32-256 character key sent by the trusted proxy in `X-API-Key`, never frontend code |
 | `DEFAULT_DOWNLOAD_MODE` | `stream` | Default for `GET /stream` when a request has no `?mode=` |
 | `STREAM_MODE_ENABLED` | `true` | Turn `GET /stream` off entirely |
 | `REVALIDATE_AFTER_SECONDS` | `604800` (7 days) | How often each stored item is re-checked |
 | `TURNSTILE_ENABLED`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_SESSION_SECONDS` | `false`, 1800 s | Optional [Cloudflare Turnstile](docs/API.md#cloudflare-turnstile-optional-bot-check) bot check in front of fetch, stream and download |
 | `YOUTUBE_FALLBACK_ENABLED` | `true` | Use a fallback provider when YouTube blocks the server |
+| `MAX_PLAYLIST_ITEMS` / `MAX_PLAYLIST_DOWNLOAD_ITEMS` | `1000` / `200` | Separate listing and bulk preparation limits |
+| `PLAYLIST_DOWNLOAD_CONCURRENCY` | `1` | Bulk workers (1–4), also bounded by download limits |
 | `MAX_CONCURRENT_DOWNLOADS_GLOBAL` / `_PER_GUEST` / `_PER_IP` | `10` / `1` / `5` | Concurrency limits (guests on one IP share `_PER_IP`) |
 | `MAX_CONCURRENT_CONVERSIONS` / `FFMPEG_THREADS` | `0` / `0` (auto) | H.264/MP3 conversions allowed at once (auto: half the CPU cores) and the threads each gets; the rest queue, so a burst of conversions cannot exhaust the server |
 | `MEDIA_PROCESS_NICE` | `10` | yt-dlp and ffmpeg run at this lower priority, so the API keeps answering under load |
@@ -247,6 +253,8 @@ are most likely to change (all in `.env`, full list with comments in [.env.examp
 | `RATE_LIMIT_MAX_GUEST` / `RATE_LIMIT_MAX_DOWNLOAD` | `30` / `10` per minute | Rate limits per visitor |
 | `RATE_LIMIT_IP_MULTIPLIER` | `10` | Per-IP ceiling, as a multiple of the per-visitor limits (only when `TRUST_PROXY` is set correctly behind a proxy) |
 | `MAX_DOWNLOAD_SIZE_BYTES`, `TEMP_DIR` | 2 GB, `./tmp` | Size cap and temporary folder |
+
+For existing deployments, update `MAX_PLAYLIST_ITEMS` explicitly, restart, and force-refresh cached playlists. See [playlist and fallback setup](docs/playlist-and-fallback.md) for bulk jobs and optional providers.
 
 ## Security
 
@@ -260,6 +268,8 @@ See [SECURITY.md](SECURITY.md) for how to report a problem, what the project alr
 | [docs/examples/](docs/examples/) | Each platform's response as a JSON file |
 | [docs/openapi.yaml](docs/openapi.yaml) | OpenAPI 3.0 definition (for generating a typed client) |
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | Step-by-step VPS deployment: Nginx, HTTPS, PM2, firewall, backups |
+| [docs/api-protection.md](docs/api-protection.md) | Manual API key, frontend proxy and access checks |
+| [docs/playlist-and-fallback.md](docs/playlist-and-fallback.md) | Playlist limits, bulk jobs, optional fallback and smoke checks |
 
 ## Production
 
@@ -288,7 +298,7 @@ fee may apply.
 
 ## Testing
 
-137 tests (unit and integration) cover the API, stream modes, the media store and every database driver path.
+Unit and integration tests cover the API, stream modes, media storage and database drivers.
 
 ```bash
 npm test             # unit + integration tests (no network needed)
@@ -299,9 +309,7 @@ npm run typecheck
 
 - `npm run diagnostics` shows database/yt-dlp/ffmpeg status and versions. `GET /health/ready` does the same over HTTP.
 - Update yt-dlp regularly (`pip install -U yt-dlp`): platforms change how they serve video.
-- **YouTube says "confirm you're not a bot":** YouTube temporarily blocked the server's IP after many requests.
-  A fallback provider serves requests automatically (check `fallbackUsed` in responses) and yt-dlp is
-  retried after a short cooldown. The block usually clears in minutes to hours.
+- **YouTube says "confirm you're not a bot":** check the exact URL from the deployment host, update yt-dlp/EJS, and verify proxy/fallback availability. `fallbackUsed` identifies successful recovery. A cooldown reduces repeated requests; block duration is not predictable.
 - **Newgrounds, Facebook or Rutube fail with a `403`-style error:** the site blocks some server IPs. Try again
   later or from another network.
 - **`LOGIN_REQUIRED`, `PRIVATE_MEDIA`, `AGE_RESTRICTED`, `MEDIA_UNAVAILABLE`:** the media itself needs a login, is

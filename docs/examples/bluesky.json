@@ -6,6 +6,8 @@
       "url": "https://bsky.app/profile/bsky.app/post/3l3vgf77uco2g"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "bluesky",
@@ -13,12 +15,12 @@
     "mediaId": "3l3vgf77uco2g",
     "canonicalUrl": "https://bsky.app/profile/bsky.app/post/3l3vgf77uco2g",
     "title": "Bluesky now has video! Update your app to version 1.91 or refresh on ...",
-    "description": "Bluesky now has video! Update your app to version 1.91 or refresh on desktop!\n\nWe’ve begun gradually rolling out the ability to post vide...",
+    "description": "Bluesky now has video! Update your app to version 1.91 or refresh on desktop!\n\nWe’ve begun gradually rolling out the ability to post video. Thanks for your pati...",
     "author": {
       "name": "Bluesky",
       "url": "https://bsky.app/profile/bsky.app"
     },
-    "thumbnail": "https://video.bsky.app/watch/did%3Aplc%3Az72i7hdynmk6r22z27h6tvur/bafkreih7qpo7ef7hhtm7ehi7paiml...",
+    "thumbnail": "https://video.bsky.app/watch/did%3Aplc%3Az72i7hdynmk6r22z27h6tvur/bafkreih7qpo7ef7hhtm7ehi7paimlieddrn5argpq4eayz6teez2qbsr7m/thumbnail.jpg",
     "durationSeconds": null,
     "uploadDate": "20240911",
     "formats": [
@@ -33,23 +35,24 @@
         "bitrate": 655.6,
         "codec": "avc1.64001e",
         "filesizeApprox": false,
-        "url": "https://video.bsky.app/watch/did%3Aplc%3Az72i7hdynmk6r22z27h6tvur/bafkreih7qpo7ef7hhtm7ehi7paiml...",
+        "url": "https://video.bsky.app/...",
         "requiresMerge": false,
         "compatible": true
       },
       {
-        "formatId": "blob",
+        "formatId": "hls-1240",
         "ext": "mp4",
         "kind": "video",
-        "quality": "1920x1080",
-        "width": 1920,
-        "height": 1080,
-        "bitrate": null,
-        "filesizeBytes": 6688967,
+        "quality": "1280x720",
+        "width": 1280,
+        "height": 720,
+        "fps": null,
+        "bitrate": 1240.8,
+        "codec": "avc1.64001f",
         "filesizeApprox": false,
-        "url": "https://puffball.us-east.host.bsky.network/xrpc/com.atproto.sync.getBlob?did=did%3Aplc%3Az72i7hd...",
+        "url": "https://video.bsky.app/...",
         "requiresMerge": false,
-        "compatible": false
+        "compatible": true
       }
     ],
     "audioFormats": [],
@@ -61,22 +64,22 @@
       "path": "/bluesky/3l3vgf77uco2g",
       "sourceUrl": "https://bsky.app/profile/bsky.app/post/3l3vgf77uco2g",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:10:13.791Z",
-      "lastFetchedAt": "2026-09-24T19:10:13.791Z",
-      "validatedAt": "2026-09-24T19:10:13.791Z",
-      "nextCheckAt": "2026-10-01T19:10:13.791Z",
+      "firstFetchedAt": "2026-09-24T21:12:17.038Z",
+      "lastFetchedAt": "2026-09-29T21:14:02.713Z",
+      "validatedAt": "2026-09-29T21:14:02.713Z",
+      "nextCheckAt": "2026-10-06T21:14:02.713Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 3,
+        "hitCount": 47,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 15,
+        "streamCount": 8,
+        "prepareCount": 7,
+        "bytesServed": 34279232,
+        "lastAccessedAt": "2026-09-29T21:15:47.274Z",
+        "lastDownloadedAt": "2026-09-25T17:14:43.784Z"
       }
     }
   }

@@ -81,6 +81,10 @@ export interface RunDownloadResult extends DownloadResult {
  * controller can stream it straight to the client.
  */
 export interface RunDownloadOptions {
+  /** Bulk preparation must retain bytes, not signed URLs that expire before the playlist finishes. */
+  persistDirect?: boolean;
+  /** Internal bulk runner: the parent already reserved this worker's visitor/network slot. */
+  visitorSlotHeld?: boolean;
   /** GET /stream?mode=auto fell back to preparing the file after direct streaming failed. */
   fellBack?: boolean;
   /** GET /stream records the entire response outcome itself, including preparation failures. */
@@ -186,7 +190,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
   let releaseUserSlot: () => void;
   try {
     await assertDiskSpace();
-    releaseUserSlot = acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey, kind: job.requestedFormat.kind });
+    releaseUserSlot = options.visitorSlotHeld ? () => undefined : acquireVisitorDownloadSlots({ userId: job.userId, guestId: job.guestId, networkKey: options.networkKey, kind: job.requestedFormat.kind });
   } catch (err) {
     await finalizeFailure(job, err, Date.now(), false, { fellBack: options.fellBack, recordFailure: options.recordFailure });
     clearJobController(job.id);
@@ -199,6 +203,7 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
   await updateJobStatus(job.id, 'preparing');
 
   try {
+    if (signal.aborted) throw new BlazfetchError('DOWNLOAD_FAILED', 'Request was cancelled.');
     const outputDir = jobTempDir(job.id);
     let effectiveFormatId = job.requestedFormat.formatId;
     let metadata: BlazfetchResponse | undefined;
@@ -248,7 +253,14 @@ export async function runDownloadJob(job: JobRecord, requestId: string, options:
       },
     );
 
+    if (options.persistDirect && result.directUrl && !result.filePath) {
+      const ext = path.extname(result.filename).replace(/[^.a-z0-9]/gi, '') || '.media';
+      const filePath = path.join(outputDir, `prepared${ext}`);
+      await downloadToFile(result.directUrl, filePath, signal, (percent) => reportProgress(job.id, 0, undefined, percent * DOWNLOAD_SHARE / 100));
+      result = { ...result, directUrl: undefined, filePath, bytes: (await fs.promises.stat(filePath)).size };
+    }
     result = await ensureValidAndCompatible(job, result, signal, options.fastConvert);
+    if (signal.aborted) throw new BlazfetchError('DOWNLOAD_FAILED', 'Request was cancelled.');
     result = { ...result, filename: displayName(result, metadata, options.filename, job.requestedFormat.kind) };
     await finalizeSuccess(job, result, startedAt, ctx);
     return { ...result, job: await refreshJob(job.id) };
@@ -334,6 +346,7 @@ async function runAudioExtraction(
     bytes: stat.size,
   };
 
+  if (signal.aborted) throw new BlazfetchError('DOWNLOAD_FAILED', 'Request was cancelled.');
   await finalizeSuccess(job, result, startedAt, ctx);
   return { ...result, job: await refreshJob(job.id) };
 }

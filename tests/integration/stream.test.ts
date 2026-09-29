@@ -275,12 +275,17 @@ describe('GET /api/v1/stream', () => {
     vi.mocked(fetchMedia).mockResolvedValueOnce(bigVp9 as never).mockResolvedValueOnce(bigVp9 as never);
     const big = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-big&kind=video&mode=auto`);
     expect(big.res.statusCode).toBe(200);
+    expect(await body(big.res)).toBe('prepared-bytes');
+    await waitFor(() => stats.length === 1);
     expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: true });
 
     const smallVp9 = { ...bigVp9, mediaId: 'vp9-small', formats: [{ ...bigVp9.formats[0], formatId: 'vp9-small', filesizeBytes: 10 * 1024 * 1024 }] };
     vi.mocked(fetchMedia).mockResolvedValueOnce(smallVp9 as never).mockResolvedValueOnce(smallVp9 as never);
     const small = await request(`/api/v1/stream?url=${VIDEO}&formatId=vp9-small&kind=video&mode=auto`);
     expect(small.res.statusCode).toBe(200);
+    expect(await body(small.res)).toBe('prepared-bytes');
+    await waitFor(() => stats.length === 2);
+    await waitFor(() => fs.readdirSync(tempDir).length === 0);
     expect(prepareOptions.at(-1)).toMatchObject({ fastConvert: false });
   });
 

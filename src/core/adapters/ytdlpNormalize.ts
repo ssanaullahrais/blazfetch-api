@@ -130,7 +130,7 @@ export function normalizeYtdlpInfo(
     formats = formats.map(({ url: _url, ...format }) => format);
     audioFormats = audioFormats.map(({ url: _url, ...format }) => format);
   }
-  const mediaType: MediaType = 'video';
+  const mediaType: MediaType = formats.length === 0 && audioFormats.length > 0 ? 'audio' : 'video';
 
   return {
     success: true,

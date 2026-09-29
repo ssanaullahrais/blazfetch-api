@@ -9,6 +9,7 @@ import { InstagramAdapter } from './InstagramAdapter';
 import { VimeoAdapter } from './VimeoAdapter';
 import { PinterestAdapter } from './PinterestAdapter';
 import { TwitterAdapter } from './TwitterAdapter';
+import { ResilientAdapter } from './ResilientAdapter';
 
 const GENERIC_PLATFORMS: PlatformId[] = [
   'facebook',
@@ -35,7 +36,7 @@ const adapters: PlatformAdapter[] = [
   ...GENERIC_PLATFORMS.map((platform) => new GenericYtDlpAdapter(platform)),
 ];
 
-const registry = new Map<PlatformId, PlatformAdapter>(adapters.map((a) => [a.platform, a]));
+const registry = new Map<PlatformId, PlatformAdapter>(adapters.map((a) => [a.platform, new ResilientAdapter(a)]));
 
 export function getAdapter(normalizedUrl: NormalizedUrlResult): PlatformAdapter {
   const adapter = registry.get(normalizedUrl.platform);

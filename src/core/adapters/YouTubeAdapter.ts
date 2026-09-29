@@ -2,6 +2,7 @@ import { env } from '../../config/env';
 import { BlazfetchError } from '../../constants/errors';
 import { logger } from '../../lib/logger';
 import { fetchYoutubeViaBtch } from '../fallback/youtube/btchYoutube';
+import { fetchPlaylistViaApi } from '../fallback/youtube/playlistApi';
 import { assertUrlIsSafeToFetch, NormalizedUrlResult } from '../../utils/url';
 import { classifyYtdlpFailure, runYtdlp, youtubeBotBlockError } from '../ytdlp/ytdlpRunner';
 import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
@@ -40,6 +41,7 @@ interface FlatPlaylistInfo {
   title?: string;
   thumbnails?: { url: string }[];
   channel?: string;
+  playlist_count?: number;
   entries: FlatPlaylistEntry[];
 }
 
@@ -60,7 +62,12 @@ export class YouTubeAdapter implements PlatformAdapter {
     const { normalizedUrl } = ctx;
 
     if (normalizedUrl.playlistId && !normalizedUrl.videoId) {
-      return this.fetchPlaylist(ctx);
+      try { return await this.fetchPlaylist(ctx); }
+      catch (error) {
+        if (!env.YOUTUBE_DATA_API_KEY || !isFallbackWorthy(error)) throw error;
+        try { return await fetchPlaylistViaApi(normalizedUrl.playlistId, normalizedUrl.canonicalUrl); }
+        catch { throw error; }
+      }
     }
 
     return this.fetchVideo(ctx);
@@ -179,7 +186,7 @@ export class YouTubeAdapter implements PlatformAdapter {
       },
       formats: [],
       audioFormats: [],
-      metadata: {},
+      metadata: { playlistLimit: env.MAX_PLAYLIST_ITEMS, playlistTotal: info.playlist_count, playlistTruncated: info.playlist_count != null ? info.playlist_count > items.length : items.length >= env.MAX_PLAYLIST_ITEMS },
       extractor: 'yt-dlp',
     };
   }

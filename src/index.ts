@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   const stopPresenceSweeper = startPresenceSweeper();
 
   const app = createApp();
-  const server = app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, env.HOST, () => {
     logger.info(`Blazfetch backend listening on port ${env.PORT} (${env.APP_ENV})`);
   });
 

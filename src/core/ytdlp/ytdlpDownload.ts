@@ -19,6 +19,8 @@ export interface YtdlpDownloadOptions {
   /** Rough size of the finished download, for progress when yt-dlp reports none (ffmpeg-assembled HLS). */
   expectedBytes?: number;
   timeoutMs?: number;
+  /** Internal adapter decision, never supplied as raw command arguments by clients. */
+  forceGenericExtractor?: boolean;
 }
 
 /** Marks yt-dlp's machine-readable progress lines on stdout (see PROGRESS_TEMPLATE). */
@@ -115,6 +117,7 @@ async function runYtdlpDownload(options: YtdlpDownloadOptions, preferFfmpegHls: 
   const outputTemplate = path.join(outputDir, '%(id)s.%(ext)s');
 
   const args = [
+    ...(options.forceGenericExtractor ? ['--force-generic-extractor'] : []),
     '-f', formatId,
     '-o', outputTemplate,
     '--no-playlist',

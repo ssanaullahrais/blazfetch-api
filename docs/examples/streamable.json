@@ -6,6 +6,8 @@
       "url": "https://streamable.com/hn8hq"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "streamable",
@@ -15,7 +17,7 @@
     "title": "Gravity Rush 2's world traversal is so goddamn addictive. [Video]",
     "description": "",
     "author": {},
-    "thumbnail": "https://cdn-cf-east.streamable.com/image/hn8hq.jpg?Expires=1790284186266&Key-Pair-Id=APKAIEYUVEN...",
+    "thumbnail": "https://cdn-cf-east.streamable.com/...",
     "durationSeconds": 24.002,
     "uploadDate": "20170208",
     "formats": [
@@ -31,7 +33,7 @@
         "codec": "h264",
         "filesizeBytes": 4746054,
         "filesizeApprox": false,
-        "url": "https://cdn-cf-east.streamable.com/video/mp4-mobile/hn8hq.mp4?Expires=1790536186263&Key-Pair-Id=...",
+        "url": "https://cdn-cf-east.streamable.com/...",
         "requiresMerge": false,
         "compatible": true
       },
@@ -47,7 +49,7 @@
         "codec": "h264",
         "filesizeBytes": 14230108,
         "filesizeApprox": false,
-        "url": "https://cdn-cf-east.streamable.com/video/mp4/hn8hq.mp4?Expires=1790536186264&Key-Pair-Id=APKAIEY...",
+        "url": "https://cdn-cf-east.streamable.com/...",
         "requiresMerge": false,
         "compatible": true
       }
@@ -61,22 +63,22 @@
       "path": "/streamable/hn8hq",
       "sourceUrl": "https://streamable.com/hn8hq",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:10:19.360Z",
-      "lastFetchedAt": "2026-09-24T19:10:19.360Z",
-      "validatedAt": "2026-09-24T19:10:19.360Z",
-      "nextCheckAt": "2026-10-01T19:10:19.360Z",
+      "firstFetchedAt": "2026-09-24T21:15:26.812Z",
+      "lastFetchedAt": "2026-09-29T21:14:05.492Z",
+      "validatedAt": "2026-09-29T21:14:05.492Z",
+      "nextCheckAt": "2026-10-06T21:14:05.492Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 3,
+        "hitCount": 39,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 15,
+        "streamCount": 11,
+        "prepareCount": 4,
+        "bytesServed": 131533804,
+        "lastAccessedAt": "2026-09-29T21:15:49.215Z",
+        "lastDownloadedAt": "2026-09-25T17:16:58.563Z"
       }
     }
   }

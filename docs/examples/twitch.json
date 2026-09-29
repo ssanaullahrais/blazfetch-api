@@ -6,6 +6,8 @@
       "url": "https://www.twitch.tv/videos/2702797838"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "twitch",
@@ -13,11 +15,11 @@
     "mediaId": "v2702797838",
     "canonicalUrl": "https://www.twitch.tv/videos/2702797838",
     "title": "RatSpiderFrog [Steam Next Fest 2026 - Key Provided]",
-    "description": "We playthrough the Demo of RatSpiderFrog that was provided by the developers who also gave us the keys for the giveaway! This game will b...",
+    "description": "We playthrough the Demo of RatSpiderFrog that was provided by the developers who also gave us the keys for the giveaway! This game will be available during Stea...",
     "author": {
       "name": "Manaricelle"
     },
-    "thumbnail": "https://static-cdn.jtvnw.net/cf_vods/d1m7jfoe9zdc1j/20f1f1029224a57f7708_manaricelle_23530583983...",
+    "thumbnail": "https://static-cdn.jtvnw.net/cf_vods/d1m7jfoe9zdc1j/20f1f1029224a57f7708_manaricelle_23530583983_6939317647//thumb/thumb2702797838-0x0.jpg",
     "durationSeconds": 3008,
     "uploadDate": "20260220",
     "formats": [
@@ -32,22 +34,22 @@
         "bitrate": 291.297,
         "codec": "avc1.4D400C",
         "filesizeApprox": false,
-        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/16...",
+        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/160p30/highlight-2702797838.m3u8",
         "requiresMerge": false,
         "compatible": true
       },
       {
-        "formatId": "1080p60",
+        "formatId": "360p",
         "ext": "mp4",
         "kind": "video",
-        "quality": "Source",
-        "width": 1920,
-        "height": 1080,
-        "fps": 60,
-        "bitrate": 5367.945,
-        "codec": "avc1.64002A",
+        "quality": "640x360",
+        "width": 640,
+        "height": 360,
+        "fps": 30,
+        "bitrate": 738.766,
+        "codec": "avc1.4D401E",
         "filesizeApprox": false,
-        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/ch...",
+        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/360p30/highlight-2702797838.m3u8",
         "requiresMerge": false,
         "compatible": true
       }
@@ -55,12 +57,13 @@
     "audioFormats": [
       {
         "formatId": "Audio_Only",
-        "ext": "mp4",
+        "ext": "mp3",
         "bitrate": 209.541,
-        "codec": "mp4a.40.2",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/au..."
+        "codec": "mp3",
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://d1m7jfoe9zdc1j.cloudfront.net/20f1f1029224a57f7708_manaricelle_23530583983_6939317647/audio_only/highlight-2702797838.m3u8",
+        "filesizeBytes": 72192000
       }
     ],
     "metadata": {
@@ -71,22 +74,22 @@
       "path": "/twitch/v2702797838",
       "sourceUrl": "https://www.twitch.tv/videos/2702797838",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:10:52.509Z",
-      "lastFetchedAt": "2026-09-24T19:10:52.509Z",
-      "validatedAt": "2026-09-24T19:10:52.509Z",
-      "nextCheckAt": "2026-10-01T19:10:52.509Z",
+      "firstFetchedAt": "2026-09-24T21:15:35.707Z",
+      "lastFetchedAt": "2026-09-29T21:14:06.403Z",
+      "validatedAt": "2026-09-29T21:14:06.403Z",
+      "nextCheckAt": "2026-10-06T21:14:06.403Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 2,
+        "hitCount": 7,
         "viewCount": 0,
-        "downloadCount": 0,
+        "downloadCount": 1,
         "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "prepareCount": 1,
+        "bytesServed": 1949500204,
+        "lastAccessedAt": "2026-09-29T21:15:49.266Z",
+        "lastDownloadedAt": "2026-09-24T21:18:35.907Z"
       }
     }
   }

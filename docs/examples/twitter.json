@@ -6,6 +6,8 @@
       "url": "https://x.com/BenGeskin/status/2102909808542154887/video/1"
     }
   },
+  "status": 200,
+  "exampleNotes": "Local API capture, 2026-09-30. May use cached metadata. Arrays/text shortened and signed URLs redacted; counts refer to the full response. AUDIO_FORCE_MP3=true.",
   "response": {
     "success": true,
     "platform": "twitter",
@@ -13,15 +15,29 @@
     "mediaId": "2102909714132508672",
     "canonicalUrl": "https://x.com/BenGeskin/status/2102909808542154887/video/1",
     "title": "Ben Geskin - This is exactly what I’ve been waiting for 🔥  Meta just announced its...",
-    "description": "This is exactly what I’ve been waiting for 🔥  Meta just announced its new VR Glasses. Basically an Apple Vision Pro-like experience, but ...",
+    "description": "This is exactly what I’ve been waiting for 🔥  Meta just announced its new VR Glasses. Basically an Apple Vision Pro-like experience, but MUCH smaller and light...",
     "author": {
       "name": "Ben Geskin",
       "url": "https://twitter.com/BenGeskin"
     },
-    "thumbnail": "https://pbs.twimg.com/amplify_video_thumb/2102909714132508672/img/ES0qFlpiERcNTZj-.jpg?name=orig",
+    "thumbnail": "https://pbs.twimg.com/...",
     "durationSeconds": 69.314,
     "uploadDate": "20260923",
     "formats": [
+      {
+        "formatId": "http-256",
+        "ext": "mp4",
+        "kind": "video",
+        "quality": "480x270",
+        "width": 480,
+        "height": 270,
+        "bitrate": 256,
+        "filesizeBytes": 2218048,
+        "filesizeApprox": true,
+        "url": "https://video.twimg.com/...",
+        "requiresMerge": false,
+        "compatible": false
+      },
       {
         "formatId": "hls-105",
         "ext": "mp4",
@@ -36,31 +52,19 @@
         "url": "https://video.twimg.com/amplify_video/2102909714132508672/pl/avc1/480x270/HPRhEq7Opc_KYk5M.m3u8",
         "requiresMerge": true,
         "compatible": true
-      },
-      {
-        "formatId": "http-2176",
-        "ext": "mp4",
-        "kind": "video",
-        "quality": "1280x720",
-        "width": 1280,
-        "height": 720,
-        "bitrate": 2176,
-        "filesizeBytes": 18853408,
-        "filesizeApprox": true,
-        "url": "https://video.twimg.com/amplify_video/2102909714132508672/vid/avc1/1280x720/eD2VgAMpNh9c9VQy.mp4...",
-        "requiresMerge": false,
-        "compatible": false
       }
     ],
     "audioFormats": [
       {
         "formatId": "hls-audio-32000-Audio",
-        "ext": "mp4",
+        "ext": "mp3",
         "bitrate": 32,
         "quality": "Audio, low",
-        "filesizeApprox": false,
-        "isConverted": false,
-        "url": "https://video.twimg.com/amplify_video/2102909714132508672/pl/mp4a/32000/sQDZF5shczK7C3DD.m3u8"
+        "filesizeApprox": true,
+        "isConverted": true,
+        "url": "https://video.twimg.com/amplify_video/2102909714132508672/pl/mp4a/32000/sQDZF5shczK7C3DD.m3u8",
+        "codec": "mp3",
+        "filesizeBytes": 1663536
       }
     ],
     "metadata": {
@@ -71,22 +75,22 @@
       "path": "/twitter/2102909714132508672",
       "sourceUrl": "https://x.com/BenGeskin/status/2102909808542154887/video/1",
       "status": "available",
-      "cached": false,
+      "cached": true,
       "urlsStale": false,
-      "firstFetchedAt": "2026-09-24T19:09:39.157Z",
-      "lastFetchedAt": "2026-09-24T19:09:39.157Z",
-      "validatedAt": "2026-09-24T19:09:39.157Z",
-      "nextCheckAt": "2026-10-01T19:09:39.157Z",
+      "firstFetchedAt": "2026-09-24T21:18:44.275Z",
+      "lastFetchedAt": "2026-09-29T21:14:05.913Z",
+      "validatedAt": "2026-09-29T21:14:05.913Z",
+      "nextCheckAt": "2026-10-06T21:14:05.913Z",
       "stats": {
-        "fetchCount": 1,
-        "hitCount": 0,
+        "fetchCount": 5,
+        "hitCount": 58,
         "viewCount": 0,
-        "downloadCount": 0,
-        "streamCount": 0,
-        "prepareCount": 0,
-        "bytesServed": 0,
-        "lastAccessedAt": null,
-        "lastDownloadedAt": null
+        "downloadCount": 17,
+        "streamCount": 8,
+        "prepareCount": 9,
+        "bytesServed": 77267912,
+        "lastAccessedAt": "2026-09-29T21:15:49.290Z",
+        "lastDownloadedAt": "2026-09-25T17:19:15.137Z"
       }
     }
   }
