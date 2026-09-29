@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeFormats } from '../../src/core/adapters/ytdlpNormalize';
+import { afterEach, describe, expect, it } from 'vitest';
+import { env } from '../../src/config/env';
+import { normalizeFormats, normalizeYtdlpInfo } from '../../src/core/adapters/ytdlpNormalize';
+
+const originalProxy = env.YTDLP_PROXY_URL;
+
+afterEach(() => {
+  (env as { YTDLP_PROXY_URL: string }).YTDLP_PROXY_URL = originalProxy;
+});
 
 describe('normalizeFormats', () => {
   it('separates audio-only, video-only, and combined formats', () => {
@@ -39,5 +46,23 @@ describe('normalizeFormats', () => {
     expect(formats).toHaveLength(1);
     expect(formats[0].kind).toBe('video');
     expect(formats[0].requiresMerge).toBe(false);
+  });
+
+  it('does not expose YouTube URLs that are bound to the configured proxy IP', () => {
+    (env as { YTDLP_PROXY_URL: string }).YTDLP_PROXY_URL = 'http://127.0.0.1:40128';
+    const response = normalizeYtdlpInfo(
+      {
+        id: 'abc123',
+        formats: [
+          { format_id: '18', ext: 'mp4', vcodec: 'avc1', acodec: 'mp4a', url: 'https://googlevideo.example/video' },
+          { format_id: '140', ext: 'm4a', vcodec: 'none', acodec: 'mp4a', url: 'https://googlevideo.example/audio' },
+        ],
+      },
+      'youtube',
+      'https://www.youtube.com/watch?v=abc123',
+    );
+
+    expect(response.formats[0].url).toBeUndefined();
+    expect(response.audioFormats[0].url).toBeUndefined();
   });
 });

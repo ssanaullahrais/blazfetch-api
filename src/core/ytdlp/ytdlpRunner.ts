@@ -1,3 +1,4 @@
+import { withYtdlpRuntime } from './ytdlpArgs';
 import { spawn } from 'node:child_process';
 import { lowerPriority } from '../processPriority';
 import { env } from '../../config/env';
@@ -28,7 +29,7 @@ export function runYtdlp(options: YtdlpRunOptions): Promise<YtdlpRunResult> {
   const { args, timeoutMs = env.FETCH_TIMEOUT_MS, signal, maxBufferBytes = DEFAULT_MAX_BUFFER } = options;
 
   return new Promise((resolve, reject) => {
-    const child = spawn(env.YTDLP_PATH, args, {
+    const child = spawn(env.YTDLP_PATH, withYtdlpRuntime(args), {
       shell: false,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -93,6 +94,10 @@ export function runYtdlp(options: YtdlpRunOptions): Promise<YtdlpRunResult> {
   });
 }
 
+export function youtubeBotBlockError(): BlazfetchError {
+  return new BlazfetchError('PLATFORM_RATE_LIMITED', 'YouTube is temporarily blocking requests from this server. Please try again later.', { botCheck: true });
+}
+
 export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   const lower = stderr.toLowerCase();
   if (lower.includes('private video') || lower.includes('this video is private')) {
@@ -104,7 +109,7 @@ export function classifyYtdlpFailure(stderr: string): BlazfetchError {
   if (lower.includes('not a bot')) {
     // YouTube's temporary "sign in to confirm you're not a bot" block on an IP: nothing to do with this
     // particular video, and worth backing off from rather than retrying.
-    return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.', { botCheck: true });
+    return youtubeBotBlockError();
   }
   if (lower.includes('login required') || lower.includes('sign in')) {
     return new BlazfetchError('LOGIN_REQUIRED', 'This media requires authentication.');

@@ -47,7 +47,7 @@ beforeEach(() => {
 
 describe('classifier', () => {
   it('flags the bot check so callers can back off, but not an age gate', () => {
-    expect(botCheck()).toMatchObject({ code: 'LOGIN_REQUIRED', details: { botCheck: true } });
+    expect(botCheck()).toMatchObject({ code: 'PLATFORM_RATE_LIMITED', status: 429, details: { botCheck: true } });
     const ageGate = classifyYtdlpFailure('ERROR: Sign in to confirm your age');
     expect(ageGate.code).toBe('LOGIN_REQUIRED');
     expect(ageGate.details).toBeUndefined();
@@ -95,12 +95,12 @@ describe('YouTube fetch fallback', () => {
     expect(mocks.ytdlpFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('still tries yt-dlp during the cooldown if the fallback is failing too', async () => {
+  it('respects the bot-block cooldown even when the fallback is failing too', async () => {
     mocks.ytdlpFetch.mockRejectedValueOnce(botCheck());
     await adapter.fetchMetadata(ctx);
     mocks.fallbackFetch.mockRejectedValue(new BlazfetchError('EXTRACTOR_FAILED', 'fallback down'));
-    const result = await adapter.fetchMetadata(ctx);
-    expect(result.title).toBe('From yt-dlp');
+    await expect(adapter.fetchMetadata(ctx)).rejects.toMatchObject({ code: 'PLATFORM_RATE_LIMITED', status: 429 });
+    expect(mocks.ytdlpFetch).toHaveBeenCalledTimes(1);
   });
 
   it('a plain sign-in requirement (age gate) uses the fallback but does not start a cooldown', async () => {
@@ -119,13 +119,13 @@ describe('YouTube fetch fallback', () => {
   it('reports the original yt-dlp error when the fallback fails as well', async () => {
     mocks.ytdlpFetch.mockRejectedValue(botCheck());
     mocks.fallbackFetch.mockRejectedValue(new BlazfetchError('EXTRACTOR_FAILED', 'fallback down'));
-    await expect(adapter.fetchMetadata(ctx)).rejects.toMatchObject({ code: 'LOGIN_REQUIRED' });
+    await expect(adapter.fetchMetadata(ctx)).rejects.toMatchObject({ code: 'PLATFORM_RATE_LIMITED' });
   });
 
   it('can be turned off with YOUTUBE_FALLBACK_ENABLED=false', async () => {
     (env as { YOUTUBE_FALLBACK_ENABLED: boolean }).YOUTUBE_FALLBACK_ENABLED = false;
     mocks.ytdlpFetch.mockRejectedValue(botCheck());
-    await expect(adapter.fetchMetadata(ctx)).rejects.toMatchObject({ code: 'LOGIN_REQUIRED' });
+    await expect(adapter.fetchMetadata(ctx)).rejects.toMatchObject({ code: 'PLATFORM_RATE_LIMITED' });
     expect(mocks.fallbackFetch).not.toHaveBeenCalled();
   });
 });
@@ -154,6 +154,14 @@ describe('YouTube download fallback', () => {
     expect(mocks.ytdlpDownload).not.toHaveBeenCalled(); // cooldown: straight to the fallback
   });
 
+  it('does not retry blocked downloads when the fallback fails during cooldown', async () => {
+    mocks.ytdlpDownload.mockRejectedValue(botCheck());
+    await adapter.download(ctx, target('18'));
+    mocks.fallbackFetch.mockRejectedValue(new BlazfetchError('EXTRACTOR_FAILED', 'fallback down'));
+    await expect(adapter.download(ctx, target('18'))).rejects.toMatchObject({ code: 'PLATFORM_RATE_LIMITED', status: 429 });
+    expect(mocks.ytdlpDownload).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps using yt-dlp when it works', async () => {
     mocks.ytdlpDownload.mockResolvedValue({ filePath: '/tmp/x.mp4', filename: 'x.mp4', mimeType: 'video/mp4', bytes: 1 });
     const result = await adapter.download(ctx, target('18'));
@@ -164,6 +172,6 @@ describe('YouTube download fallback', () => {
   it('rethrows the yt-dlp error when the fallback cannot help', async () => {
     mocks.ytdlpDownload.mockRejectedValue(botCheck());
     mocks.fallbackFetch.mockRejectedValue(new BlazfetchError('EXTRACTOR_FAILED', 'fallback down'));
-    await expect(adapter.download(ctx, target('18'))).rejects.toMatchObject({ code: 'LOGIN_REQUIRED' });
+    await expect(adapter.download(ctx, target('18'))).rejects.toMatchObject({ code: 'PLATFORM_RATE_LIMITED' });
   });
 });

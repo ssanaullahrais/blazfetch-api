@@ -93,6 +93,7 @@ describe('spawnYtdlpToStdout', () => {
     spawnYtdlpToStdout({ url: 'https://example.com/v', formatSelector: '18' }).stream.on('error', () => undefined);
     const call = vi.mocked(spawn).mock.calls.at(-1)!;
     expect(call[1]).toEqual(expect.arrayContaining(['-o', '-', '--no-part', '--no-playlist']));
+    expect(call[1]).toEqual(expect.arrayContaining(['--js-runtimes', `node:${process.execPath}`, '--remote-components', 'ejs:github']));
     expect(call[2]).toMatchObject({ shell: false });
   });
 });

@@ -1,3 +1,4 @@
+import { withYtdlpRuntime } from './ytdlpArgs';
 import { spawn } from 'node:child_process';
 import { lowerPriority } from '../processPriority';
 import path from 'node:path';
@@ -132,7 +133,7 @@ async function runYtdlpDownload(options: YtdlpDownloadOptions, preferFfmpegHls: 
   ];
 
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(env.YTDLP_PATH, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], ...processGroupOptions });
+    const child = spawn(env.YTDLP_PATH, withYtdlpRuntime(args), { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], ...processGroupOptions });
     lowerPriority(child);
 
     let stderr = '';

@@ -1,3 +1,4 @@
+import { ffmpegProxyEnvironment, withYtdlpRuntime } from './ytdlpArgs';
 import { spawn } from 'node:child_process';
 import { lowerPriority } from '../processPriority';
 import { PassThrough, Readable } from 'node:stream';
@@ -53,9 +54,10 @@ function spawnToStream(
   signal: AbortSignal | undefined,
   classify: (stderr: string) => BlazfetchError,
   label: string,
+  spawnEnv?: NodeJS.ProcessEnv,
 ): StreamSource {
   const out = new PassThrough();
-  const child = spawn(command, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], ...processGroupOptions });
+  const child = spawn(command, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: spawnEnv, ...processGroupOptions });
   lowerPriority(child);
   if (child.pid !== undefined) activeChildren.add(child.pid);
 
@@ -110,7 +112,7 @@ export function spawnYtdlpToStdout(options: { url: string; formatSelector: strin
     '--quiet',
     options.url,
   ];
-  return spawnToStream(env.YTDLP_PATH, args, options.signal, classifyYtdlpFailure, 'yt-dlp');
+  return spawnToStream(env.YTDLP_PATH, withYtdlpRuntime(args), options.signal, classifyYtdlpFailure, 'yt-dlp');
 }
 
 /**
@@ -203,6 +205,7 @@ export function spawnFfmpegToStdout(options: { inputs: ResolvedInput[]; mode: Ff
     options.signal,
     () => new BlazfetchError('DOWNLOAD_FAILED', 'ffmpeg failed to process the stream.'),
     'ffmpeg',
+    ffmpegProxyEnvironment(),
   );
 }
 
@@ -220,6 +223,9 @@ function isSegmented(input: ResolvedInput): boolean {
  * ranged chunks instead of one long request that hosts like YouTube throttle to playback speed.
  */
 export async function spawnFfmpegRelayed(options: { inputs: ResolvedInput[]; mode: FfmpegMode; signal?: AbortSignal }): Promise<StreamSource> {
+  // Direct media URLs produced through a proxy can be bound to that proxy's public IP.
+  // Let ffmpeg use the same proxy rather than fetching those URLs through the local ranged relay.
+  if (env.YTDLP_PROXY_URL) return spawnFfmpegToStdout(options);
   const relays = await Promise.all(options.inputs.map((input) => (isSegmented(input) ? undefined : relayUrl(input.url, input.headers))));
   const release = (): void => relays.forEach((relay) => relay?.release());
   const inputs = options.inputs.map((input, index) => {

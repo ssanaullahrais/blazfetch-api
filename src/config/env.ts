@@ -28,6 +28,12 @@ const envSchema = z.object({
   DATABASE_SQLITE_PATH: z.string().default('./data/blazfetch.sqlite3'),
 
   YTDLP_PATH: z.string().default('yt-dlp'),
+  // Permit yt-dlp to obtain its official JavaScript challenge solver when not bundled.
+  YTDLP_REMOTE_EJS_ENABLED: boolFromString(true),
+  // Optional outbound proxy for yt-dlp and ffmpeg media requests. This is useful when a
+  // datacenter IP is temporarily blocked by a source platform. Keep the proxy on loopback
+  // or otherwise protect it; credentials may be included in the URL and are never logged.
+  YTDLP_PROXY_URL: z.union([z.literal(''), z.string().url()]).default(''),
   FFMPEG_PATH: z.string().default('ffmpeg'),
   FFPROBE_PATH: z.string().default('ffprobe'),
 

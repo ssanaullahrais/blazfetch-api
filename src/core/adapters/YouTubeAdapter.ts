@@ -3,7 +3,7 @@ import { BlazfetchError } from '../../constants/errors';
 import { logger } from '../../lib/logger';
 import { fetchYoutubeViaBtch } from '../fallback/youtube/btchYoutube';
 import { assertUrlIsSafeToFetch, NormalizedUrlResult } from '../../utils/url';
-import { classifyYtdlpFailure, runYtdlp } from '../ytdlp/ytdlpRunner';
+import { classifyYtdlpFailure, runYtdlp, youtubeBotBlockError } from '../ytdlp/ytdlpRunner';
 import { GenericYtDlpAdapter } from './GenericYtDlpAdapter';
 import { AdapterFetchContext, DownloadResult, DownloadTarget, PlatformAdapter } from './types';
 import { BlazfetchPlaylistItem, BlazfetchResponse } from '../../types/blazfetch';
@@ -78,7 +78,8 @@ export class YouTubeAdapter implements PlatformAdapter {
       try {
         return await this.fetchViaFallback(ctx);
       } catch (fallbackErr) {
-        logger.warn({ requestId: ctx.requestId, err: (fallbackErr as Error).message }, 'YouTube fallback failed during cooldown, trying yt-dlp anyway');
+        logger.warn({ requestId: ctx.requestId, err: (fallbackErr as Error).message }, 'YouTube fallback failed during cooldown');
+        throw youtubeBotBlockError();
       }
     }
 
@@ -195,7 +196,8 @@ export class YouTubeAdapter implements PlatformAdapter {
       try {
         return await this.fallbackDownload(ctx, target);
       } catch (fallbackErr) {
-        logger.warn({ requestId: ctx.requestId, err: (fallbackErr as Error).message }, 'YouTube fallback download failed during cooldown, trying yt-dlp anyway');
+        logger.warn({ requestId: ctx.requestId, err: (fallbackErr as Error).message }, 'YouTube fallback download failed during cooldown');
+        throw youtubeBotBlockError();
       }
     }
 

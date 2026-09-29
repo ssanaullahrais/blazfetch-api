@@ -1,4 +1,5 @@
 import { PlatformId } from '../../constants/platforms';
+import { env } from '../../config/env';
 import { BlazfetchAudioFormat, BlazfetchFormat, BlazfetchResponse, MediaType } from '../../types/blazfetch';
 
 /** Minimal shape of yt-dlp's `-J` output that we actually consume. Never exposed to the client directly. */
@@ -121,7 +122,14 @@ export function normalizeYtdlpInfo(
   canonicalUrl: string,
   extractor = 'yt-dlp',
 ): BlazfetchResponse {
-  const { formats, audioFormats } = normalizeFormats(info.formats ?? []);
+  let { formats, audioFormats } = normalizeFormats(info.formats ?? []);
+  // YouTube media URLs extracted through a proxy are normally bound to the proxy's public IP.
+  // Do not expose/cache them as direct fast paths: downloads must go back through yt-dlp/ffmpeg,
+  // which are configured to use that same proxy.
+  if (platform === 'youtube' && env.YTDLP_PROXY_URL) {
+    formats = formats.map(({ url: _url, ...format }) => format);
+    audioFormats = audioFormats.map(({ url: _url, ...format }) => format);
+  }
   const mediaType: MediaType = 'video';
 
   return {
