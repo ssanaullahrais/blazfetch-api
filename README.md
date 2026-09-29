@@ -37,6 +37,16 @@ remember each link's details, such as title and formats, so repeat requests are 
 
 <div align="center">
 
+### 🚀 Live Demo
+
+[![Open BlazFetch](https://img.shields.io/badge/🌐_Launch_BlazFetch-social.blaztools.com-0A0A0A?style=for-the-badge)](https://social.blaztools.com)
+
+**[social.blaztools.com](https://social.blaztools.com)**
+
+</div>
+
+<div align="center">
+
 <a href="docs/media/demo.mp4"><img src="docs/media/demo.gif" alt="BlazFetch demo: paste a link, pick a quality, download" width="760" /></a>
 
 <sub>Click the animation to open the full video ([demo.mp4](docs/media/demo.mp4)).</sub>
